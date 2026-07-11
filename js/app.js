@@ -114,10 +114,14 @@ function renderGoal(){
 function healthScore(){
   const rs=rows('all'), t=totals('all'), inv=Math.max(1,t.value-cashFor('all'));
   const metrics=[];
-  // 1. Diversification — penalize concentration in largest single holding
-  const top=Math.max(0,...rs.map(r=>r.qty*priceOf(r.sym)/inv));
-  const divScore=Math.max(0,Math.min(100, 100-(top-0.25)*220));
-  metrics.push({k:'Diversification', v:divScore, detail:`Largest holding ${(top*100).toFixed(0)}%`, tip: top>0.30?`Your largest position is ${(top*100).toFixed(0)}% of the portfolio — concentration adds single-name risk.`:null});
+  // 1. Diversification — broad index funds ARE diversification; only single companies count as concentration
+  const DIVERSIFIED=new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']); // BRK.B = diversified conglomerate, not a single-product bet
+  const singles=rs.filter(r=>!DIVERSIFIED.has(r.sym)).map(r=>({sym:r.sym, w:r.qty*priceOf(r.sym)/inv})).sort((a,b)=>b.w-a.w);
+  const top=singles.length?singles[0].w:0;
+  const divScore=Math.max(0,Math.min(100, 100-(top-0.10)*250));
+  metrics.push({k:'Diversification', v:divScore,
+    detail: top>0?`Biggest single stock ${(top*100).toFixed(0)}%`:'No concentrated bets',
+    tip: top>0.15?`${singles[0].sym.replace('-','.')} alone is ${(top*100).toFixed(0)}% of the portfolio — index funds can't protect you from one company's bad decade.`:null});
   // 2. Global exposure — reward international 20-45%
   const intl=rs.filter(r=>r.sym==='VXUS').reduce((a,r)=>a+r.qty*priceOf(r.sym),0)/inv;
   const gScore=intl<0.05?35:intl<0.15?70:intl<=0.45?100:80;

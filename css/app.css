@@ -442,3 +442,13 @@ body:not(.locked) #lockScreen{display:none}
 .lockbox .btn{width:100%;margin-bottom:10px}
 .locknote{color:var(--faint);font-size:11.5px;line-height:1.6;margin-top:4px}
 .lockerr{color:var(--red);font-size:12.5px;min-height:18px;margin-top:8px;font-weight:600}
+
+/* ---------- universal scrub readout + coach ---------- */
+.scrubro{min-height:16px;font-size:11.5px;color:var(--mut);font-weight:600;margin-top:6px;
+  font-variant-numeric:tabular-nums;line-height:1.5}
+.scrubro b{color:var(--tx)}
+.cmv{display:flex;gap:13px;padding:14px 16px;border-bottom:1px solid var(--line);align-items:flex-start}
+.cmv:last-of-type{border-bottom:none}
+.cmv .ci{font-size:20px;flex-shrink:0;line-height:1.3}
+.cmv .ct{font-weight:700;font-size:13.5px}
+.cmv .cb{color:var(--mut);font-size:12.5px;margin-top:3px;line-height:1.55;font-weight:500}

@@ -90,14 +90,19 @@ function renderDrawdown(){
     labels.push(s.labels[k]); dd.push((v/peak-1)*100);
   }
   const cur=dd[dd.length-1], worst=Math.min(...dd);
-  $('ddStat').innerHTML=`Worst this year <b class="neg">${worst.toFixed(1)}%</b> · now <b class="${cur<-0.05?'neg':'pos'}">${cur<-0.05?cur.toFixed(1)+'%':'at the peak'}</b>`;
-  new Chart(el,{type:'line',data:{labels,datasets:[{data:dd,borderColor:cvar('--red'),
+  const ddBase=`Worst this year <b class="neg">${worst.toFixed(1)}%</b> · now <b class="${cur<-0.05?'neg':'pos'}">${cur<-0.05?cur.toFixed(1)+'%':'at the peak'}</b>`;
+  $('ddStat').innerHTML=ddBase;
+  const ddChart=new Chart(el,{type:'line',data:{labels,datasets:[{data:dd,borderColor:cvar('--red'),
       backgroundColor:`rgba(${cvar('--red-rgb')},.13)`,fill:true,pointRadius:0,borderWidth:1.6,tension:.25}]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,titleColor:cvar('--mut'),bodyColor:cvar('--tx'),displayColors:false,
         callbacks:{label:c=>c.parsed.y<-0.05?c.parsed.y.toFixed(1)+'% below peak':'At the peak'}}},
       scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,maxRotation:0,font:{size:10},callback:function(v){return this.getLabelForValue(v).slice(5);}}},
               y:{max:0,grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:4,font:{size:10},callback:v=>v+'%'}}}}});
+  attachScrubAny(ddChart, i=>{
+    $('ddStat').innerHTML = i==null ? ddBase :
+      `${niceLbl(labels[i])} · <b class="${dd[i]<-0.05?'neg':'pos'}">${dd[i]<-0.05?dd[i].toFixed(1)+'% below peak':'at the peak'}</b>`;
+  });
 }
 function renderPECard(){
   const rs=rows('all'); let wsum=0, earn=0;
@@ -164,12 +169,14 @@ function renderWorthChart(){
     }
   }
   const shown=ds.filter(d=>d.data.some(v=>v>0));
-  new Chart(el,{type:'line',data:{labels:days,datasets:shown},
+  const worthChart=new Chart(el,{type:'line',data:{labels:days,datasets:shown},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,titleColor:cvar('--mut'),bodyColor:cvar('--tx'),displayColors:false,callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,maxRotation:0,font:{size:10},callback:function(v){return this.getLabelForValue(v).slice(5);}}},
               y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},callback:v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}}}});
   $('worthLegend').innerHTML=shown.map(d=>`<div class="alg"><span class="dot" style="background:${d.borderColor}"></span>${d.label}</div>`).join('');
+  attachScrubAny(worthChart, i=>{ const ro=$('worthRO'); if(!ro) return;
+    ro.textContent = i==null ? '' : `${niceLbl(days[i])} · `+shown.map(d=>`${d.label} ${cfmt(d.data[i])}`).join(' · '); });
 }
 function openPESheet(){
   const rs=rows('all');
@@ -285,7 +292,14 @@ function renderPerf(){
     const t=document.querySelector(`#rangeSeg button[data-r="${tr.dataset.r}"]`); if(t) t.click();
   });
 }
-function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); }
+function ensureChartsSized(){ // charts created mid page-transition can get stamped width:0 — heal them
+  ['ddChart','projChart','worthChart','contribChart'].forEach(id=>{
+    const el=$(id); if(!el||!window.Chart) return;
+    const c=Chart.getChart(el);
+    if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
+  });
+}
+function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */
 function renderTaxCard(){
@@ -372,7 +386,7 @@ function renderContribChart(){
   const cum=[]; let running=0; for(const v of data){ running+=v; cum.push(running); } // all-time running total
   const show=labels.slice(-24), sdata=data.slice(-24), scum=cum.slice(-24);
   const compact=v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
-  new Chart(el,{data:{labels:show,datasets:[
+  const contribChart=new Chart(el,{data:{labels:show,datasets:[
       {type:'bar',label:'That month',data:sdata,backgroundColor:cvar('--brand'),borderRadius:3,yAxisID:'y'},
       {type:'line',label:'Total deposited',data:scum,borderColor:CAT[3],borderWidth:1.8,pointRadius:0,pointHoverRadius:3,tension:.25,yAxisID:'y1'}]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
@@ -380,4 +394,105 @@ function renderContribChart(){
       scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:6,maxRotation:0,font:{size:9},callback:function(v){const l=this.getLabelForValue(v);return l.slice(5)==='01'?l.slice(0,4):l.slice(5);}}},
               y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:4,font:{size:9},callback:compact}},
               y1:{position:'right',grid:{display:false},border:{display:false},ticks:{color:CAT[3],maxTicksLimit:4,font:{size:9},callback:compact}}}}});
+  attachScrubAny(contribChart, i=>{ const ro=$('contribRO'); if(!ro) return;
+    ro.textContent = i==null ? '' : `${show[i]} · ${fmt(sdata[i])} added · ${fmt(scum[i])} deposited in total`; });
 }
+
+/* ============ LOOKING AHEAD (coach + projection) ============ */
+function cfmt(v){ return state.view.priv?'••••':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact',maximumFractionDigits:1}).format(v*rate()); }
+function contribPace(){ // months of history + $/month pace from real buys
+  const buys=state.lots.filter(l=>!l.div);
+  const months=buys.length?Math.max(1,(Date.now()-new Date(buys.map(l=>l.date).sort()[0]).getTime())/2629800000):12;
+  return { pmt: buys.reduce((a,l)=>a+l.cost,0)/months, buys };
+}
+function coachItems(){ // rules-based nudges computed from YOUR data — guidance, not advice
+  const items=[];
+  const t=totals('all'), rs=rows('all');
+  const cash=cashFor('all'), cashPct=cash/Math.max(1,t.value);
+  const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.12):0.07;
+  if(cashPct>0.05) items.push({ic:'⚡', t:'Put idle cash to work',
+    b:`${fmt(cash)} (${(cashPct*100).toFixed(0)}% of the portfolio) is uninvested. At your ~${(r*100).toFixed(0)}%/yr pace that's ≈${fmt(cash*r)} of growth per year sitting out.`});
+  // single-company weight (index funds are already diversified)
+  const DIV=new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']); // BRK.B = diversified conglomerate
+  const singles=rs.filter(x=>!DIV.has(x.sym)).map(x=>({sym:x.sym, w:x.qty*priceOf(x.sym)/Math.max(1,t.value)})).sort((a,b)=>b.w-a.w);
+  if(singles.length && singles[0].w>0.15) items.push({ic:'⚖️', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
+    b:`${(singles[0].w*100).toFixed(0)}% of everything rides on one company. Steering new contributions to your index funds dilutes that gradually — no selling, no taxes.`});
+  // all-equity note
+  if(!rs.some(x=>['BND','BNDX','AGG','BSV'].includes(x.sym))){
+    const rk=riskStats();
+    items.push({ic:'🛡️', t:'100% stocks — know the ride',
+      b:`Maximum long-run growth, but your worst drop so far was ${rk?rk.mdd.toFixed(0):'-'}%${rk?'':''}. Fine for a long horizon; if a big goal is under ~5 years away, a slice of bonds (BND) softens the swings.`});
+  }
+  // tax lots turning long-term soon
+  const YR=31557600000, now=Date.now();
+  const turning=state.lots.map(l=>({sym:l.sym, g:l.qty*priceOf(l.sym)-l.cost, at:new Date(l.date+'T12:00:00').getTime()+YR}))
+    .filter(x=>x.at>now && x.at<now+45*86400e3 && x.g>25).sort((a,b)=>a.at-b.at);
+  if(turning.length){
+    const x=turning[0], d=new Date(x.at).toLocaleDateString([],{month:'short',day:'numeric'});
+    items.push({ic:'🧾', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
+      b:`A lot with ${fmtSign(x.g)} of gain turns long-term on ${d} — before that, the gain would be taxed at the higher short-term rate.`});
+  }
+  // contribution cadence
+  const {pmt, buys}=contribPace();
+  const lastBuy=buys.map(l=>l.date).sort().pop();
+  if(lastBuy){
+    const days=Math.floor((now-new Date(lastBuy+'T12:00:00').getTime())/86400e3);
+    if(days>40) items.push({ic:'🔁', t:'Keep the contribution streak',
+      b:`Last buy was ${days} days ago. The projections below assume your ${fmt(pmt)}/mo pace continues — consistency is the whole engine.`});
+  }
+  if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', t:'Set a goal',
+    b:'Give the money a number. A target unlocks the progress ring and a projected finish date on the Portfolio tab.'});
+  return items.slice(0,4);
+}
+function renderCoach(){
+  if(!$('coachBody')) return;
+  const items=coachItems();
+  $('coachBody').innerHTML=(items.length?items.map(x=>
+    `<div class="cmv"><span class="ci">${x.ic}</span><div><div class="ct">${x.t}</div><div class="cb">${x.b}</div></div></div>`).join('')
+    :'<div class="mload" style="padding:18px">Nothing needs your attention — the portfolio is running clean.</div>')
+    +'<div class="inc-note" style="padding:10px 16px 14px">Rules-based nudges computed from your own numbers · guidance, not financial advice.</div>';
+}
+let projYears=10;
+function renderProjection(){
+  const el=$('projChart'); if(!el||!window.Chart) return;
+  const o=Chart.getChart(el); if(o) o.destroy();
+  const V0=totals('all').value;
+  const {pmt}=contribPace();
+  const scen=[['Cautious 4%',0.04],['Average 7%',0.07],['Strong 10%',0.10]];
+  const N=projYears*12, y0=new Date().getFullYear();
+  const labels=[], data=scen.map(()=>[]);
+  for(let m=0;m<=N;m++){
+    labels.push(m);
+    scen.forEach((sc,s)=>{ const rm=Math.pow(1+sc[1],1/12)-1;
+      data[s].push(m ? data[s][m-1]*(1+rm)+pmt : V0); });
+  }
+  const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
+  const ds=[
+    {label:scen[0][0], data:data[0], borderColor:cvar('--faint'), borderDash:[4,4], borderWidth:1.3, pointRadius:0, fill:false, tension:.15},
+    {label:scen[2][0], data:data[2], borderColor:cvar('--faint'), borderDash:[4,4], borderWidth:1.3, pointRadius:0,
+     fill:{target:0}, backgroundColor:`rgba(${cvar('--green-rgb')},.07)`, tension:.15},
+    {label:scen[1][0], data:data[1], borderColor:cvar('--brand'), borderWidth:2.2, pointRadius:0, fill:false, tension:.15}
+  ];
+  if(goal && goal<data[2][N]*1.4) ds.push({label:'Goal', data:labels.map(()=>goal), borderColor:'#fab219', borderDash:[6,5], borderWidth:1.2, pointRadius:0, fill:false});
+  const projChart=new Chart(el,{type:'line',data:{labels,datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:Math.min(projYears,8)+1,maxRotation:0,font:{size:9.5},
+                 callback:v=>v%12===0?String(y0+v/12):''}},
+              y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},
+                 callback:v=>state.view.priv?'':cfmt(v)}}}}});
+  const ro=$('projRO');
+  const base=`In ${projYears} years: <b>${fmt(data[1][N])}</b> at 7%/yr <span style="color:var(--faint)">(range ${cfmt(data[0][N])} – ${cfmt(data[2][N])})</span>`;
+  ro.innerHTML=base;
+  attachScrubAny(projChart, i=>{
+    if(i==null){ ro.innerHTML=base; return; }
+    const yr=y0+Math.floor(i/12), mo=i%12;
+    ro.innerHTML=`${yr}${mo?` +${mo}mo`:''} · <b>${fmt(data[1][i])}</b> avg <span style="color:var(--faint)">(${cfmt(data[0][i])} – ${cfmt(data[2][i])})</span>`;
+  });
+  $('projNote').textContent=`Assumes your real ${fmt(pmt)}/mo contribution pace continues, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ${goal?'Gold dashed line = your goal. ':''}Not advice.`;
+}
+if($('projSeg')) $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{
+  projYears=+b.dataset.y;
+  $('projSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  renderProjection();
+});

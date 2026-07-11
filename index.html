@@ -112,7 +112,7 @@
 
   <section class="card" id="goalCard"><div class="card-title">Goal</div><div id="goalBody"></div></section>
 
-  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v9.0</div>
+  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v9.1</div>
 </div><!-- /page-portfolio -->
 
 <!-- ================= NEWS ================= -->
@@ -175,6 +175,19 @@
     <div class="icard" id="peCard"><div class="it">Portfolio P/E</div></div>
   </div>
 
+  <div class="eyebrow">Looking ahead</div>
+  <h2>Your Next Moves</h2>
+  <section class="card" id="coachCard"><div id="coachBody"></div></section>
+  <div class="igrid">
+    <div class="icard wide" id="projCard">
+      <div class="it" style="display:flex;justify-content:space-between;align-items:center">Where This Is Headed
+        <span class="seg mini" id="projSeg"><button data-y="5">5y</button><button data-y="10" class="on">10y</button><button data-y="20">20y</button></span></div>
+      <div class="scrubro" id="projRO"></div>
+      <div style="position:relative;height:190px;margin-top:10px"><canvas id="projChart"></canvas></div>
+      <div class="estnote" id="projNote"></div>
+    </div>
+  </div>
+
   <div class="eyebrow">What you own</div>
   <h2>Under the hood</h2>
   <section class="card"><div class="card-title">Stocks you secretly own</div><div id="lookList" style="margin-top:6px"></div></section>
@@ -182,7 +195,7 @@
   <div class="igrid">
     <div class="icard wide" id="locCard"><div class="it">Where Your Money Lives <span class="chev">›</span></div><div class="sbar" id="locBar"></div><div class="dlegend" id="locLegend"></div></div>
     <div class="icard wide" id="sectorCard"><div class="it">Sectors <span class="chev">›</span></div><div id="sectorBars"></div></div>
-    <div class="icard wide"><div class="it">Asset Worth · 1Y</div><div style="position:relative;height:190px"><canvas id="worthChart"></canvas></div><div class="dlegend" id="worthLegend" style="display:flex;gap:14px;flex-wrap:wrap"></div></div>
+    <div class="icard wide"><div class="it">Asset Worth · 1Y</div><div class="scrubro" id="worthRO"></div><div style="position:relative;height:190px;margin-top:6px"><canvas id="worthChart"></canvas></div><div class="dlegend" id="worthLegend" style="display:flex;gap:14px;flex-wrap:wrap"></div></div>
   </div>
 
   <div class="eyebrow">Dive deeper</div>
@@ -191,7 +204,7 @@
     <div class="estnote" style="padding:0 6px">Realized = profit from sells. Unrealized = paper profit on what you still hold.</div></section>
   <div class="igrid">
     <div class="icard wide" id="taxCard"><div class="it">Tax Lots</div></div>
-    <div class="icard wide"><div class="it">Contributions</div><div style="position:relative;height:150px"><canvas id="contribChart"></canvas></div></div>
+    <div class="icard wide"><div class="it">Contributions</div><div class="scrubro" id="contribRO"></div><div style="position:relative;height:150px;margin-top:6px"><canvas id="contribChart"></canvas></div></div>
   </div>
   <div class="foot">P/E and fee figures are estimates from published fund data · Risk computed from your real price history · Not financial advice.</div>
 </div><!-- /page-insights -->

@@ -135,7 +135,7 @@ function renderIncome(){
   if(fwd>0){
     const yld=t.value>0?fwd/t.value*100:0;
     html += `<div class="inc-total">${fmt(fwd)}<span> projected next 12 mo · ~${yld.toFixed(2)}% yield</span></div>`;
-    if(window.Chart && Object.keys(byMonth).length) html += `<div style="position:relative;height:110px;margin:4px 0 10px"><canvas id="divCal"></canvas></div>`;
+    if(window.Chart && Object.keys(byMonth).length) html += `<div class="scrubro" id="divRO"></div><div style="position:relative;height:110px;margin:2px 0 10px"><canvas id="divCal"></canvas></div>`;
     html += upcoming.slice(0,4).map(u=>`<div class="inc-row"><span>≈ ${new Date(u.when).toLocaleDateString([],{month:'short',day:'numeric'})} · ${esc(u.sym.replace('-','.'))}</span><span>~${fmt(u.est)}</span></div>`).join('');
   } else { html += `<div style="color:var(--mut);font-size:12px">Income forecast loads with the next online update.</div>`; }
   if(rl.length){
@@ -157,11 +157,13 @@ function renderIncome(){
       const k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');
       labels.push(dt.toLocaleDateString([],{month:'short'})); data.push(byMonth[k]||0);
     }
-    new Chart(cal,{type:'bar',data:{labels,datasets:[{data,backgroundColor:cvar('--brand'),borderRadius:3}]},
+    const calChart=new Chart(cal,{type:'bar',data:{labels,datasets:[{data,backgroundColor:cvar('--brand'),borderRadius:3}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
         tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,bodyColor:cvar('--tx'),displayColors:false,callbacks:{label:c=>'~'+fmt(c.parsed.y)}}},
         scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),font:{size:9},maxRotation:0,autoSkip:false}},
                 y:{display:false}}}});
+    attachScrubAny(calChart, i=>{ const ro=$('divRO'); if(!ro) return;
+      ro.textContent = i==null ? '' : `${labels[i]} · ~${fmt(data[i])} expected`; });
   }
   ensureDivs();
 }
@@ -287,6 +289,67 @@ function buildIntradaySeries(acc){ // 1D view: portfolio value per 5-min bar, cu
   return {labels,value,profit};
 }
 let mainChart=null, chartBaseV=0; // portfolio value at range start — % base for the profit metric
+/* --- universal scrubbing: drag ANY chart to read exact values at a point in time --- */
+const scrubLine = { id:'scrubLine',
+  afterDatasetsDraw(c){
+    if(c._scrub==null) return;
+    if(c.config.plugins && c.config.plugins.length) return; // the hero chart draws its own scrub
+    if(!c.chartArea) return;
+    const g=c.ctx, i=c._scrub;
+    let x=null; const dots=[];
+    c.data.datasets.forEach((ds,k)=>{
+      const m=c.getDatasetMeta(k); if(m.hidden) return;
+      const p=m.data[i]; if(!p) return;
+      if(x==null) x=p.x;
+      dots.push([p, typeof ds.borderColor==='string'?ds.borderColor:(typeof ds.backgroundColor==='string'?ds.backgroundColor:cvar('--brand'))]);
+    });
+    if(x==null) return;
+    g.save();
+    g.strokeStyle=cvar('--faint'); g.lineWidth=1; g.setLineDash([3,3]);
+    g.beginPath(); g.moveTo(x,c.chartArea.top); g.lineTo(x,c.chartArea.bottom); g.stroke(); g.setLineDash([]);
+    for(const [p,col] of dots){
+      g.fillStyle=col; g.beginPath(); g.arc(p.x,p.y,3.5,0,7); g.fill();
+      g.strokeStyle=cvar('--card'); g.lineWidth=1.5; g.stroke();
+    }
+    g.restore();
+  }};
+if(window.Chart) Chart.register(scrubLine);
+function attachScrubAny(c, onMove){ // onMove(i) with index, onMove(null) when released
+  const el=c.canvas;
+  el.style.touchAction='pan-y'; // horizontal drag scrubs, vertical swipe still scrolls the page
+  const idx=e=>{
+    const r=el.getBoundingClientRect(), x=e.clientX-r.left;
+    const n=(c.data.labels||[]).length; if(n<2||!c.chartArea) return 0;
+    const {left,right}=c.chartArea;
+    if(!(right-left>2)) return 0; // chart not laid out yet
+    const t=Math.min(1,Math.max(0,(x-left)/(right-left)));
+    return Math.round(t*(n-1));
+  };
+  const move=e=>{ const i=idx(e); if(i===c._scrub) return; c._scrub=i; c.update('none'); onMove(i); };
+  el.onpointerdown=e=>{
+    try{ el.setPointerCapture(e.pointerId); }catch(x){}
+    if(c.chartArea && !(c.chartArea.right-c.chartArea.left>2)){ try{ c.resize(); }catch(x){} } // throttled layouts
+    if(c.options.plugins.tooltip){ c._ttWas=c.options.plugins.tooltip.enabled!==false; c.options.plugins.tooltip.enabled=false; }
+    c._scrubbing=true; move(e);
+  };
+  el.onpointermove=e=>{ if(c._scrubbing) move(e); };
+  el.onpointerup=el.onpointercancel=()=>{
+    if(!c._scrubbing) return;
+    c._scrubbing=false; c._scrub=null;
+    if(c.options.plugins.tooltip && c._ttWas!==undefined) c.options.plugins.tooltip.enabled=c._ttWas;
+    c.update('none'); onMove(null);
+  };
+}
+function niceLbl(l){ return /^\d{4}-\d{2}-\d{2}$/.test(l) ? new Date(l+'T12:00:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : l; }
+function wireDetailScrub(c, labels, closes, roId){ // price readout for holding/stock sheets
+  const ro=$(roId); if(!ro||!c) return;
+  const hint=ro.textContent;
+  attachScrubAny(c, i=>{
+    if(i==null){ ro.textContent=hint; return; }
+    const v=closes[i], d0=closes[0];
+    ro.textContent=`${niceLbl(labels[i])} · ${fmtPx(v)}${d0>0?` · ${fmtPct((v/d0-1)*100)} over range`:''}`;
+  });
+}
 const heroFx = { id:'heroFx',
   beforeDatasetsDraw(c){ const g=c.ctx; g.save();
     g.shadowColor=`rgba(${c._up!==false?cvar('--green-rgb'):cvar('--red-rgb')},.30)`; g.shadowBlur=16; g.shadowOffsetY=7; },
@@ -454,6 +517,7 @@ function openDetail(sym){
       <div style="font-size:26px;font-weight:700;margin-top:8px">${fmtPx(p)} <span style="font-size:14px" class="${cls(dp)}">${fmtPct(dp)} today</span></div>
     </div><button class="xbtn" id="detailX">✕</button></div>
     <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px"></div></div>
+    <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats">
       <div class="stat"><div class="k">Shares</div><div class="v">${r.qty.toFixed(3).replace(/\.?0+$/,'')}</div></div>
       <div class="stat"><div class="k">Avg cost</div><div class="v">${fmtPx(r.cost/r.qty)}</div></div>
@@ -485,6 +549,7 @@ function openDetail(sym){
     const labels=[], closes=[];
     for(let i=0;i<ih.t.length;i++) if(ih.c[i]!=null){ labels.push(new Date(ih.t[i]).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); closes.push(ih.c[i]); }
     detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
+    wireDetailScrub(detailChart, labels, closes, 'detailRO');
   } else if(h && h.t && h.t.length>1){
     const cut=rangeCutoff(state.view.range==='1D' ? '1W' : state.view.range);
     const labels=[], closes=[];
@@ -492,6 +557,7 @@ function openDetail(sym){
     const today=dayStr(Date.now());
     if(labels.length && labels[labels.length-1]===today) closes[closes.length-1]=p; else { labels.push(today); closes.push(p); }
     detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
+    wireDetailScrub(detailChart, labels, closes, 'detailRO');
   } else if($('detailMsg')) $('detailMsg').textContent='Price chart appears after the first online update.';
 }
 function closeDetail(){ $('detail').classList.add('hidden'); if(detailChart){ detailChart.destroy(); detailChart=null; } }

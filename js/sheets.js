@@ -52,6 +52,7 @@ async function openStockSheet(sym, name){
       <div id="ssPrice" style="font-size:26px;font-weight:700;margin-top:8px">${q?fmtP(q.price):'…'}</div>
     </div><div style="display:flex;gap:8px;align-items:flex-start"><button class="xbtn" id="watchBtn" style="font-size:17px"></button><button class="xbtn" id="detailX">✕</button></div></div>
     <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px">Loading chart…</div></div>
+    <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats" id="ssStats"></div>
     <div id="sheetNews" data-sym="${esc(sym)}"></div>`;
   $('detail').classList.remove('hidden');
@@ -80,6 +81,7 @@ async function openStockSheet(sym, name){
     const closes=d.c, labels=d.t.map(dayStr);
     $('ssPrice').innerHTML = `${fmtP(d.price)} <span style="font-size:14px" class="${cls(d.price-d.prev)}">${fmtPct(d.prev>0?(d.price/d.prev-1)*100:0)} today</span>`;
     detailChart=drawChart('detailChart', labels, closes, $('detailMsg'));
+    wireDetailScrub(detailChart, labels, closes, 'detailRO');
     const hi=Math.max(...closes), lo=Math.min(...closes);
     $('ssStats').innerHTML=`
       <div class="stat"><div class="k">52w high</div><div class="v">${fmtP(hi)}</div></div>
