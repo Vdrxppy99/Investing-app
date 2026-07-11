@@ -500,3 +500,14 @@ body:not(.locked) #lockScreen{display:none}
 .empty .ei{font-size:34px}
 .empty .et{font-weight:800;font-size:16px;margin-top:10px}
 .empty .eb{color:var(--mut);font-size:12.5px;margin-top:6px;line-height:1.55;font-weight:500}
+
+/* ---------- v9.4: glanceable coach tiles + woven-in facts ---------- */
+.h2sub{margin:-4px 4px 12px;font-size:12.5px;color:var(--mut);font-weight:500;line-height:1.5}
+.cmove{cursor:pointer;position:relative;transition:transform .12s}
+.cmove:active{transform:var(--press)}
+.cmove .chev{position:absolute;top:13px;right:14px;color:var(--faint);font-weight:400}
+.cmove .cicon{font-size:19px;line-height:1}
+.cmove .big-n{margin-top:8px}
+.cmove.sev-warn .big-n{color:#fab219}
+.cmove.sev-info .big-n{color:var(--brand)}
+.cmove.sev-ok .big-n{color:var(--green)}

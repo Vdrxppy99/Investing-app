@@ -57,6 +57,14 @@ function renderLocDonut(){
 }
 function renderLook(){
   if(!$('lookList')) return;
+  const sub=$('lookSub');
+  if(sub){
+    const syms=new Set(rows('all').map(r=>r.sym));
+    let n=0;
+    if(syms.has('VTI')) n+=3600; else { if(syms.has('VOO')) n+=500; if(syms.has('VXF')) n+=3400; }
+    if(syms.has('VXUS')) n+=8300;
+    sub.textContent = n>1000 ? `Your funds hold ~${n.toLocaleString()} companies across ~50 countries — these are your biggest slices.` : '';
+  }
   const look=lookExposure().slice(0,10);
   $('lookList').innerHTML = look.map(l=>{
     const q=state.quotes[l.sym];
@@ -147,7 +155,8 @@ function renderRiskCard(){
     `<span class="risk-badge" style="background:${lvl[1]}22;color:${lvl[1]}">${lvl[0]}</span>`+
     `<div class="krow"><span class="k">Volatility (1Y)</span><span>${r.vol.toFixed(1)}%</span></div>
      <div class="krow"><span class="k">Beta vs S&P 500</span><span>${r.beta.toFixed(2)}</span></div>
-     <div class="krow"><span class="k">Max drawdown</span><span class="neg">${r.mdd.toFixed(1)}%</span></div>`;
+     <div class="krow"><span class="k">Max drawdown</span><span class="neg">${r.mdd.toFixed(1)}%</span></div>`+
+    `<div class="sub-n" style="margin-top:9px">${r.beta<0.995?`You swing ${Math.round((1-r.beta)*100)}% less than the market.`:r.beta>1.005?`You swing ${Math.round((r.beta-1)*100)}% more than the market.`:'You move in lockstep with the market.'}</div>`;
 }
 function renderWorthChart(){
   const el=$('worthChart'); if(!window.Chart) return;
@@ -299,7 +308,7 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
   });
 }
-function renderInsights(){ renderStories(); renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */
 function renderTaxCard(){
@@ -340,6 +349,8 @@ function renderSectorDonut(){
   const top=items.slice(0,6); other += items.slice(6).reduce((a,x)=>a+x[1],0);
   if(other>0) top.push(['Other',other]);
   const tot=top.reduce((a,x)=>a+x[1],0)||1; const max=top[0][1]||1;
+  const ss=$('sectorSub');
+  if(ss && top.length) ss.textContent=`${top[0][0]} is your biggest bet at ${(top[0][1]/tot*100).toFixed(0)}% — every ${top[0][0].toLowerCase()} rally works for you.`;
   $('sectorBars').innerHTML = top.map(([label,v])=>`<div class="hbrow"><div class="t"><span>${esc(label)}</span><span class="p">${(v/tot*100).toFixed(1)}%</span></div><div class="bar"><i style="width:${(v/max*100).toFixed(1)}%"></i></div></div>`).join('');
 }
 function renderHeatmap(){
@@ -396,6 +407,9 @@ function renderContribChart(){
               y1:{position:'right',grid:{display:false},border:{display:false},ticks:{color:CAT[3],maxTicksLimit:4,font:{size:9},callback:compact}}}}});
   attachScrubAny(contribChart, i=>{ const ro=$('contribRO'); if(!ro) return;
     ro.textContent = i==null ? '' : `${show[i]} · ${fmt(sdata[i])} added · ${fmt(scum[i])} deposited in total`; });
+  const cs=$('contribSub');
+  if(cs){ const m12=new Set(state.lots.filter(l=>!l.div && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
+    cs.textContent = m12>0 ? `You added money ${m12} of the last 12 months — consistency is the engine.` : ''; }
 }
 
 /* ============ LOOKING AHEAD (coach + projection) ============ */
@@ -410,18 +424,18 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const t=totals('all'), rs=rows('all');
   const cash=cashFor('all'), cashPct=cash/Math.max(1,t.value);
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.12):0.07;
-  if(cashPct>0.05) items.push({ic:'⚡', t:'Put idle cash to work',
+  if(cashPct>0.05) items.push({ic:'⚡', stat:`${(cashPct*100).toFixed(1)}%`, label:'cash sitting idle', sev:'warn', t:'Put idle cash to work',
     b:`${fmt(cash)} (${(cashPct*100).toFixed(0)}% of the portfolio) is uninvested. At your ~${(r*100).toFixed(0)}%/yr pace that's ≈${fmt(cash*r)} of growth per year sitting out.`});
   // single-company weight (index funds are already diversified)
   const DIV=new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']); // BRK.B = diversified conglomerate
   const singles=rs.filter(x=>!DIV.has(x.sym)).map(x=>({sym:x.sym, w:x.qty*priceOf(x.sym)/Math.max(1,t.value)})).sort((a,b)=>b.w-a.w);
-  if(singles.length && singles[0].w>0.15) items.push({ic:'⚖️', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
+  if(singles.length && singles[0].w>0.15) items.push({ic:'⚖️', stat:`${(singles[0].w*100).toFixed(0)}%`, label:`in ${singles[0].sym.replace('-','.')} alone`, sev:'warn', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
     b:`${(singles[0].w*100).toFixed(0)}% of everything rides on one company. Steering new contributions to your index funds dilutes that gradually — no selling, no taxes.`});
   // all-equity note
   if(!rs.some(x=>['BND','BNDX','AGG','BSV'].includes(x.sym))){
     const rk=riskStats();
-    items.push({ic:'🛡️', t:'100% stocks — know the ride',
-      b:`Maximum long-run growth, but your worst drop so far was ${rk?rk.mdd.toFixed(0):'-'}%${rk?'':''}. Fine for a long horizon; if a big goal is under ~5 years away, a slice of bonds (BND) softens the swings.`});
+    items.push({ic:'🛡️', stat:`${rk?Math.abs(rk.mdd).toFixed(0):'–'}%`, label:'worst drop · all stocks', sev:'info', t:'100% stocks — know the ride',
+      b:`Maximum long-run growth, but your worst drop so far was ${rk?rk.mdd.toFixed(0):'-'}%. Fine for a long horizon; if a big goal is under ~5 years away, a slice of bonds (BND) softens the swings.`});
   }
   // tax lots turning long-term soon
   const YR=31557600000, now=Date.now();
@@ -429,7 +443,8 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
     .filter(x=>x.at>now && x.at<now+45*86400e3 && x.g>25).sort((a,b)=>a.at-b.at);
   if(turning.length){
     const x=turning[0], d=new Date(x.at).toLocaleDateString([],{month:'short',day:'numeric'});
-    items.push({ic:'🧾', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
+    const dl=Math.max(1,Math.ceil((x.at-now)/86400e3));
+    items.push({ic:'🧾', stat:`${dl}d`, label:`${x.sym.replace('-','.')} → long-term`, sev:'warn', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
       b:`A lot with ${fmtSign(x.g)} of gain turns long-term on ${d} — before that, the gain would be taxed at the higher short-term rate.`});
   }
   // contribution cadence
@@ -437,20 +452,23 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const lastBuy=buys.map(l=>l.date).sort().pop();
   if(lastBuy){
     const days=Math.floor((now-new Date(lastBuy+'T12:00:00').getTime())/86400e3);
-    if(days>40) items.push({ic:'🔁', t:'Keep the contribution streak',
+    if(days>40) items.push({ic:'🔁', stat:`${days}d`, label:'since your last buy', sev:'warn', t:'Keep the contribution streak',
       b:`Last buy was ${days} days ago. The projections below assume your ${fmt(pmt)}/mo pace continues — consistency is the whole engine.`});
   }
-  if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', t:'Set a goal',
+  if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', stat:'Set one', label:'no goal yet', sev:'info', t:'Set a goal',
     b:'Give the money a number. A target unlocks the progress ring and a projected finish date on the Portfolio tab.'});
   return items.slice(0,4);
 }
 function renderCoach(){
-  if(!$('coachBody')) return;
+  const grid=$('coachGrid'); if(!grid) return;
   const items=coachItems();
-  $('coachBody').innerHTML=(items.length?items.map(x=>
-    `<div class="cmv"><span class="ci">${x.ic}</span><div><div class="ct">${x.t}</div><div class="cb">${x.b}</div></div></div>`).join('')
-    :'<div class="mload" style="padding:18px">Nothing needs your attention — the portfolio is running clean.</div>')
-    +'<div class="inc-note" style="padding:10px 16px 14px">Rules-based nudges computed from your own numbers · guidance, not financial advice.</div>';
+  grid.innerHTML = items.length ? items.map(x=>
+    `<div class="icard cmove sev-${x.sev||'info'}"><span class="chev">›</span>
+      <div class="cicon">${x.ic}</div>
+      <div class="big-n">${x.stat}</div>
+      <div class="sub-n">${x.label}</div></div>`).join('')
+    : '<div class="icard wide"><div class="sub-n" style="text-align:center;padding:10px 0">✓ Nothing needs your attention — the portfolio is running clean.</div></div>';
+  grid.querySelectorAll('.cmove').forEach((el,i)=> el.onclick=()=>openInfoSheet(items[i].t, `<p>${items[i].b}</p>`));
 }
 let projYears=10;
 function renderProjection(){
@@ -489,7 +507,11 @@ function renderProjection(){
     const yr=y0+Math.floor(i/12), mo=i%12;
     ro.innerHTML=`${yr}${mo?` +${mo}mo`:''} · <b>${fmt(data[1][i])}</b> avg <span style="color:var(--faint)">(${cfmt(data[0][i])} – ${cfmt(data[2][i])})</span>`;
   });
-  $('projNote').textContent=`Assumes your real ${fmt(pmt)}/mo contribution pace continues, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ${goal?'Gold dashed line = your goal. ':''}Not advice.`;
+  let divLine='';
+  { let fwd=0; for(const r2 of rows('all')){ const dv=state.divs[r2.sym]; if(!dv||!dv.list) continue;
+      fwd+=r2.qty*dv.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0); }
+    if(fwd>0 && V0>0) divLine=`Dividends alone could grow from ${fmt(fwd)}/yr today to ~${fmt(fwd*data[1][N]/V0)}/yr by ${y0+projYears}. `; }
+  $('projNote').textContent=divLine+`Assumes your real ${fmt(pmt)}/mo contribution pace continues, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ${goal?'Gold dashed line = your goal. ':''}Not advice.`;
 }
 if($('projSeg')) $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{
   projYears=+b.dataset.y;
@@ -497,41 +519,3 @@ if($('projSeg')) $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=(
   renderProjection();
 });
 
-/* ============ STORY STRIP — the numbers, translated into meaning ============ */
-function storyItems(){
-  const out=[]; const rs=rows('all'); const syms=new Set(rs.map(r=>r.sym));
-  const t=totals('all'); const inv=Math.max(1,t.value-cashFor('all'));
-  // breadth: how much of the world you actually own
-  let n=0;
-  if(syms.has('VTI')) n+=3600; else { if(syms.has('VOO')) n+=500; if(syms.has('VXF')) n+=3400; }
-  if(syms.has('VXUS')) n+=8300;
-  if(n>1000) out.push({big:`~${n.toLocaleString()} companies`, sub:'live inside your funds, across roughly 50 countries. You own a slice of the world economy.'});
-  // biggest sector
-  const per={};
-  for(const r of rs){ const w=SECTOR_WEIGHTS[r.sym]; if(!w) continue; const v=r.qty*priceOf(r.sym);
-    for(const [s,pc] of Object.entries(w)) if(s!=='Other') per[s]=(per[s]||0)+v*pc/100; }
-  const topSec=Object.entries(per).sort((a,b)=>b[1]-a[1])[0];
-  if(topSec) out.push({big:`${(topSec[1]/inv*100).toFixed(0)}% ${topSec[0]}`, sub:`is your largest sector exposure — every ${topSec[0].toLowerCase()} rally works for you.`});
-  // temperament vs the market
-  const rk=riskStats();
-  if(rk) out.push({big: rk.beta<0.995?`${Math.round((1-rk.beta)*100)}% calmer`: rk.beta>1.005?`${Math.round((rk.beta-1)*100)}% livelier`:'In lockstep',
-    sub:`than the S&P 500 (beta ${rk.beta.toFixed(2)}). ${rk.beta<1?'Your international and dividend holdings smooth the ride.':'Expect bigger swings both ways.'}`});
-  // dividend future
-  let fwd=0;
-  for(const r of rs){ const d=state.divs[r.sym]; if(!d||!d.list) continue;
-    fwd+=r.qty*d.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0); }
-  if(fwd>0){
-    const {pmt}=contribPace(); const rm=Math.pow(1.07,1/12)-1; let v=t.value;
-    for(let m=0;m<120;m++) v=v*(1+rm)+pmt;
-    const ratio=t.value>0?v/t.value:1;
-    out.push({big:`${fmt(fwd)}/yr in dividends`, sub:`today — at your pace that could be ~${fmt(fwd*ratio)} a year by ${new Date().getFullYear()+10}, without lifting a finger.`});
-  }
-  // consistency
-  const m12=new Set(state.lots.filter(l=>!l.div && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
-  if(m12>=4) out.push({big:`${m12} of 12 months`, sub:'you added money this year. Consistency, not timing, is what builds this chart.'});
-  return out.slice(0,5);
-}
-function renderStories(){
-  const el=$('storyRow'); if(!el) return;
-  el.innerHTML=storyItems().map(s=>`<div class="story"><div class="sb">${s.big}</div><div class="ss">${s.sub}</div></div>`).join('');
-}
