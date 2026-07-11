@@ -424,17 +424,17 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const t=totals('all'), rs=rows('all');
   const cash=cashFor('all'), cashPct=cash/Math.max(1,t.value);
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.12):0.07;
-  if(cashPct>0.05) items.push({ic:'⚡', stat:`${(cashPct*100).toFixed(1)}%`, label:'cash sitting idle', sev:'warn', t:'Put idle cash to work',
+  if(cashPct>0.05) items.push({ic:'💵', title:'Deploy idle cash', detail:`${fmt(cash)} · ${(cashPct*100).toFixed(0)}% uninvested`, sev:'warn', t:'Put idle cash to work',
     b:`${fmt(cash)} (${(cashPct*100).toFixed(0)}% of the portfolio) is uninvested. At your ~${(r*100).toFixed(0)}%/yr pace that's ≈${fmt(cash*r)} of growth per year sitting out.`});
   // single-company weight (index funds are already diversified)
   const DIV=new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']); // BRK.B = diversified conglomerate
   const singles=rs.filter(x=>!DIV.has(x.sym)).map(x=>({sym:x.sym, w:x.qty*priceOf(x.sym)/Math.max(1,t.value)})).sort((a,b)=>b.w-a.w);
-  if(singles.length && singles[0].w>0.15) items.push({ic:'⚖️', stat:`${(singles[0].w*100).toFixed(0)}%`, label:`in ${singles[0].sym.replace('-','.')} alone`, sev:'warn', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
+  if(singles.length && singles[0].w>0.15) items.push({ic:'⚖️', title:'Trim a big bet', detail:`${singles[0].sym.replace('-','.')} is ${(singles[0].w*100).toFixed(0)}% of everything`, sev:'warn', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
     b:`${(singles[0].w*100).toFixed(0)}% of everything rides on one company. Steering new contributions to your index funds dilutes that gradually — no selling, no taxes.`});
   // all-equity note
   if(!rs.some(x=>['BND','BNDX','AGG','BSV'].includes(x.sym))){
     const rk=riskStats();
-    items.push({ic:'🛡️', stat:`${rk?Math.abs(rk.mdd).toFixed(0):'–'}%`, label:'worst drop · all stocks', sev:'info', t:'100% stocks — know the ride',
+    items.push({ic:'🛡️', title:'Know your risk', detail:`100% stocks · worst dip ${rk?rk.mdd.toFixed(0):'–'}%`, sev:'info', t:'100% stocks — know the ride',
       b:`Maximum long-run growth, but your worst drop so far was ${rk?rk.mdd.toFixed(0):'-'}%. Fine for a long horizon; if a big goal is under ~5 years away, a slice of bonds (BND) softens the swings.`});
   }
   // tax lots turning long-term soon
@@ -444,7 +444,7 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   if(turning.length){
     const x=turning[0], d=new Date(x.at).toLocaleDateString([],{month:'short',day:'numeric'});
     const dl=Math.max(1,Math.ceil((x.at-now)/86400e3));
-    items.push({ic:'🧾', stat:`${dl}d`, label:`${x.sym.replace('-','.')} → long-term`, sev:'warn', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
+    items.push({ic:'🧾', title:'Tax timing', detail:`${x.sym.replace('-','.')} turns long-term in ${dl}d`, sev:'warn', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
       b:`A lot with ${fmtSign(x.g)} of gain turns long-term on ${d} — before that, the gain would be taxed at the higher short-term rate.`});
   }
   // contribution cadence
@@ -452,10 +452,10 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const lastBuy=buys.map(l=>l.date).sort().pop();
   if(lastBuy){
     const days=Math.floor((now-new Date(lastBuy+'T12:00:00').getTime())/86400e3);
-    if(days>40) items.push({ic:'🔁', stat:`${days}d`, label:'since your last buy', sev:'warn', t:'Keep the contribution streak',
+    if(days>40) items.push({ic:'🔁', title:'Keep investing', detail:`${days} days since your last buy`, sev:'warn', t:'Keep the contribution streak',
       b:`Last buy was ${days} days ago. The projections below assume your ${fmt(pmt)}/mo pace continues — consistency is the whole engine.`});
   }
-  if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', stat:'Set one', label:'no goal yet', sev:'info', t:'Set a goal',
+  if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', title:'Set a goal', detail:'No target set yet', sev:'info', t:'Set a goal',
     b:'Give the money a number. A target unlocks the progress ring and a projected finish date on the Portfolio tab.'});
   return items.slice(0,4);
 }
@@ -463,10 +463,10 @@ function renderCoach(){
   const grid=$('coachGrid'); if(!grid) return;
   const items=coachItems();
   grid.innerHTML = items.length ? items.map(x=>
-    `<div class="icard cmove sev-${x.sev||'info'}"><span class="chev">›</span>
-      <div class="cicon">${x.ic}</div>
-      <div class="big-n">${x.stat}</div>
-      <div class="sub-n">${x.label}</div></div>`).join('')
+    `<div class="icard cmove sev-${x.sev||'info'}">
+      <div class="cmhead"><span class="cicon">${x.ic}</span><span class="chev">›</span></div>
+      <div class="ctitle">${x.title}</div>
+      <div class="cdetail">${x.detail}</div></div>`).join('')
     : '<div class="icard wide"><div class="sub-n" style="text-align:center;padding:10px 0">✓ Nothing needs your attention — the portfolio is running clean.</div></div>';
   grid.querySelectorAll('.cmove').forEach((el,i)=> el.onclick=()=>openInfoSheet(items[i].t, `<p>${items[i].b}</p>`));
 }

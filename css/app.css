@@ -484,8 +484,10 @@ body:not(.locked) #lockScreen{display:none}
 
 /* ---------- v9.3 polish: logos, mini-bar, saves, empty states ---------- */
 .badge{position:relative;overflow:hidden}
-.blogo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:7px;background:#fff;border-radius:inherit}
-.badge.sm .blogo{padding:5px}
+.blogo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:6px;background:#fff;
+  border-radius:inherit;opacity:0;transition:opacity .28s ease}
+.blogo.on{opacity:1}
+.badge.sm .blogo{padding:4px}
 .hsym .htick{color:var(--mut);font-size:11px;font-weight:600;margin-left:4px}
 #miniBar{position:fixed;top:0;left:0;right:0;z-index:45;display:flex;align-items:center;justify-content:center;gap:10px;
   padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;cursor:pointer;
@@ -503,11 +505,14 @@ body:not(.locked) #lockScreen{display:none}
 
 /* ---------- v9.4: glanceable coach tiles + woven-in facts ---------- */
 .h2sub{margin:-4px 4px 12px;font-size:12.5px;color:var(--mut);font-weight:500;line-height:1.5}
-.cmove{cursor:pointer;position:relative;transition:transform .12s}
+.cmove{cursor:pointer;transition:transform .12s}
 .cmove:active{transform:var(--press)}
-.cmove .chev{position:absolute;top:13px;right:14px;color:var(--faint);font-weight:400}
-.cmove .cicon{font-size:19px;line-height:1}
-.cmove .big-n{margin-top:8px}
-.cmove.sev-warn .big-n{color:#fab219}
-.cmove.sev-info .big-n{color:var(--brand)}
-.cmove.sev-ok .big-n{color:var(--green)}
+.cmove .cmhead{display:flex;align-items:center;justify-content:space-between}
+.cmove .cicon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1}
+.cmove .chev{color:var(--faint);font-weight:400;font-size:16px}
+.cmove.sev-warn .cicon{background:rgba(250,178,25,.15)}
+.cmove.sev-info .cicon{background:var(--brand-soft)}
+.cmove.sev-ok .cicon{background:rgba(var(--green-rgb),.14)}
+.cmove .ctitle{font-weight:700;font-size:14.5px;margin-top:11px;letter-spacing:-.01em}
+.cmove .cdetail{color:var(--mut);font-size:11.5px;margin-top:4px;line-height:1.45;font-weight:500}
+.cmove.sev-warn{border-color:color-mix(in srgb,#fab219 22%,var(--line))}

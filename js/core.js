@@ -71,9 +71,9 @@ function skel(n){ // shimmer placeholder rows — premium apps never show spinne
   return h;
 }
 function badge(sym){ return esc(sym.split('-')[0].slice(0,4)); }
-function badgeHtml(sym, small){ // letter tile with the real logo layered on top when available
+function badgeHtml(sym, small){ // colored letter tile; a real company logo crossfades over it once loaded
   const d=(typeof TICKER_DOMAINS!=='undefined')&&TICKER_DOMAINS[sym];
-  const logo=d?`<img class="blogo" src="https://www.google.com/s2/favicons?domain=${d}&sz=64" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:'';
+  const logo=d?`<img class="blogo" src="https://www.google.com/s2/favicons?domain=${d}&sz=128" alt="" referrerpolicy="no-referrer" onload="this.classList.add('on')" onerror="this.remove()">`:'';
   return `<div class="badge${small?' sm':''}" style="${bstyle(colorOf(sym))}">${badge(sym)}${logo}</div>`;
 }
 function bstyle(c){ return `background:linear-gradient(140deg,${c},color-mix(in srgb,${c} 55%,#000))`; }
