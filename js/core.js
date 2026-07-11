@@ -71,6 +71,11 @@ function skel(n){ // shimmer placeholder rows — premium apps never show spinne
   return h;
 }
 function badge(sym){ return esc(sym.split('-')[0].slice(0,4)); }
+function badgeHtml(sym, small){ // letter tile with the real logo layered on top when available
+  const d=(typeof TICKER_DOMAINS!=='undefined')&&TICKER_DOMAINS[sym];
+  const logo=d?`<img class="blogo" src="https://www.google.com/s2/favicons?domain=${d}&sz=64" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:'';
+  return `<div class="badge${small?' sm':''}" style="${bstyle(colorOf(sym))}">${badge(sym)}${logo}</div>`;
+}
 function bstyle(c){ return `background:linear-gradient(140deg,${c},color-mix(in srgb,${c} 55%,#000))`; }
 function colorOf(sym){ if(COLORS[sym]) return COLORS[sym]; let h=0; for(const ch of sym) h=(h*31+ch.charCodeAt(0))%360; return `hsl(${h},55%,52%)`; }
 function dayStr(ms){ return new Date(ms).toISOString().slice(0,10); }

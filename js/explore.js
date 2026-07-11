@@ -28,6 +28,7 @@ const IDEAS = [
   {sym:'VGT',  name:'Vanguard Information Technology ETF', why:'Pure tech-sector tilt if the S&P\'s ~33% tech is not enough for you.'}
 ];
 
+const SECTOR_ETFS=[['XLK','Technology'],['XLF','Financials'],['XLV','Healthcare'],['XLY','Consumer Disc.'],['XLC','Comm. Services'],['XLI','Industrials'],['XLE','Energy'],['XLP','Staples'],['XLU','Utilities'],['XLRE','Real Estate'],['XLB','Materials']];
 const mkt = { idx:{}, lists:{}, ts:0, fetching:false };
 async function fetchIndexCard(x){
   try{
@@ -70,7 +71,10 @@ async function refreshMarkets(force){
   const ideaJobs=IDEAS.filter(i=>!owned.has(i.sym))
     .filter(i=>{const q=state.quotes[i.sym]; return !q||!q.ts||Date.now()-q.ts>QUOTE_TTL;})
     .map(i=>fetchQuote(i.sym));
-  await Promise.allSettled([...IDX_LIST.map(fetchIndexCard), fetchScreener('most_actives'), fetchScreener('day_gainers'), fetchScreener('day_losers'), ...watchJobs, ...ideaJobs]);
+  const sectorJobs=SECTOR_ETFS
+    .filter(([s])=>{const q=state.quotes[s]; return !q||!q.ts||Date.now()-q.ts>QUOTE_TTL;})
+    .map(([s])=>fetchQuote(s));
+  await Promise.allSettled([...IDX_LIST.map(fetchIndexCard), fetchScreener('most_actives'), fetchScreener('day_gainers'), fetchScreener('day_losers'), ...watchJobs, ...ideaJobs, ...sectorJobs]);
   mkt.ts=Date.now(); mkt.fetching=false;
   lsSet('pt_quotes',state.quotes);
   renderMarkets();
@@ -83,7 +87,7 @@ function sparkArr(pts,W,H,up){
 }
 function mRow(sym,name,pxHtml,pct){
   const pill = pct==null ? '' : `<span class="pctpill ${pct>=0?'up':'down'}">${fmtPct(pct)}</span>`;
-  return `<div class="mrow" data-sym="${esc(sym)}" data-name="${esc(name||'')}"><div class="badge" style="${bstyle(colorOf(sym))}">${badge(sym)}</div>
+  return `<div class="mrow" data-sym="${esc(sym)}" data-name="${esc(name||'')}">${badgeHtml(sym)}
     <div class="mmid"><div class="msym">${esc(sym.replace('-','.'))}</div><div class="mname">${esc(name||'')}</div></div>
     <div class="mright"><div class="mpx">${pxHtml}</div><div class="mchg">${pill}</div></div></div>`;
 }
@@ -94,6 +98,17 @@ function renderMarkets(){
     return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)}"><div class="n">${x.n}</div><div class="p">${d.price.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="c ${cls(pct)}">${fmtPct(pct)}</div>${sparkArr(d.spark,102,26,pct>=0)}</div>`;
   }).join('');
   $('idxRow').innerHTML = cards || `<div class="mload">${mkt.fetching?'Loading indices…':'Couldn’t load — tap the Explore tab again to retry.'}</div>`;
+  // sector pulse: every sector ETF, hottest first, heat-tinted like a compact heatmap
+  const secs=SECTOR_ETFS.map(([s,n])=>{ const q=state.quotes[s];
+      return q&&q.prev>0 ? {s,n,pct:(q.price/q.prev-1)*100} : null; }).filter(Boolean)
+    .sort((a,b)=>b.pct-a.pct);
+  $('sectorRow').innerHTML = secs.length ? secs.map(x=>{
+    const a=Math.min(.4,Math.abs(x.pct)/4+.06);
+    const col=x.pct>=0?`rgba(${cvar('--green-rgb')},${a})`:`rgba(${cvar('--red-rgb')},${a})`;
+    return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)} sector (${esc(x.s)})" style="background:${col};flex-basis:118px">
+      <div class="n">${esc(x.n)}</div><div class="c ${cls(x.pct)}" style="font-size:15px;font-weight:800;margin-top:4px">${fmtPct(x.pct)}</div>
+      <div class="n" style="margin-top:5px;opacity:.7">${esc(x.s)}</div></div>`;
+  }).join('') : (mkt.fetching ? `<div class="mload">Loading sectors…</div>` : `<div class="mload">Couldn’t load — tap Explore again.</div>`);
   const wl=state.watch||[];
   $('watchWrap').style.display = wl.length ? '' : 'none';
   $('watchList').innerHTML = wl.map(w=>{
@@ -109,7 +124,7 @@ function renderMarkets(){
     const px = q&&q.price>0 ? fmtPx(q.price) : '…';
     const pct = q&&q.prev>0 ? (q.price/q.prev-1)*100 : null;
     const pill = pct==null ? '' : `<span class="pctpill ${pct>=0?'up':'down'}">${fmtPct(pct)}</span>`;
-    return `<div class="mrow" data-sym="${esc(i.sym)}" data-name="${esc(i.name)}"><div class="badge" style="${bstyle(colorOf(i.sym))}">${badge(i.sym)}</div>
+    return `<div class="mrow" data-sym="${esc(i.sym)}" data-name="${esc(i.name)}">${badgeHtml(i.sym)}
       <div class="mmid"><div class="msym">${esc(i.sym)}</div><div class="mname">${esc(i.name)}</div><div class="iwhy">${esc(i.why)}</div></div>
       <div class="mright"><div class="mpx">${px}</div><div class="mchg">${pill}</div></div></div>`;
   }).join('') || '<div class="mload">You own everything on the ideas list — impressive.</div>';
@@ -133,7 +148,7 @@ async function runSearch(q){
     box.innerHTML=qs.slice(0,8).map(x=>{
       const nm=esc(x.shortname||x.longname||'');
       const tag=x.quoteType==='ETF'?'ETF':x.quoteType==='INDEX'?'Index':esc(x.exchange||'Stock');
-      return `<div class="mrow" data-sym="${esc(x.symbol)}" data-name="${nm}"><div class="badge" style="${bstyle(colorOf(x.symbol))}">${badge(x.symbol)}</div>
+      return `<div class="mrow" data-sym="${esc(x.symbol)}" data-name="${nm}">${badgeHtml(x.symbol)}
         <div class="mmid"><div class="msym">${esc(x.symbol.replace('-','.'))}</div><div class="mname">${nm}</div></div>
         <div class="mright"><div class="mchg" style="color:var(--mut)">${tag}</div></div></div>`;
     }).join('');

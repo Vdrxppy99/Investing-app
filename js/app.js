@@ -166,7 +166,7 @@ function renderMover(){ // day-change attribution: which holdings drove today's 
   const tot=items.reduce((a,x)=>a+x.impact,0);
   $('moverBody').innerHTML = `<div class="drivehead"><span>Today's drivers</span><span class="${cls(tot)}">${fmtSign(tot)}</span></div>`+
     items.slice(0,3).map(x=>`<div class="drow" data-sym="${esc(x.sym)}">
-      <div class="badge sm" style="${bstyle(colorOf(x.sym))}">${badge(x.sym)}</div>
+      ${badgeHtml(x.sym,true)}
       <div class="mmid"><div class="msym">${esc(x.sym.replace('-','.'))}</div></div>
       <div class="mright"><span class="${cls(x.impact)}" style="font-weight:700;font-size:13.5px">${fmtSign(x.impact)}</span>
       <span class="pctpill ${x.pct>=0?'up':'down'}" style="margin-left:8px">${fmtPct(x.pct)}</span></div></div>`).join('');
@@ -222,6 +222,26 @@ $('editBtn').onclick = openEdit;
 $('refreshBtn').onclick = ()=>refreshAll(true);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ refreshQuotesOnly(); schedulePoll(); } });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDetail(); $('editModal').classList.add('hidden'); } });
+
+/* glass mini-bar: compact balance appears when the header scrolls away */
+function paintMiniBar(){
+  const t=totals(state.view.acc);
+  const dayPct=(t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
+  $('mbVal').textContent=fmt(t.value);
+  const d=$('mbDay'); d.textContent=`${fmtSign(t.day)} · ${fmtPct(dayPct)}`;
+  d.className='daypill '+(t.day>=0?'up':'down');
+}
+let mbTick=false;
+window.addEventListener('scroll', ()=>{
+  if(mbTick) return; mbTick=true;
+  setTimeout(()=>{
+    mbTick=false;
+    const show=window.scrollY>170 && !$('page-portfolio').classList.contains('hidden') && !document.body.classList.contains('locked');
+    if(show) paintMiniBar();
+    $('miniBar').classList.toggle('show', show);
+  }, 80);
+}, {passive:true});
+$('miniBar').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
 
 (function(){ const h=new Date().getHours();
   const g = h<5?'Good night':h<12?'Good morning':h<18?'Good afternoon':'Good evening';

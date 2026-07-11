@@ -6,6 +6,20 @@ const NAMES = {
   'VXF':'Vanguard Extended Market ETF', 'VXUS':'Vanguard Total Intl Stock ETF',
   'VYM':'Vanguard High Dividend Yield ETF', 'BRK-B':'Berkshire Hathaway B'
 };
+/* real company/fund logos via Google's favicon service — <img> hotlinking is allowed,
+   and every badge falls back to its letter tile if the logo fails or you're offline */
+const TICKER_DOMAINS = {
+  VOO:'vanguard.com', VTI:'vanguard.com', VXF:'vanguard.com', VXUS:'vanguard.com', VYM:'vanguard.com',
+  VT:'vanguard.com', VNQ:'vanguard.com', VGT:'vanguard.com', BND:'vanguard.com',
+  'BRK-B':'berkshirehathaway.com', SCHD:'schwab.com', QQQ:'invesco.com', AVUV:'avantisinvestors.com', GLDM:'ssga.com',
+  NVDA:'nvidia.com', MSFT:'microsoft.com', AAPL:'apple.com', AMZN:'amazon.com', GOOGL:'google.com',
+  META:'meta.com', AVGO:'broadcom.com', TSLA:'tesla.com', JPM:'jpmorganchase.com', TSM:'tsmc.com',
+  ASML:'asml.com', SAP:'sap.com', TCEHY:'tencent.com', TM:'toyota.com', AZN:'astrazeneca.com',
+  NVS:'novartis.com', SHEL:'shell.com', XOM:'exxonmobil.com', JNJ:'jnj.com', PG:'pg.com',
+  HD:'homedepot.com', ABBV:'abbvie.com', KO:'coca-colacompany.com', CVX:'chevron.com', WMT:'walmart.com',
+  XLK:'ssga.com', XLF:'ssga.com', XLE:'ssga.com', XLV:'ssga.com', XLY:'ssga.com', XLI:'ssga.com',
+  XLC:'ssga.com', XLP:'ssga.com', XLU:'ssga.com', XLRE:'ssga.com', XLB:'ssga.com'
+};
 const COLORS = {'VTI':CAT[0],'VXUS':CAT[1],'VXF':CAT[2],'VOO':CAT[3],'BRK-B':CAT[4],'VYM':CAT[5]};
 /* Personal data no longer ships in this public file — it lives encrypted in the
    vault on your device (js/vault.js). Fresh devices start empty: restore via

@@ -56,9 +56,9 @@ function renderList(){
     const tick = (was!=null && p!==was) ? (p>was ? ' tick-up' : ' tick-down') : '';
     lastShownPx[r.sym] = p;
     return `<div class="hrow${tick}" data-sym="${esc(r.sym)}">
-      <div class="badge" style="${bstyle(colorOf(r.sym))}">${badge(r.sym)}</div>
+      ${badgeHtml(r.sym)}
       <div class="hmid">
-        <div class="hsym">${esc(r.sym.replace('-','.'))}</div>
+        <div class="hsym">${esc((NAMES[r.sym]||r.sym.replace('-','.')).replace(/^Vanguard /,''))} <span class="htick">${esc(r.sym.replace('-','.'))}</span></div>
         <div class="hinfo">${fmtPx(p)} <span class="${cls(dp)}">${fmtPct(dp)}</span> · ${r.qty.toFixed(3).replace(/\.?0+$/,'')} sh</div>
       </div>
       <div class="hspark">${spark(r.sym)}</div>
@@ -66,7 +66,10 @@ function renderList(){
         <div class="hval">${fmt(val)}</div>
         <div class="hpl ${cls(pl)}">${fmtSign(pl)} · ${fmtPct(plp)}</div>
       </div><div class="wbar"><i style="width:${(val/wtot*100).toFixed(1)}%"></i></div></div>`;
-  }).join('') || '<div style="padding:20px;color:var(--mut);font-size:13px">No holdings — tap ⚙︎ to add some.</div>';
+  }).join('') || `<div class="empty"><div class="ei">📄</div><div class="et">No holdings yet</div>
+    <div class="eb">Add your first position with ⚙︎ above, or restore everything from a backup file.</div>
+    <button class="btn pri" id="emptyAdd" style="margin-top:12px">Open settings</button></div>`;
+  const ea=$('emptyAdd'); if(ea) ea.onclick=openEdit;
   $('holdList').querySelectorAll('.hrow').forEach(el=> el.onclick = ()=>openDetail(el.dataset.sym));
   const cash = cashFor(state.view.acc);
   $('cashRow').style.display = cash>0 ? 'flex' : 'none';
