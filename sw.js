@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.1'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
+const V = 'pt-v9.2'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
 const CORE = ['./', './index.html', './manifest.webmanifest',
   './css/app.css',
   './js/vault.js', './js/boot.js', './js/seed.js', './js/core.js', './js/portfolio.js', './js/api.js',
@@ -9,7 +9,11 @@ const CORE = ['./', './index.html', './manifest.webmanifest',
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(caches.open(V).then(c => c.addAll(CORE).catch(() => {})));
+  // cache:'reload' bypasses the HTTP cache so a new SW version always ships
+  // exactly what the server has — never a heuristically-"fresh" stale file
+  e.waitUntil(caches.open(V).then(c =>
+    Promise.all(CORE.map(u => fetch(u, {cache:'reload'}).then(r => { if(r.ok) return c.put(u, r); }).catch(() => {})))
+  ));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(

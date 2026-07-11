@@ -452,3 +452,32 @@ body:not(.locked) #lockScreen{display:none}
 .cmv .ci{font-size:20px;flex-shrink:0;line-height:1.3}
 .cmv .ct{font-weight:700;font-size:13.5px}
 .cmv .cb{color:var(--mut);font-size:12.5px;margin-top:3px;line-height:1.55;font-weight:500}
+
+/* ---------- story strip (Insights) ---------- */
+.stories{display:flex;gap:10px;overflow-x:auto;padding:14px 2px 4px;scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.stories::-webkit-scrollbar{display:none}
+.story{flex:0 0 auto;width:min(260px,78vw);scroll-snap-align:start;border:1px solid var(--line);
+  border-radius:var(--r-lg);padding:16px 17px;box-shadow:var(--shadow);
+  background:linear-gradient(150deg, color-mix(in srgb, var(--brand) 13%, var(--card)) 0%, var(--card) 62%)}
+.story .sb{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.story .ss{color:var(--mut);font-size:12px;margin-top:7px;line-height:1.55;font-weight:500}
+
+/* ---------- skeleton shimmer ---------- */
+.skel-row{display:flex;gap:12px;padding:14px 16px;align-items:center}
+.skel-badge{width:42px;height:42px;border-radius:13px;flex-shrink:0}
+.skel-lines{flex:1}
+.skel-lines i{display:block;height:11px;border-radius:6px;margin:6px 0}
+.skel-badge,.skel-lines i{background:linear-gradient(90deg,var(--card2) 25%,color-mix(in srgb,var(--card2) 88%,var(--tx) 12%) 50%,var(--card2) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
+/* ---------- header today line ---------- */
+.todayline{margin-top:9px;font-size:12px;font-weight:600;color:var(--mut);min-height:15px}
+.todayline.pos{color:var(--green)} .todayline.neg{color:var(--red)}
+
+/* ---------- accessibility ---------- */
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:8px}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}

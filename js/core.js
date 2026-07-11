@@ -65,6 +65,11 @@ function fmtSign(v){ return (v>=0?'+':'−') + fmt(Math.abs(v)); }
 function fmtPct(v){ return (v>=0?'+':'−') + Math.abs(v).toFixed(2) + '%'; }
 function cls(v){ return v>=0?'pos':'neg'; }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function skel(n){ // shimmer placeholder rows — premium apps never show spinners for lists
+  let h='';
+  for(let i=0;i<(n||4);i++) h+='<div class="skel-row"><div class="skel-badge"></div><div class="skel-lines"><i style="width:'+(55+((i*17)%35))+'%"></i><i style="width:'+(30+((i*23)%25))+'%"></i></div></div>';
+  return h;
+}
 function badge(sym){ return esc(sym.split('-')[0].slice(0,4)); }
 function bstyle(c){ return `background:linear-gradient(140deg,${c},color-mix(in srgb,${c} 55%,#000))`; }
 function colorOf(sym){ if(COLORS[sym]) return COLORS[sym]; let h=0; for(const ch of sym) h=(h*31+ch.charCodeAt(0))%360; return `hsl(${h},55%,52%)`; }

@@ -61,6 +61,7 @@
     </div>
     <div id="status" class="status"><span class="dot"></span><span id="statusTx">Loading…</span></div>
     <div class="big" id="totalVal">—</div>
+    <div class="todayline" id="todayLine"></div>
     <div class="sub" id="totalSub"></div>
     <div class="chips" id="accChips"></div>
   </header>
@@ -112,7 +113,7 @@
 
   <section class="card" id="goalCard"><div class="card-title">Goal</div><div id="goalBody"></div></section>
 
-  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v9.1</div>
+  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v9.2</div>
 </div><!-- /page-portfolio -->
 
 <!-- ================= NEWS ================= -->
@@ -159,7 +160,8 @@
 <!-- ================= INSIGHTS ================= -->
 <div id="page-insights" class="page hidden">
   <div class="pagehead" style="margin-top:14px">Insights</div>
-  <div class="eyebrow">Your standing</div>
+  <div class="stories" id="storyRow"></div>
+  <div class="eyebrow" style="margin-top:14px">Your standing</div>
   <h2>Portfolio Health</h2>
   <section class="card" id="healthCard"><div id="healthBody"></div></section>
 

@@ -115,7 +115,7 @@ function renderNews(){
       </div>
       ${i.th?`<img class="nimg" src="${esc(i.th)}" alt="" ${k>5?'loading="lazy"':''} referrerpolicy="no-referrer" onerror="this.remove()">`:''}
     </a>`).join('')
-    : (hero ? '' : `<div class="mload">${newsSt.fetching?'Loading news…':'No stories yet — connect to the internet and pull to refresh.'}</div>`));
+    : (hero ? '' : (newsSt.fetching ? skel(6) : `<div class="mload">No stories yet — connect to the internet and pull to refresh.</div>`)));
 }
 $('newsSort').querySelectorAll('button').forEach(b=> b.onclick = ()=>{
   newsSt.sort=b.dataset.n;

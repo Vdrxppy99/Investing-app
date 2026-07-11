@@ -299,7 +299,7 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
   });
 }
-function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+function renderInsights(){ renderStories(); renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */
 function renderTaxCard(){
@@ -496,3 +496,42 @@ if($('projSeg')) $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=(
   $('projSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
   renderProjection();
 });
+
+/* ============ STORY STRIP — the numbers, translated into meaning ============ */
+function storyItems(){
+  const out=[]; const rs=rows('all'); const syms=new Set(rs.map(r=>r.sym));
+  const t=totals('all'); const inv=Math.max(1,t.value-cashFor('all'));
+  // breadth: how much of the world you actually own
+  let n=0;
+  if(syms.has('VTI')) n+=3600; else { if(syms.has('VOO')) n+=500; if(syms.has('VXF')) n+=3400; }
+  if(syms.has('VXUS')) n+=8300;
+  if(n>1000) out.push({big:`~${n.toLocaleString()} companies`, sub:'live inside your funds, across roughly 50 countries. You own a slice of the world economy.'});
+  // biggest sector
+  const per={};
+  for(const r of rs){ const w=SECTOR_WEIGHTS[r.sym]; if(!w) continue; const v=r.qty*priceOf(r.sym);
+    for(const [s,pc] of Object.entries(w)) if(s!=='Other') per[s]=(per[s]||0)+v*pc/100; }
+  const topSec=Object.entries(per).sort((a,b)=>b[1]-a[1])[0];
+  if(topSec) out.push({big:`${(topSec[1]/inv*100).toFixed(0)}% ${topSec[0]}`, sub:`is your largest sector exposure — every ${topSec[0].toLowerCase()} rally works for you.`});
+  // temperament vs the market
+  const rk=riskStats();
+  if(rk) out.push({big: rk.beta<0.995?`${Math.round((1-rk.beta)*100)}% calmer`: rk.beta>1.005?`${Math.round((rk.beta-1)*100)}% livelier`:'In lockstep',
+    sub:`than the S&P 500 (beta ${rk.beta.toFixed(2)}). ${rk.beta<1?'Your international and dividend holdings smooth the ride.':'Expect bigger swings both ways.'}`});
+  // dividend future
+  let fwd=0;
+  for(const r of rs){ const d=state.divs[r.sym]; if(!d||!d.list) continue;
+    fwd+=r.qty*d.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0); }
+  if(fwd>0){
+    const {pmt}=contribPace(); const rm=Math.pow(1.07,1/12)-1; let v=t.value;
+    for(let m=0;m<120;m++) v=v*(1+rm)+pmt;
+    const ratio=t.value>0?v/t.value:1;
+    out.push({big:`${fmt(fwd)}/yr in dividends`, sub:`today — at your pace that could be ~${fmt(fwd*ratio)} a year by ${new Date().getFullYear()+10}, without lifting a finger.`});
+  }
+  // consistency
+  const m12=new Set(state.lots.filter(l=>!l.div && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
+  if(m12>=4) out.push({big:`${m12} of 12 months`, sub:'you added money this year. Consistency, not timing, is what builds this chart.'});
+  return out.slice(0,5);
+}
+function renderStories(){
+  const el=$('storyRow'); if(!el) return;
+  el.innerHTML=storyItems().map(s=>`<div class="story"><div class="sb">${s.big}</div><div class="ss">${s.sub}</div></div>`).join('');
+}

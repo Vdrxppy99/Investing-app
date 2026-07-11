@@ -20,6 +20,17 @@ function renderHeader(){
   if(rr!=null) chips.push({k:'Return / yr', v:fmtPct(rr*100), c:cls(rr)});
   $('totalSub').innerHTML = chips.map(c=>`<div class="chip" data-ex="${c.k}"><span class="lbl">${c.k} <span class="cq">?</span></span><span class="${c.c||''}">${c.v}</span></div>`).join('');
   $('totalSub').querySelectorAll('.chip').forEach(el=>el.onclick=()=>explainStat(el.dataset.ex));
+  // the 3-second story: how today compares to the market
+  const voo=state.quotes.VOO, tl=$('todayLine');
+  if(tl){
+    if(voo && voo.prev>0 && (t.value-t.day)>0){
+      const sp=(voo.price/voo.prev-1)*100, d=dayPct-sp;
+      tl.className='todayline '+(Math.abs(d)<0.02?'':cls(d));
+      tl.textContent = Math.abs(d)<0.02 ? 'Moving with the market today'
+        : d>0 ? `Outpacing the S&P 500 by ${d.toFixed(2)}% today`
+              : `Trailing the S&P 500 by ${Math.abs(d).toFixed(2)}% today`;
+    } else tl.textContent='';
+  }
   $('ccyBtn').textContent = state.view.ccy==='USD' ? '$' : '€';
 }
 function renderChips(){

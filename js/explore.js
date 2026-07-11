@@ -115,7 +115,7 @@ function renderMarkets(){
   }).join('') || '<div class="mload">You own everything on the ideas list — impressive.</div>';
   const fill=(id,el)=>{ const L=mkt.lists[id];
     $(el).innerHTML = L&&L.length ? L.map(q=>mRow(q.sym,q.name,fmtPx(q.px),q.pct)).join('')
-      : `<div class="mload">${mkt.fetching?'Loading…':'Couldn’t load — tap the Explore tab again to retry.'}</div>`; };
+      : (mkt.fetching ? skel(4) : `<div class="mload">Couldn’t load — tap the Explore tab again to retry.</div>`); };
   fill('most_actives','activeList'); fill('day_gainers','gainList'); fill('day_losers','loseList');
   /* row taps are handled by one delegated listener on #page-explore (app.js) —
      no per-row wiring, so rows re-rendered mid-fetch can never lose their handler */
