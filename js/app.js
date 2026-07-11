@@ -251,4 +251,21 @@ renderAll();
 animateTotal();
 refreshAll(false).then(schedulePoll);
 setInterval(()=>{ if(!state.fetching) setStatus(); }, 1000);
-if('serviceWorker' in navigator){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); } // keep the "Xs ago" stamp ticking
+/* ---- bulletproof auto-update ----
+   updateViaCache:'none' forces the browser to fetch sw.js fresh every check (never from
+   its HTTP cache) — without this, a cached sw.js hides new versions and the app goes stale.
+   When a new worker takes control we reload once so the new code shows immediately. */
+if('serviceWorker' in navigator){
+  let reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(reloading) return; reloading=true; location.reload();
+  });
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(reg=>{
+      reg.update();
+      // re-check for a new version whenever the app comes back to the foreground
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) reg.update(); });
+      setInterval(()=>reg.update(), 60*60*1000); // and hourly while open
+    }).catch(()=>{});
+  });
+}
