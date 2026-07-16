@@ -269,3 +269,59 @@ if('serviceWorker' in navigator){
     }).catch(()=>{});
   });
 }
+
+/* ============ MARKET OPEN & CLOSE OVERVIEWS ============
+   The "daily update message" ×2, delivered the no-server way: the first time the
+   app is opened during market hours you get the OPEN overview (how the day is
+   starting), and the first open after 4pm ET you get the CLOSE overview — both
+   built from the drivers math. Once per event, per day. */
+function etParts(){
+  const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',weekday:'short',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit'}).formatToParts(new Date());
+  const g=t=>p.find(x=>x.type===t).value;
+  return { wd:g('weekday'), h:+g('hour'), iso:`${g('year')}-${g('month')}-${g('day')}` };
+}
+function lastCloseKey(){ // YYYY-MM-DD of the most recently COMPLETED US trading day
+  const {wd,h,iso}=etParts();
+  const d=new Date(iso+'T00:00:00Z');
+  const dow={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[wd];
+  let back=0;
+  if(dow===0) back=2; else if(dow===6) back=1; else if(h<16) back=(dow===1)?3:1;
+  d.setUTCDate(d.getUTCDate()-back);
+  return d.toISOString().slice(0,10);
+}
+function maybeShowRecap(){
+  if(lsGet('pt_recap_off')) return;
+  if(document.body.classList.contains('locked')) return;
+  if(!$('detail').classList.contains('hidden') || !$('editModal').classList.contains('hidden')) return; // don't interrupt
+  if(!state.live) return;                // need fresh prices to tell the truth
+  const open=marketOpen();
+  const day = open ? etParts().iso : lastCloseKey();
+  const key = day + (open ? '-open' : '-close');
+  if(lsGet('pt_recap_last')===key) return;
+  const rs=rows('all'); if(!rs.length) return;
+  if(!open){ // for a close recap the quotes must actually be from that close day
+    const newest=Math.max(...uniqSyms().map(s=>state.quotes[s]?state.quotes[s].ts:0));
+    if(dayStr(newest)<day) return;
+  }
+  const t=totals('all');
+  const dayPct=(t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
+  const items=rs.map(r=>{ const pv=prevOf(r.sym), pc=priceOf(r.sym);
+    if(!(pv>0&&pc>0)) return null; return {sym:r.sym, pct:(pc/pv-1)*100, imp:r.qty*(pc-pv)}; }).filter(Boolean);
+  const ups=items.filter(x=>x.imp>0).sort((a,b)=>b.imp-a.imp).slice(0,3);
+  const dns=items.filter(x=>x.imp<0).sort((a,b)=>a.imp-b.imp).slice(0,3);
+  const voo=state.quotes.VOO, sp=(voo&&voo.prev>0)?(voo.price/voo.prev-1)*100:null;
+  const row=x=>`<div class="krow"><span class="k">${esc(x.sym.replace('-','.'))}</span>
+    <span><span class="${cls(x.imp)}">${fmtSign(x.imp)}</span> <span class="pctpill ${x.pct>=0?'up':'down'}" style="font-size:10px">${fmtPct(x.pct)}</span></span></div>`;
+  const nice=new Date(day+'T12:00:00').toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'});
+  const vsSp = sp!=null ? ` — ${dayPct-sp>=0?'ahead of':'behind'} the S&P 500 (${fmtPct(sp)}) by ${Math.abs(dayPct-sp).toFixed(2)}%` : '';
+  openInfoSheet((open?'Markets open · ':'Market close · ')+nice, `
+    <div style="font-size:28px;font-weight:800;margin:4px 0 2px" class="${cls(t.day)}">${fmtSign(t.day)}</div>
+    <p style="margin-top:4px">${open
+      ? `Your portfolio is <b class="${cls(t.day)}">${fmtPct(dayPct)}</b> so far today at <b>${fmt(t.value)}</b>${vsSp}.`
+      : `Your portfolio closed <b class="${cls(t.day)}">${fmtPct(dayPct)}</b> at <b>${fmt(t.value)}</b>${vsSp}.`}</p>
+    ${ups.length?`<div style="font-weight:700;font-size:13px;margin-top:14px">Top movers</div>${ups.map(row).join('')}`:''}
+    ${dns.length?`<div style="font-weight:700;font-size:13px;margin-top:14px">Laggards</div>${dns.map(row).join('')}`:''}
+    <div class="inc-note" style="margin-top:14px">Shows once at each market open and close. <a href="#" id="recapOff" style="color:var(--mut)">Don't show automatically</a></div>`);
+  const off=$('recapOff'); if(off) off.onclick=e=>{ e.preventDefault(); lsSet('pt_recap_off',true); closeDetail(); };
+  lsSet('pt_recap_last', key);
+}

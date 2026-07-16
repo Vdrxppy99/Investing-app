@@ -124,6 +124,7 @@ async function refreshAll(force){
   state.fetching=false;
   $('refreshBtn').classList.remove('spinning');
   persist(); renderAll();
+  if(typeof maybeShowRecap==='function') maybeShowRecap();
 }
 /* --- live polling: every few seconds while the US market is open --- */
 let failStreak=0, pollTimer=null;
