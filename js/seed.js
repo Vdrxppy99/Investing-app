@@ -6,12 +6,13 @@ const NAMES = {
   'VXF':'Vanguard Extended Market ETF', 'VXUS':'Vanguard Total Intl Stock ETF',
   'VYM':'Vanguard High Dividend Yield ETF', 'BRK-B':'Berkshire Hathaway B'
 };
-/* real company/fund logos via Google's favicon service — <img> hotlinking is allowed,
-   and every badge falls back to its letter tile if the logo fails or you're offline */
-/* Real logos ONLY for individual companies (distinct, instantly recognizable).
-   Funds/ETFs keep their colored letter tiles — five Vanguard ETFs would otherwise
-   all show the identical Vanguard logo and be impossible to tell apart. */
+/* Real logos everywhere (per owner request) — funds show their issuer's mark like
+   Delta does; rows lead with the fund NAME so same-issuer funds stay distinguishable.
+   Every badge still crossfades in over its colored letter tile and falls back to it. */
 const TICKER_DOMAINS = {
+  VOO:'vanguard.com', VTI:'vanguard.com', VXF:'vanguard.com', VXUS:'vanguard.com', VYM:'vanguard.com',
+  VT:'vanguard.com', VNQ:'vanguard.com', VGT:'vanguard.com', BND:'vanguard.com',
+  SCHD:'schwab.com', QQQ:'invesco.com', AVUV:'avantisinvestors.com', GLDM:'ssga.com',
   'BRK-B':'berkshirehathaway.com',
   NVDA:'nvidia.com', MSFT:'microsoft.com', AAPL:'apple.com', AMZN:'amazon.com', GOOGL:'google.com',
   META:'meta.com', AVGO:'broadcom.com', TSLA:'tesla.com', JPM:'jpmorganchase.com', TSM:'tsmc.com',
