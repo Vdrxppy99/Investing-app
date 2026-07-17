@@ -29,16 +29,31 @@ const EXPLAIN = {
   'Invested':['Invested','Your cost basis: the total you paid for the shares you still hold in this account.']
 };
 function openInfoSheet(title, html){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX">✕</button></div><div class="infobody">${html}</div>`;
+  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div><div class="infobody">${html}</div>`;
   $('detail').classList.remove('hidden');
   $('detailX').onclick=closeDetail;
+  $('detailX').focus({preventScroll:true});
+}
+/* in-app replacements for native alert()/confirm() — they match the design system
+   (and never say "localhost says…"). Vault flows keep native dialogs: they run pre-unlock. */
+function toast(msg, bad){
+  const t=$('toast'); if(!t) return;
+  t.textContent=msg; t.className='show'+(bad?' bad':'');
+  clearTimeout(t._h); t._h=setTimeout(()=>{ t.className=''; }, 2800);
+}
+function showConfirm(title, msg, yesLabel, onYes){
+  openInfoSheet(title, `<p>${msg}</p>
+    <div class="ebtns"><button class="btn warn" id="cfYes">${yesLabel}</button><button class="btn sec" id="cfNo">Cancel</button></div>`);
+  $('cfYes').onclick=()=>{ closeDetail(); onYes(); };
+  $('cfNo').onclick=closeDetail;
 }
 function explainStat(key){ const e=EXPLAIN[key]; if(e) openInfoSheet(e[0], `<p>${e[1]}</p>`); }
 function openListSheet(title, bodyHtml, note){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX">✕</button></div>
+  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>
     ${bodyHtml}${note?`<div class="inc-note">${note}</div>`:''}`;
   $('detail').classList.remove('hidden');
   $('detailX').onclick=closeDetail;
+  $('detailX').focus({preventScroll:true});
 }
 async function openStockSheet(sym, name){
   if(!sym) return;
@@ -57,6 +72,7 @@ async function openStockSheet(sym, name){
     <div id="sheetNews" data-sym="${esc(sym)}"></div>`;
   $('detail').classList.remove('hidden');
   $('detailX').onclick=closeDetail;
+  $('detailX').focus({preventScroll:true});
   if(!sym.startsWith('^')) loadSheetNews(sym);
   const inWatch=()=>(state.watch||[]).some(w=>w.sym===sym);
   const paintWatch=()=>{ const b=$('watchBtn'); if(!b) return;

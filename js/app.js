@@ -32,6 +32,8 @@ function showPage(p){
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('hidden', el.id!=='page-'+p));
   document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on', b.dataset.page===p));
   window.scrollTo(0,0);
+  // entrance animation plays once per page per session, not on every revisit
+  const pg=$('page-'+p); if(pg && !pg.classList.contains('seen')) setTimeout(()=>pg.classList.add('seen'), 450);
   if(p==='explore') refreshMarkets(false);
   if(p==='news') refreshNews(false);
   if(p==='insights') renderInsights();
@@ -79,17 +81,21 @@ function ringSvg(pct, color, r){
     <circle class="rc" cx="${R+8}" cy="${R+8}" r="${R}"/>
     <circle class="rp" cx="${R+8}" cy="${R+8}" r="${R}" style="stroke:${color};stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off.toFixed(1)}"/></svg>`;
 }
+function renderGoalForm(prefill){ // shared by first-time setup and "Change goal" (prefilled — never lose the number)
+  const card=$('goalCard');
+  card.querySelector('.card-title').style.display='';
+  $('goalBody').innerHTML=`<div class="goalset">
+    <div style="color:var(--mut);font-size:12.5px;line-height:1.5;margin-bottom:10px;font-weight:500">Set a target and track your progress with a projected finish date based on your real return.</div>
+    <input id="goalInput" type="number" inputmode="decimal" placeholder="Target amount, e.g. 100000" aria-label="Goal amount"${prefill>0?` value="${prefill}"`:''}>
+    <button class="btn pri" id="goalSave" style="width:100%;margin-top:10px">${prefill>0?'Update goal':'Set goal'}</button>
+    ${prefill>0?'<div class="ebtns" style="margin-top:8px"><button class="btn sec" id="goalCancel" style="flex:1">Cancel</button><button class="btn warn" id="goalRemove" style="flex:1">Remove goal</button></div>':''}</div>`;
+  $('goalSave').onclick=()=>{ const v=+$('goalInput').value; if(v>0){ state.goal={amt:v}; lsSet('pt_goal',state.goal); renderGoal(); if(typeof renderProjection==='function' && !$('page-insights').classList.contains('hidden')) renderProjection(); } };
+  const gc=$('goalCancel'); if(gc) gc.onclick=renderGoal;
+  const gr=$('goalRemove'); if(gr) gr.onclick=()=>{ state.goal=null; lsSet('pt_goal',null); renderGoal(); };
+}
 function renderGoal(){
   const card=$('goalCard'), t=totals('all');
-  if(!state.goal || !(state.goal.amt>0)){
-    card.querySelector('.card-title').style.display='';
-    $('goalBody').innerHTML=`<div class="goalset">
-      <div style="color:var(--mut);font-size:12.5px;line-height:1.5;margin-bottom:10px;font-weight:500">Set a target and track your progress with a projected finish date based on your real return.</div>
-      <input id="goalInput" type="number" inputmode="decimal" placeholder="Target amount, e.g. 100000">
-      <button class="btn pri" id="goalSave" style="width:100%;margin-top:10px">Set goal</button></div>`;
-    $('goalSave').onclick=()=>{ const v=+$('goalInput').value; if(v>0){ state.goal={amt:v}; lsSet('pt_goal',state.goal); renderGoal(); } };
-    return;
-  }
+  if(!state.goal || !(state.goal.amt>0)){ renderGoalForm(0); return; }
   const goal=state.goal.amt, pct=t.value/goal, remain=goal-t.value;
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.15):0.08; // cap optimism
   let eta='';
@@ -106,14 +112,13 @@ function renderGoal(){
     <div class="goalinfo"><div class="gt">${fmt(t.value)} of ${fmt(goal)}</div>
       <div class="gs">${remain>0?fmt(remain)+' to go · ':''}${eta}</div>
       <div class="gs" style="margin-top:6px"><a href="#" id="goalEdit" style="color:var(--mut)">Change goal</a></div></div></div>`;
-  $('goalEdit').onclick=e=>{ e.preventDefault(); state.goal=null; lsSet('pt_goal',null); renderGoal(); };
+  $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal); };
 }
 function healthScore(){
   const rs=rows('all'), t=totals('all'), inv=Math.max(1,t.value-cashFor('all'));
   const metrics=[];
   // 1. Diversification — broad index funds ARE diversification; only single companies count as concentration
-  const DIVERSIFIED=new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']); // BRK.B = diversified conglomerate, not a single-product bet
-  const singles=rs.filter(r=>!DIVERSIFIED.has(r.sym)).map(r=>({sym:r.sym, w:r.qty*priceOf(r.sym)/inv})).sort((a,b)=>b.w-a.w);
+  const singles=rs.filter(r=>!DIVERSIFIED_FUNDS.has(r.sym)).map(r=>({sym:r.sym, w:r.qty*priceOf(r.sym)/inv})).sort((a,b)=>b.w-a.w);
   const top=singles.length?singles[0].w:0;
   const divScore=Math.max(0,Math.min(100, 100-(top-0.10)*250));
   metrics.push({k:'Diversification', v:divScore,
@@ -138,9 +143,9 @@ function healthScore(){
 function renderHealth(){
   const {score,metrics}=healthScore();
   const grade=score>=85?'A':score>=75?'B':score>=65?'C':score>=50?'D':'F';
-  const col=score>=75?cvar('--green'):score>=55?'#fab219':cvar('--red');
+  const col=score>=75?cvar('--green'):score>=55?cvar('--warn'):cvar('--red');
   const label=score>=85?'Excellent':score>=75?'Strong':score>=65?'Solid':score>=50?'Needs work':'At risk';
-  const barCol=v=>v>=75?cvar('--green'):v>=50?'#fab219':cvar('--red');
+  const barCol=v=>v>=75?cvar('--green'):v>=50?cvar('--warn'):cvar('--red');
   const tips=metrics.filter(m=>m.tip).slice(0,3);
   $('healthBody').innerHTML=`
     <div class="hsplit">
@@ -246,6 +251,7 @@ $('miniBar').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
 })();
 renderAll();
 animateTotal();
+setTimeout(()=>$('page-portfolio').classList.add('seen'), 600); // launch animation played — don't replay on tab returns
 refreshAll(false).then(schedulePoll);
 setInterval(()=>{ if(!state.fetching) setStatus(); }, 1000);
 /* ---- bulletproof auto-update ----
@@ -277,13 +283,13 @@ function etParts(){
   const g=t=>p.find(x=>x.type===t).value;
   return { wd:g('weekday'), h:+g('hour'), iso:`${g('year')}-${g('month')}-${g('day')}` };
 }
-function lastCloseKey(){ // YYYY-MM-DD of the most recently COMPLETED US trading day
+function lastCloseKey(){ // YYYY-MM-DD of the most recently COMPLETED US trading day (weekend + holiday aware)
   const {wd,h,iso}=etParts();
   const d=new Date(iso+'T00:00:00Z');
+  const isTrading=x=>{ const g=x.getUTCDay(); return g!==0 && g!==6 && !US_MARKET_HOLIDAYS.has(x.toISOString().slice(0,10)); };
   const dow={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[wd];
-  let back=0;
-  if(dow===0) back=2; else if(dow===6) back=1; else if(h<16) back=(dow===1)?3:1;
-  d.setUTCDate(d.getUTCDate()-back);
+  if(dow>=1 && dow<=5 && h>=16 && isTrading(d)) return d.toISOString().slice(0,10);
+  do{ d.setUTCDate(d.getUTCDate()-1); }while(!isTrading(d));
   return d.toISOString().slice(0,10);
 }
 function maybeShowRecap(){

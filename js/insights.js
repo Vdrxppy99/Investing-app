@@ -150,7 +150,7 @@ function riskStats(){
 function renderRiskCard(){
   const r=riskStats();
   if(!r){ $('riskCard').innerHTML='<div class="it">Risk <span class="chev">›</span></div><div class="sub-n">Needs a year of price history — connect once.</div>'; return; }
-  const lvl = r.vol<10?['Low',cvar('--green')]:r.vol<18?['Moderate','#fab219']:r.vol<28?['Elevated','#ec835a']:['High',cvar('--red')];
+  const lvl = r.vol<10?['Low',cvar('--green')]:r.vol<18?['Moderate',cvar('--warn')]:r.vol<28?['Elevated','#ec835a']:['High',cvar('--red')];
   $('riskCard').innerHTML='<div class="it">Risk <span class="chev">›</span></div>'+
     `<span class="risk-badge" style="background:${lvl[1]}22;color:${lvl[1]}">${lvl[0]}</span>`+
     `<div class="krow"><span class="k">Volatility (1Y)</span><span>${r.vol.toFixed(1)}%</span></div>
@@ -205,34 +205,30 @@ function openRiskSheet(){
 }
 function openHealthSheet(){
   const {score,metrics}=healthScore();
-  const barCol=v=>v>=75?cvar('--green'):v>=50?'#fab219':cvar('--red');
+  const barCol=v=>v>=75?cvar('--green'):v>=50?cvar('--warn'):cvar('--red');
   const body = `<p>A single grade for your portfolio\'s shape, averaged from four checks. Tap any bar\'s topic below to see where you stand and how to improve.</p>`
     + metrics.map(m=>`<div class="hmet"><div class="t"><span>${m.k}</span><span class="s">${m.detail} · ${Math.round(m.v)}/100</span></div><div class="bar"><i style="width:${m.v.toFixed(0)}%;background:${barCol(m.v)}"></i></div>${m.tip?`<div class="htip" style="margin-top:7px"><span class="ti">→</span><span>${m.tip}</span></div>`:'<div class="htip" style="margin-top:7px;color:var(--mut)"><span class="ti">✓</span><span>Looking good here.</span></div>'}</div>`).join('')
     + `<p style="margin-top:6px;color:var(--faint);font-size:11px">Score = average of the four checks. Guidance, not financial advice.</p>`;
   openInfoSheet('Portfolio Health · '+score+'/100', body);
 }
-function periodReturns(){ // deposit-adjusted returns: modified Dietz short windows, chained monthly Dietz long ones
+function monthlyDietzReturns(){ // 'YYYY-MM' -> deposit-adjusted % return — shared by heatmap + Monte Carlo
+  const s=buildSeries('all'); if(!s||s.labels.length<3) return null;
+  const eom={}; for(let i=0;i<s.labels.length;i++) eom[s.labels[i].slice(0,7)]=s.value[i];
+  const dep={}; for(const l of state.lots){ if(!l.div) dep[l.date.slice(0,7)]=(dep[l.date.slice(0,7)]||0)+l.cost; }
+  const months=Object.keys(eom).sort(); const ret={};
+  for(let i=1;i<months.length;i++){ const m=months[i], v0=eom[months[i-1]], d=dep[m]||0;
+    if(v0>0) ret[m]=(eom[m]-v0-d)/(v0+d/2)*100; }
+  return {months, ret};
+}
+function periodReturns(){ // deposit-adjusted returns — ONE modified-Dietz formula for every window
+  // (the old month-chaining for 6M/YTD/1Y/All silently dropped the first partial month of history)
   const s=buildSeries('all'); if(!s||s.labels.length<3) return [];
-  const n=s.labels.length;
-  const eom={}; for(let i=0;i<n;i++) eom[s.labels[i].slice(0,7)]=s.value[i];
-  const depM={}; for(const l of state.lots){ if(!l.div) depM[l.date.slice(0,7)]=(depM[l.date.slice(0,7)]||0)+l.cost; }
-  const months=Object.keys(eom).sort(); const mret={};
-  for(let i=1;i<months.length;i++){ const m=months[i], v0=eom[months[i-1]], d=depM[m]||0;
-    if(v0>0) mret[m]=(eom[m]-v0-d)/(v0+d/2); }
-  const out=[];
-  for(const [k,cut,mode] of [['1W',rangeCutoff('1W'),'dietz'],['1M',rangeCutoff('1M'),'dietz'],['6M',rangeCutoff('6M'),'chain'],['YTD',rangeCutoff('YTD'),'chainIncl'],['1Y',rangeCutoff('1Y'),'chain'],['All','0000-00-00','chainIncl']]){
+  const n=s.labels.length, out=[];
+  for(const [k,cut] of [['1W',rangeCutoff('1W')],['1M',rangeCutoff('1M')],['6M',rangeCutoff('6M')],['YTD',rangeCutoff('YTD')],['1Y',rangeCutoff('1Y')],['All','0000-00-00']]){
     let i=s.labels.findIndex(d=>d>=cut); if(i<0) i=0;
     if(i>=n-1){ out.push({k,p:null}); continue; }
-    let p=null;
-    if(mode==='dietz'){
-      const V0=s.value[i], D=state.lots.filter(l=>!l.div&&l.date>s.labels[i]).reduce((a,l)=>a+l.cost,0);
-      if(V0+D/2>0) p=(s.value[n-1]-V0-D)/(V0+D/2)*100;
-    } else {
-      const cutM=s.labels[i].slice(0,7); let acc=1, any=false;
-      for(const m of months) if(mret[m]!=null && (mode==='chainIncl' ? m>=cutM : m>cutM)){ acc*=1+mret[m]; any=true; }
-      if(any) p=(acc-1)*100;
-    }
-    out.push({k,p});
+    const V0=s.value[i], D=state.lots.filter(l=>!l.div&&l.date>s.labels[i]).reduce((a,l)=>a+l.cost,0);
+    out.push({k, p:(V0+D/2>0) ? (s.value[n-1]-V0-D)/(V0+D/2)*100 : null});
   }
   return out;
 }
@@ -354,18 +350,10 @@ function renderSectorDonut(){
   $('sectorBars').innerHTML = top.map(([label,v])=>`<div class="hbrow"><div class="t"><span>${esc(label)}</span><span class="p">${(v/tot*100).toFixed(1)}%</span></div><div class="bar"><i style="width:${(v/max*100).toFixed(1)}%"></i></div></div>`).join('');
 }
 function renderHeatmap(){
-  const s=buildSeries('all'); if(!s||s.labels.length<40){ $('hmBody').innerHTML='<div class="sub-n">Needs price history.</div>'; return; }
-  const endOfMonth={}; // 'YYYY-MM' -> last value seen that month
-  for(let i=0;i<s.labels.length;i++) endOfMonth[s.labels[i].slice(0,7)]=s.value[i];
-  const dep={}; // deposits per month
-  for(const l of state.lots){ if(!l.div) dep[l.date.slice(0,7)]=(dep[l.date.slice(0,7)]||0)+l.cost; }
-  const months=Object.keys(endOfMonth).sort();
-  const ret={}; const years=new Set();
-  for(let i=1;i<months.length;i++){
-    const m=months[i], v0=endOfMonth[months[i-1]], v1=endOfMonth[m], d=dep[m]||0;
-    if(v0>0) ret[m]=(v1-v0-d)/(v0+d/2)*100;
-    years.add(m.slice(0,4));
-  }
+  const md=monthlyDietzReturns();
+  if(!md || Object.keys(md.ret).length<2){ $('hmBody').innerHTML='<div class="sub-n">Needs price history.</div>'; return; }
+  const ret=md.ret;
+  const years=new Set(Object.keys(ret).map(m=>m.slice(0,4)));
   const MN=['J','F','M','A','M','J','J','A','S','O','N','D'];
   let html='<table class="hm"><tr><th></th>'+MN.map(m=>`<th>${m}</th>`).join('')+'<th>Yr</th></tr>';
   for(const y of [...years].sort().reverse()){
@@ -413,7 +401,7 @@ function renderContribChart(){
 }
 
 /* ============ LOOKING AHEAD (coach + projection) ============ */
-function cfmt(v){ return state.view.priv?'••••':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact',maximumFractionDigits:1}).format(v*rate()); }
+/* cfmt (compact currency, privacy-aware) now lives in core.js */
 function contribPace(){ // months of history + $/month pace from real buys
   const buys=state.lots.filter(l=>!l.div);
   const months=buys.length?Math.max(1,(Date.now()-new Date(buys.map(l=>l.date).sort()[0]).getTime())/2629800000):12;
@@ -439,9 +427,8 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
         b:`${worst.sym.replace('-','.')} sits ${Math.abs(worst.d).toFixed(1)}% below the target mix you set. Pointing the next deposit at it restores your chosen balance — no selling, no taxes.`});
     }
   }
-  // single-company weight (index funds are already diversified)
-  const DIV=new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']); // BRK.B = diversified conglomerate
-  const singles=rs.filter(x=>!DIV.has(x.sym)).map(x=>({sym:x.sym, w:x.qty*priceOf(x.sym)/Math.max(1,t.value)})).sort((a,b)=>b.w-a.w);
+  // single-company weight (index funds are already diversified — shared set in seed.js)
+  const singles=rs.filter(x=>!DIVERSIFIED_FUNDS.has(x.sym)).map(x=>({sym:x.sym, w:x.qty*priceOf(x.sym)/Math.max(1,t.value)})).sort((a,b)=>b.w-a.w);
   if(singles.length && singles[0].w>0.15) items.push({ic:'⚖️', title:'Trim a big bet', detail:`${singles[0].sym.replace('-','.')} is ${(singles[0].w*100).toFixed(0)}% of everything`, sev:'warn', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
     b:`${(singles[0].w*100).toFixed(0)}% of everything rides on one company. Steering new contributions to your index funds dilutes that gradually — no selling, no taxes.`});
   // all-equity note
@@ -505,7 +492,7 @@ function renderProjection(){
      fill:{target:0}, backgroundColor:`rgba(${cvar('--green-rgb')},.07)`, tension:.15},
     {label:scen[1][0], data:data[1], borderColor:cvar('--brand'), borderWidth:2.2, pointRadius:0, fill:false, tension:.15}
   ];
-  if(goal && goal<data[2][N]*1.4) ds.push({label:'Goal', data:labels.map(()=>goal), borderColor:'#fab219', borderDash:[6,5], borderWidth:1.2, pointRadius:0, fill:false});
+  if(goal && goal<data[2][N]*1.4) ds.push({label:'Goal', data:labels.map(()=>goal), borderColor:cvar('--warn'), borderDash:[6,5], borderWidth:1.2, pointRadius:0, fill:false});
   const projChart=new Chart(el,{type:'line',data:{labels,datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},
       plugins:{legend:{display:false},tooltip:{enabled:false}},
@@ -526,6 +513,26 @@ function renderProjection(){
       fwd+=r2.qty*dv.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0); }
     if(fwd>0 && V0>0) divLine=`Dividends alone could grow from ${fmt(fwd)}/yr today to ~${fmt(fwd*data[1][N]/V0)}/yr by ${y0+projYears}. `; }
   $('projNote').textContent=divLine+`What today's ${cfmt(V0)} can turn into on its own — no future deposits counted, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ${goal?'Gold dashed line = your goal. ':''}Not advice.`;
+  renderMonteCarlo(V0, N, goal, y0);
+}
+/* Monte Carlo: bootstrap YOUR real monthly returns into many possible futures.
+   Deterministic LCG seed → the numbers don't jitter on every re-render. */
+function renderMonteCarlo(V0, N, goal, y0){
+  const mc=$('projMC'); if(!mc) return;
+  const md=monthlyDietzReturns();
+  const pool=md?Object.values(md.ret).map(x=>x/100):[];
+  if(!(V0>0) || pool.length<12){ mc.textContent=''; return; }
+  let seed=((pool.length*7919 + N*104729 + Math.round(goal||0)) >>> 0) || 1;
+  const rnd=()=>{ seed=(seed*1664525+1013904223)>>>0; return seed/4294967296; };
+  const SIMS=400, finals=[]; let hit=0;
+  for(let s=0;s<SIMS;s++){
+    let v=V0;
+    for(let m=0;m<N;m++) v*=1+pool[Math.floor(rnd()*pool.length)];
+    finals.push(v); if(goal && v>=goal) hit++;
+  }
+  finals.sort((a,b)=>a-b);
+  const p10=finals[Math.floor(SIMS*0.10)], p50=finals[Math.floor(SIMS*0.50)], p90=finals[Math.floor(SIMS*0.90)];
+  mc.textContent=`Monte Carlo: replaying your own ${pool.length} real months ${SIMS}× → median ${cfmt(p50)} by ${y0+N/12}, likely range ${cfmt(p10)} – ${cfmt(p90)}`+(goal?` · you hit the goal in ${Math.round(hit/SIMS*100)}% of replays.`:'.');
 }
 if($('projSeg')) $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{
   projYears=+b.dataset.y;

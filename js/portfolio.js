@@ -112,6 +112,8 @@ function renderAlloc(){
 function renderTargetMix(rs, tot){
   const box=$('tgtWrap'); if(!box) return;
   if(box.querySelector('.tgtedit')) return; // editor open — don't wipe it on a background refresh
+  const depInp=box.querySelector('#tgtDep'); // ...same for a deposit being planned
+  if(depInp && (depInp.value || document.activeElement===depInp)) return;
   const tg=state.targets;
   if(!tg || !Object.keys(tg).length){
     box.innerHTML=`<a href="#" id="tgtSet" class="tgtlink">🎛 Set a target mix — see drift and where new money should go ›</a>`;
@@ -132,8 +134,37 @@ function renderTargetMix(rs, tot){
   const tip = (worst && worst.d<-1)
     ? `<div class="tgtnext">Next deposit → <b>${esc(worst.sym.replace('-','.'))}</b> (${Math.abs(worst.d).toFixed(1)}% under target). Buying the laggard rebalances without selling — no taxes.</div>`
     : `<div class="tgtnext">✓ Everything is within reach of its target.</div>`;
-  box.innerHTML=`<div class="tgthead">Target mix · bar = now, notch = target <a href="#" id="tgtEditLnk">edit</a></div>${rowsH}${tip}`;
+  const plan=`<div class="tgtplan"><input id="tgtDep" type="number" inputmode="decimal" placeholder="Adding money? e.g. 500" aria-label="Deposit amount to plan">
+    <button class="btn pri" id="tgtDepGo" style="min-height:38px;padding:8px 14px">Plan it</button></div><div id="tgtDepOut"></div>`;
+  box.innerHTML=`<div class="tgthead">Target mix · bar = now, notch = target <a href="#" id="tgtEditLnk">edit</a></div>${rowsH}${tip}${plan}`;
   $('tgtEditLnk').onclick=e=>{ e.preventDefault(); openTargetEditor(rs, tot); };
+  $('tgtDepGo').onclick=()=>planDeposit(rs, tot);
+  $('tgtDep').addEventListener('keydown',e=>{ if(e.key==='Enter') planDeposit(rs, tot); });
+}
+function planDeposit(rs, tot){ // split a deposit so it closes the target-mix gaps first
+  const D=+$('tgtDep').value, out=$('tgtDepOut'), tg=state.targets;
+  if(!(D>0)||!tg){ out.innerHTML=''; return; }
+  const newTot=tot+D;
+  const need=[]; let needSum=0;
+  for(const [sym,pct] of Object.entries(tg)){
+    const cur=(rs.find(r=>r.sym===sym)||{qty:0}).qty*priceOf(sym);
+    const gap=Math.max(0, pct/100*newTot - cur); // $ short of target AFTER the deposit lands
+    if(gap>0){ need.push({sym,gap}); needSum+=gap; }
+  }
+  let allocs=[];
+  if(needSum<=0){ // already balanced — split by target weights
+    allocs=Object.entries(tg).map(([sym,pct])=>({sym, amt:D*pct/100}));
+  } else if(needSum<=D){ // close every gap, spread the remainder by target weights
+    const rest=D-needSum;
+    allocs=need.map(x=>({sym:x.sym, amt:x.gap + rest*(tg[x.sym]||0)/100}));
+    const used=allocs.reduce((a,x)=>a+x.amt,0);
+    if(used<D-0.5 && allocs.length) allocs[0].amt+=D-used;
+  } else { // not enough to close everything — biggest gaps get their fair share
+    allocs=need.map(x=>({sym:x.sym, amt:D*x.gap/needSum}));
+  }
+  allocs=allocs.filter(x=>x.amt>=1).sort((a,b)=>b.amt-a.amt);
+  out.innerHTML=allocs.map(x=>`<div class="inc-row"><span>${esc(x.sym.replace('-','.'))}</span><span><b>${fmt(x.amt)}</b></span></div>`).join('')
+    +`<div class="inc-note">Buying in these amounts lands the mix closest to your targets — estimates, not advice.</div>`;
 }
 function openTargetEditor(rs, tot){
   const box=$('tgtWrap'), tg=state.targets||{};
@@ -148,7 +179,7 @@ function openTargetEditor(rs, tot){
     $('tgtSum').textContent=`Adds up to ${s.toFixed(0)}%`+(Math.abs(s-100)<=2?' ✓':' — aim for 100%'); return s; };
   box.querySelectorAll('[data-tsym]').forEach(i=>i.oninput=sum); sum();
   $('tgtSave').onclick=()=>{
-    const s=sum(); if(Math.abs(s-100)>5){ alert('Targets should add up to roughly 100% (now '+s.toFixed(0)+'%).'); return; }
+    const s=sum(); if(Math.abs(s-100)>5){ $('tgtSum').innerHTML='<span style="color:var(--red)">Targets should add up to roughly 100% — now '+s.toFixed(0)+'%.</span>'; return; }
     const t={}; box.querySelectorAll('[data-tsym]').forEach(i=>{ const v=+i.value||0; if(v>0) t[i.dataset.tsym]=v; });
     state.targets=Object.keys(t).length?t:null; lsSet('pt_targets',state.targets);
     box.innerHTML=''; renderAlloc(); if(typeof renderCoach==='function') renderCoach();
@@ -247,15 +278,26 @@ function renderStale(){
   $('staleX').onclick = ()=>{ staleDismissed=true; el.classList.add('hidden'); };
 }
 function markConfirmed(){ state.confirmed = dayStr(Date.now()); staleDismissed=false; }
+/* NYSE full-day closures (update yearly — one line of maintenance) */
+const US_MARKET_HOLIDAYS=new Set([
+  '2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25','2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25',
+  '2027-01-01','2027-01-18','2027-02-15','2027-03-26','2027-05-31','2027-06-18','2027-07-05','2027-09-06','2027-11-25','2027-12-24'
+]);
 function marketOpen(){
-  const parts = new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',weekday:'short',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date());
+  const parts = new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',weekday:'short',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date());
   const g = t=>{ const x=parts.find(p=>p.type===t); return x?x.value:''; };
   const wd = g('weekday'); if(wd==='Sat'||wd==='Sun') return false;
+  if(US_MARKET_HOLIDAYS.has(`${g('year')}-${g('month')}-${g('day')}`)) return false;
   const m = parseInt(g('hour'),10)*60 + parseInt(g('minute'),10);
   return m>=570 && m<960; // 9:30–16:00 ET
 }
 function setStatus(){
   const st=$('status');
+  if(window.vaultSaveError || window.storageFull){ // data at risk beats everything else on this line
+    st.className='status err';
+    $('statusTx').textContent='⚠ Couldn’t save your changes on this device — export a backup now (⚙︎).';
+    return;
+  }
   const newest = Math.max(...uniqSyms().map(s=>state.quotes[s]?state.quotes[s].ts:0), SEED_TS);
   const age = Math.max(0, Math.round((Date.now()-newest)/1000));
   let when;
@@ -275,7 +317,19 @@ function rangeCutoff(range){ // 'YYYY-MM-DD' string; labels are compared lexicog
   if(range==='YTD') return new Date().getFullYear()+'-01-01';
   return dayStr(Date.now()-(RANGES[range]||31)*86400000);
 }
+/* buildSeries is the app's hottest expensive path (900+ days × every symbol) and is
+   called by the chart, period pills, drawdown, risk, heatmap… — memoize on everything
+   that can change its output. quotesRev only bumps on REAL price changes (core.js). */
+let _bsKey='', _bsVal=null;
 function buildSeries(acc){
+  let hts=0; for(const s of uniqSyms()){ const h=state.history[s]; if(h&&h.ts&&h.ts>hts) hts=h.ts; }
+  const key=acc+'|'+state.lots.length+'|'+state.holdings.map(h=>h.acc+h.sym+h.qty+':'+h.cost).join(',')+'|'+cashFor(acc)+'|'+hts+'|'+quotesRev;
+  if(key===_bsKey) return _bsVal;
+  const s=buildSeriesRaw(acc);
+  _bsKey=key; _bsVal=s;
+  return s;
+}
+function buildSeriesRaw(acc){
   const rs = rows(acc); const cash = cashFor(acc);
   const withHist = rs.filter(r=>state.history[r.sym] && state.history[r.sym].t && state.history[r.sym].t.length>1);
   if(!withHist.length) return null;
@@ -607,6 +661,7 @@ function openDetail(sym){
     })()}<div id="sheetNews" data-sym="${esc(sym)}"></div>`;
   $('detail').classList.remove('hidden');
   $('detailX').onclick = closeDetail;
+  $('detailX').focus({preventScroll:true});
   loadSheetNews(sym);
   if(detailChart){ detailChart.destroy(); detailChart=null; }
   const h=state.history[sym];
@@ -671,10 +726,11 @@ function openEdit(){
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">`;
   $('editModal').classList.remove('hidden');
   $('editX').onclick=$('cancelEdit').onclick=()=>$('editModal').classList.add('hidden');
+  $('editX').focus({preventScroll:true});
   $('buyAdd').onclick=()=>{
     const acc=$('buyAcc').value, sym=$('buySym').value.trim().toUpperCase().replace('.','-'),
           date=$('buyDate').value, qty=+$('buyQty').value, cost=+$('buyCost').value, div=$('buyDiv').checked;
-    if(!sym || !date || !(qty>0) || !(cost>0)){ alert('Please fill in ticker, date, shares and total cost.'); return; }
+    if(!sym || !date || !(qty>0) || !(cost>0)){ toast('Fill in ticker, date, shares and total cost first.', true); return; }
     state.lots.push(div ? {acc,sym,date,qty,cost,div:true} : {acc,sym,date,qty,cost});
     const h=state.holdings.find(x=>x.acc===acc && x.sym===sym);
     if(h){ h.qty+=qty; h.cost+=cost; } else state.holdings.push({acc,sym,qty,cost});
@@ -693,7 +749,7 @@ function openEdit(){
     try{
       if(vaultFaceEnabled()) vaultDisableFace();
       else { ft.textContent='Follow the Face ID prompt…'; await vaultEnableFace(); }
-    }catch(e){ alert("Face ID unlock isn't available on this device/browser yet — the passcode still protects everything."); }
+    }catch(e){ toast("Face ID isn't available on this device yet — the passcode still protects everything.", true); }
     paintFt();
   };
   $('chgPass').onclick=async()=>{
@@ -706,7 +762,9 @@ function openEdit(){
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
   $('editSheet').querySelectorAll('.del').forEach(b=> b.onclick=()=>{ readEditInputs(); state.holdings.splice(+b.dataset.i,1); openEdit(); });
   $('addRow').onclick=()=>{ readEditInputs(); state.holdings.push({acc:'brok',sym:'',qty:0,cost:0}); openEdit(); };
-  $('resetSeed').onclick=()=>{ if(confirm('Erase ALL holdings, lots, cash and deposits from this device? Export a backup first if you might want them back.')){ state.holdings=[]; state.lots=[]; state.cash={main:0,brok:0}; state.deposits=0; state.confirmed=''; staleDismissed=false; persist(); $('editModal').classList.add('hidden'); renderAll(); } };
+  $('resetSeed').onclick=()=>showConfirm('Erase all holdings?',
+    'ALL holdings, lots, cash and deposits will be removed from this device. Export a backup first if you might want them back.',
+    'Erase everything', ()=>{ state.holdings=[]; state.lots=[]; state.cash={main:0,brok:0}; state.deposits=0; state.confirmed=''; staleDismissed=false; persist(); $('editModal').classList.add('hidden'); renderAll(); });
   $('saveEdit').onclick=()=>{
     readEditInputs();
     state.holdings = state.holdings.filter(h=>h.sym && h.qty>0);
@@ -722,7 +780,10 @@ function readEditInputs(){
     h[f] = (f==='qty'||f==='cost') ? (+inp.value||0) : inp.value.trim().toUpperCase().replace('.','-');
   });
 }
-function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_quotes',state.quotes); lsSet('pt_history',state.history); lsSet('pt_intraday',state.intraday); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_targets',state.targets); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); }
+/* persist = the SMALL personal/pref keys only. The heavy caches (quotes, history,
+   intraday, divs) are saved at their fetch sites — re-stringifying ~300KB of history
+   here on every refresh was the main-thread cost, not a safety net. */
+function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_targets',state.targets); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); }
 function exportCSV(){ // spreadsheet-friendly dump: positions, then every purchase lot
   const lines=['Positions','Account,Symbol,Shares,Cost basis USD,Price USD,Value USD,Profit USD'];
   for(const h of state.holdings){
@@ -761,8 +822,8 @@ function importBackup(file){
       if(d.goal&&d.goal.amt>0) state.goal=d.goal;
       if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
       persist(); $('editModal').classList.add('hidden'); renderAll(); refreshAll(true);
-      alert('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
-    }catch(e){ alert('That file is not a valid portfolio backup.'); }
+      toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
+    }catch(e){ toast('That file is not a valid portfolio backup.', true); }
   };
   r.readAsText(file);
 }

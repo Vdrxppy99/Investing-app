@@ -25,6 +25,9 @@ const TICKER_LOGOS = {
   'BRK-B':'https://assets.parqet.com/logos/symbol/BRK-B?format=png&size=128'
 };
 const COLORS = {'VTI':CAT[0],'VXUS':CAT[1],'VXF':CAT[2],'VOO':CAT[3],'BRK-B':CAT[4],'VYM':CAT[5]};
+/* single source of truth for "counts as diversified" (health score + coach both use it).
+   BRK.B = diversified conglomerate, never flagged like a single-product stock (owner rule). */
+const DIVERSIFIED_FUNDS = new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']);
 /* Personal data no longer ships in this public file — it lives encrypted in the
    vault on your device (js/vault.js). Fresh devices start empty: restore via
    ⚙︎ → Import backup. */

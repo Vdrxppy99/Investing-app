@@ -13,7 +13,7 @@
 <title>My Portfolio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body class="locked">
@@ -23,13 +23,13 @@
     <div class="locktitle">My Portfolio</div>
     <div class="locksub" id="lockSub">Unlocking…</div>
     <div id="lockSetup" style="display:none">
-      <input id="setPass1" type="password" placeholder="Create passcode (min 6 characters)" autocomplete="new-password">
-      <input id="setPass2" type="password" placeholder="Repeat passcode" autocomplete="new-password">
+      <input id="setPass1" type="password" placeholder="Create passcode (min 6 characters)" autocomplete="new-password" aria-label="Create passcode">
+      <input id="setPass2" type="password" placeholder="Repeat passcode" autocomplete="new-password" aria-label="Repeat passcode">
       <button class="btn pri" id="setupBtn">Create passcode</button>
       <div class="locknote">Your holdings are encrypted with this passcode on this device — nothing is sent anywhere. If you forget it, only an exported backup (⚙︎) can bring the data back.</div>
     </div>
     <div id="lockEnter" style="display:none">
-      <input id="unlockPass" type="password" placeholder="Passcode" autocomplete="current-password">
+      <input id="unlockPass" type="password" placeholder="Passcode" autocomplete="current-password" aria-label="Passcode">
       <button class="btn pri" id="unlockBtn">Unlock</button>
       <button class="btn sec" id="faceBtn" style="display:none">Unlock with Face ID</button>
       <a href="#" id="forgotLink" class="locknote" style="display:block;text-align:center;margin-top:12px">Forgot passcode?</a>
@@ -55,7 +55,7 @@
       <div class="hdr-actions">
         <button id="privBtn" title="Hide amounts" aria-label="Hide amounts"></button>
         <button id="themeBtn" title="Light / dark" aria-label="Toggle theme"></button>
-        <button id="ccyBtn" title="Switch currency">$</button>
+        <button id="ccyBtn" title="Switch currency" aria-label="Switch currency">$</button>
         <button id="editBtn" title="Edit holdings" aria-label="Edit"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 8 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H2a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 3.6 8a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H8a1.6 1.6 0 0 0 1-1.5V2a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V8a1.6 1.6 0 0 0 1.5 1H22a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
         <button id="refreshBtn" title="Refresh prices" aria-label="Refresh"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>
       </div>
@@ -115,7 +115,7 @@
 
   <section class="card" id="goalCard"><div class="card-title">Goal</div><div id="goalBody"></div></section>
 
-  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v10.1</div>
+  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v10.2</div>
 </div><!-- /page-portfolio -->
 
 <!-- ================= NEWS ================= -->
@@ -133,7 +133,7 @@
 <div id="page-explore" class="page hidden">
   <div class="pagehead" style="margin-top:14px">Explore</div>
   <div class="searchbar"><svg viewBox="0 0 24 24" class="si"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-    <input id="mktSearch" type="search" placeholder="Search any stock or ETF…" autocomplete="off" autocorrect="off" spellcheck="false">
+    <input id="mktSearch" type="search" placeholder="Search any stock or ETF…" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Search stocks and ETFs">
     <button id="mktSearchX" style="display:none">✕</button></div>
   <div id="searchResults" class="card" style="display:none"></div>
   <div id="watchWrap" style="display:none">
@@ -192,6 +192,7 @@
       <div class="scrubro" id="projRO"></div>
       <div style="position:relative;height:190px;margin-top:10px"><canvas id="projChart"></canvas></div>
       <div class="estnote" id="projNote"></div>
+      <div class="estnote" id="projMC" style="color:var(--mut)"></div>
     </div>
   </div>
 
@@ -225,8 +226,9 @@
   <button data-page="insights"><svg viewBox="0 0 24 24"><path d="M4 20V14"/><path d="M10 20V10"/><path d="M16 20v-6"/><path d="M4 8l6-4 5 5 5-4"/></svg>Insights</button>
 </nav>
 
-<div id="detail" class="overlay hidden"><div class="sheet" id="detailSheet"></div></div>
-<div id="editModal" class="overlay hidden"><div class="sheet" id="editSheet"></div></div>
+<div id="detail" class="overlay hidden"><div class="sheet" id="detailSheet" role="dialog" aria-modal="true"></div></div>
+<div id="editModal" class="overlay hidden"><div class="sheet" id="editSheet" role="dialog" aria-modal="true"></div></div>
+<div id="toast" role="status"></div>
 
 <script src="js/vault.js"></script>
 </body>

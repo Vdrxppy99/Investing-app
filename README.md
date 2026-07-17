@@ -35,6 +35,7 @@ sw.js               service worker: offline shell, network-first HTML
 
 Push to `main` — GitHub Pages serves the repo root.
 **Always bump `V` in `sw.js`** when changing any css/js file, or installed clients keep the old cached version.
+**Adding a new js/css file?** It must also be added to `CORE` in `sw.js`, or offline installs will silently miss it.
 
 ## Security
 
@@ -46,4 +47,5 @@ Push to `main` — GitHub Pages serves the repo root.
 
 - All personal data lives in the browser's localStorage (nothing leaves the device). Back up via ⚙︎ → Export backup.
 - Prices: Yahoo Finance free endpoints (direct, then via CORS proxies), stooq as delayed fallback, frankfurter.dev for USD→EUR.
+- Privacy note: the free CORS proxies (allorigins, corsproxy.io) see which *tickers* are requested — never holdings, amounts, or any personal data.
 - Seed snapshot from the Vanguard "Unrealized Summary" PDF, 2026-07-01.

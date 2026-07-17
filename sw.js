@@ -1,11 +1,15 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v10.1'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
+const V = 'pt-v10.2'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
+// ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
+//   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
   './css/app.css',
   './js/vault.js', './js/boot.js', './js/seed.js', './js/core.js', './js/portfolio.js', './js/api.js',
   './js/explore.js', './js/insights.js', './js/sheets.js', './js/news.js', './js/app.js',
-  './apple-touch-icon.png', './icon-192.png', './icon-512.png'];
+  './apple-touch-icon.png', './icon-192.png', './icon-512.png',
+  // the chart library must survive offline too — without it every chart is blank
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();

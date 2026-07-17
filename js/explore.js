@@ -145,10 +145,12 @@ async function runSearch(q){
     if(q!==lastQuery) return;
     const qs=(j.quotes||[]).filter(x=>x.symbol && (x.quoteType==='EQUITY'||x.quoteType==='ETF'||x.quoteType==='INDEX'));
     if(!qs.length){ box.innerHTML='<div class="mload" style="padding:18px">No matches for “'+esc(q)+'”.</div>'; box.style.display=''; return; }
+    // US listings first (they get live prices); foreign listings trail, dimmed
+    qs.sort((a,b)=>(a.symbol.includes('.')?1:0)-(b.symbol.includes('.')?1:0));
     box.innerHTML=qs.slice(0,8).map(x=>{
       const nm=esc(x.shortname||x.longname||'');
       const tag=x.quoteType==='ETF'?'ETF':x.quoteType==='INDEX'?'Index':esc(x.exchange||'Stock');
-      return `<div class="mrow" data-sym="${esc(x.symbol)}" data-name="${nm}">${badgeHtml(x.symbol)}
+      return `<div class="mrow${x.symbol.includes('.')?' dim':''}" data-sym="${esc(x.symbol)}" data-name="${nm}">${badgeHtml(x.symbol)}
         <div class="mmid"><div class="msym">${esc(x.symbol.replace('-','.'))}</div><div class="mname">${nm}</div></div>
         <div class="mright"><div class="mchg" style="color:var(--mut)">${tag}</div></div></div>`;
     }).join('');

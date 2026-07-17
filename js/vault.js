@@ -13,6 +13,8 @@ const LS=localStorage;
 const enc=new TextEncoder(), dec=new TextDecoder();
 const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+/* ⚠ MUST stay identical to PRIVATE_KEYS in js/core.js (this file loads alone, pre-unlock,
+   so it cannot share core's copy). Adding a key? Change BOTH lists + exportBackup(). */
 const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets'];
 const APP_SCRIPTS=['js/boot.js','js/seed.js','js/core.js','js/portfolio.js','js/api.js',
                    'js/explore.js','js/insights.js','js/sheets.js','js/news.js','js/app.js'];
@@ -52,12 +54,18 @@ async function loadVaultData(){
   const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(o.iv)},MK,ub64(o.ct));
   return JSON.parse(dec.decode(pt));
 }
-/* serialized, debounced persist — called by the app's lsSet for private keys */
+/* serialized, debounced persist — called by the app's lsSet for private keys.
+   A failed write (storage quota, crypto error) must NEVER be silent: it means edits
+   would vanish on close — window.vaultSaveError is surfaced by the app's status line. */
 let saveQ=Promise.resolve(), saveDirty=false;
+window.vaultSaveError=false;
 window.vaultPersist=function(){
   if(!MK) return;
   saveDirty=true;
-  saveQ=saveQ.then(async()=>{ if(!saveDirty) return; saveDirty=false; await saveVaultNow(); }).catch(()=>{});
+  saveQ=saveQ.then(async()=>{ if(!saveDirty) return; saveDirty=false;
+    try{ await saveVaultNow(); window.vaultSaveError=false; }
+    catch(e){ window.vaultSaveError=true; }
+  }).catch(()=>{});
 };
 
 /* ---------- setup / unlock ---------- */

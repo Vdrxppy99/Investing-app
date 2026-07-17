@@ -33,12 +33,23 @@ function parseYahoo(j){
   if(prev==null) prev = meta.chartPreviousClose;
   return { price, prev, t:valid.map(x=>x[0]), c:valid.map(x=>x[1]) };
 }
+const pendingBig={}; // sym -> {price, ts}: first sighting of a >25% move, awaiting confirmation
 function setQuote(sym, price, prev){ // single gate for every price write
   const old=state.quotes[sym];
   if(!(price>0)) return false;
-  // reject implausible ticks (bad/garbled proxy responses) — unless our data is over a week old
-  if(old && old.price>0 && old.ts && Date.now()-old.ts<7*86400e3 && Math.abs(price/old.price-1)>0.25) return false;
-  state.quotes[sym]={ price, prev:(prev>0?prev:(old&&old.prev)||price), ts:Date.now() };
+  // reject implausible ticks (bad/garbled proxy responses) — unless our data is over a week old.
+  // Real >25% gaps DO happen (watchlist earnings): accept when two fetches within 3 min agree.
+  if(old && old.price>0 && old.ts && Date.now()-old.ts<7*86400e3 && Math.abs(price/old.price-1)>0.25){
+    const pb=pendingBig[sym];
+    if(!(pb && Date.now()-pb.ts<3*60000 && Math.abs(price/pb.price-1)<0.03)){
+      pendingBig[sym]={price, ts:Date.now()};
+      return false;
+    }
+    delete pendingBig[sym]; // confirmed twice — the move is real
+  }
+  const next={ price, prev:(prev>0?prev:(old&&old.prev)||price), ts:Date.now() };
+  if(!old || old.price!==next.price || old.prev!==next.prev){ qDirty=true; quotesRev++; }
+  state.quotes[sym]=next;
   return true;
 }
 async function fetchQuote(sym){
@@ -48,9 +59,10 @@ async function fetchQuote(sym){
     if(setQuote(sym, d.price, d.prev)) return true;
     throw new Error('bad quote');
   }catch(e){
-    try{ // stooq fallback — 15-min DELAYED, so never overwrite a quote fresher than 10 minutes
+    try{ // stooq fallback — ~15-min DELAYED, so only step in when our quote is older than that
+      // (a 10-min guard let stooq overwrite an 11-min-old Yahoo price with OLDER data → visible backwards tick)
       const old=state.quotes[sym];
-      if(old && old.ts && Date.now()-old.ts<10*60000) return false;
+      if(old && old.ts && Date.now()-old.ts<25*60000) return false;
       const st = sym.toLowerCase().replace('.','-')+'.us';
       const tx = await tryFetch(`https://stooq.com/q/l/?s=${st}&f=sd2t2ohlcv&h&e=csv`, false);
       const cells = tx.trim().split('\n').pop().split(',');
@@ -69,14 +81,14 @@ async function fetchHistory(sym){
   }catch(e){}
   return false;
 }
-let benchFetching=false;
+const benchFetching=new Set(); // per-symbol, so cycling World→Nasdaq mid-download can't skip a fetch
 async function ensureBenchHistory(sym){ // benchmark funds you don't own (e.g. VT) need their own history
   const h=state.history[sym];
   if(h && h.t && h.t.length>5 && h.ts && Date.now()-h.ts<12*3600e3) return true;
-  if(benchFetching) return false;
-  benchFetching=true;
+  if(benchFetching.has(sym)) return false;
+  benchFetching.add(sym);
   const ok=await fetchHistory(sym);
-  benchFetching=false;
+  benchFetching.delete(sym);
   if(ok) lsSet('pt_history', state.history);
   return ok;
 }
@@ -117,7 +129,8 @@ async function refreshAll(force){
   // even after days away, instead of waiting behind 10-year history downloads
   const qres = await Promise.allSettled(syms.map(fetchQuote));
   const quotesOk = qres.some(r=>r.status==='fulfilled' && r.value===true);
-  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); renderAll(); }
+  // phase 1 renders only the light surfaces — the heavy charts rebuild once, in phase 2
+  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); renderHeader(); renderList(); renderMover(); renderStale(); setStatus(); }
   // PHASE 2 — heavy history + FX refresh quietly behind the already-live screen
   const hjobs = syms.filter(s=>{
     const h=state.history[s];
@@ -128,6 +141,7 @@ async function refreshAll(force){
   state.live = quotesOk || results.some(r=>r.status==='fulfilled' && r.value===true);
   state.fetching=false;
   $('refreshBtn').classList.remove('spinning');
+  lsSet('pt_history', state.history); // persist() no longer carries the heavy caches
   persist(); renderAll();
   if(typeof maybeShowRecap==='function') maybeShowRecap();
 }
@@ -145,16 +159,23 @@ function schedulePoll(){
 async function refreshQuotesOnly(){
   if(state.fetching || document.hidden) return;
   state.fetching=true; setStatus();
+  qDirty=false;
   const results = await Promise.allSettled(uniqSyms().map(fetchQuote));
   const ok = results.some(r=>r.status==='fulfilled'&&r.value===true);
   failStreak = ok ? 0 : failStreak+1;
   if(ok) state.live=true; else if(failStreak>3) state.live=false;
   state.fetching=false;
-  lsSet('pt_quotes', state.quotes);
-  renderHeader(); renderList(); renderMover(); updateChartLive(); setStatus();
+  // nothing moved (market closed, repeated closes) → skip the DOM/chart work entirely
+  if(qDirty){
+    lsSet('pt_quotes', state.quotes);
+    renderHeader(); renderList(); renderMover(); updateChartLive();
+  }
+  setStatus();
   if(state.view.range==='1D') ensureIntraday(); // refresh the 5-min bars too (throttled inside)
 }
-/* update only the chart's last point on each tick (no full redraw) */
+/* update only the chart's last point on each tick (no full redraw).
+   Known trade-off: the dashed benchmark's last point stays at its last full render
+   within a session — recomputing it per tick isn't worth the churn. */
 function updateChartLive(){
   if(scrubbing) return;
   if(!mainChart){ renderChart(); return; }

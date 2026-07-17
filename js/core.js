@@ -2,15 +2,33 @@
 /* ============ STORAGE ============ */
 /* personal keys live ONLY inside the encrypted vault (see js/vault.js) —
    everything else (quote/history/news caches, view prefs) stays in plain localStorage */
+/* ⚠ MUST stay identical to PRIVATE_KEYS in js/vault.js (vault loads alone, pre-unlock).
+   Adding a key? Change BOTH lists + exportBackup(). */
 const PRIVATE_KEYS = new Set(['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets']);
 const mem = {};
+let quotesRev=0, qDirty=false; // bumped by setQuote only when a price actually changed
+window.storageFull=false;
 function lsGet(k){
   if(PRIVATE_KEYS.has(k)){ const v=window.VAULT_DATA?window.VAULT_DATA[k]:undefined; return v===undefined?null:v; }
   try{ const v=localStorage.getItem(k); return v?JSON.parse(v):mem[k]||null; }catch(e){ return mem[k]||null; }
 }
 function lsSet(k,v){
   if(PRIVATE_KEYS.has(k)){ if(window.VAULT_DATA){ window.VAULT_DATA[k]=v; if(window.vaultPersist) vaultPersist(); } return; }
-  mem[k]=v; try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){}
+  mem[k]=v;
+  try{ localStorage.setItem(k,JSON.stringify(v)); window.storageFull=false; }
+  catch(e){
+    // quota hit — evict the biggest reconstructible caches and retry once, loudly if that fails too
+    try{
+      localStorage.removeItem('pt_intraday');
+      if(typeof state!=='undefined' && state.history){
+        const owned=new Set(state.holdings.map(h=>h.sym));
+        for(const s of Object.keys(state.history)) if(!owned.has(s)) delete state.history[s];
+        if(k!=='pt_history') localStorage.setItem('pt_history', JSON.stringify(state.history));
+      }
+      localStorage.setItem(k,JSON.stringify(v));
+      window.storageFull=false;
+    }catch(e2){ window.storageFull=true; }
+  }
 }
 
 /* ============ STATE ============ */
@@ -54,8 +72,22 @@ function rows(acc){ // merged positions for a filter
 }
 function totals(acc){
   const rs = rows(acc); const cash = cashFor(acc);
+  // shares bought TODAY didn't exist at yesterday's close — their "today" gain is
+  // measured from what was actually paid, not from prev close (else buy days over/understate)
+  const today=dayStr(Date.now()); const bt={};
+  for(const l of state.lots){
+    if(l.date===today && (acc==='all'||l.acc===acc)){
+      const b=bt[l.sym]||(bt[l.sym]={qty:0,cost:0}); b.qty+=l.qty; b.cost+=l.cost;
+    }
+  }
   let val=cash, cost=0, day=0;
-  for(const r of rs){ val += r.qty*priceOf(r.sym); cost += r.cost; day += r.qty*(priceOf(r.sym)-prevOf(r.sym)); }
+  for(const r of rs){
+    const p=priceOf(r.sym), pv=prevOf(r.sym);
+    val += r.qty*p; cost += r.cost;
+    const b=bt[r.sym], bq=b?Math.min(b.qty,r.qty):0;
+    day += (r.qty-bq)*(p-pv);
+    if(bq>0) day += bq*p - b.cost*(bq/b.qty);
+  }
   return { value:val, invested:cost, profit:val-cash-cost, day };
 }
 function rate(){ return state.view.ccy==='EUR' ? state.fx.rate : 1; }
@@ -64,6 +96,7 @@ function fmtPx(v){ return new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'
 function fmt(v){ return state.view.priv ? '••••••' : fmtPx(v); }
 function fmtSign(v){ return (v>=0?'+':'−') + fmt(Math.abs(v)); }
 function fmtPct(v){ return (v>=0?'+':'−') + Math.abs(v).toFixed(2) + '%'; }
+function cfmt(v){ return state.view.priv?'••••':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact',maximumFractionDigits:1}).format(v*rate()); }
 function cls(v){ return v>=0?'pos':'neg'; }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function skel(n){ // shimmer placeholder rows — premium apps never show spinners for lists
@@ -107,7 +140,13 @@ function personalReturn(acc){ // dividend reinvestments are internal return, not
     .sort((a,b)=>a.t-b.t);
   if(!flows.length) return null;
   flows.push({t:Date.now(), v:totals(acc).value});
-  return xirr(flows);
+  const x=xirr(flows);
+  if(x!=null) return x;
+  // xirr's bisection bracket failed (rate outside −95%…+900% or no sign change) —
+  // fall back to a simple annualized ratio so the Return/yr chip never just vanishes
+  const inv=-flows.slice(0,-1).reduce((a,f)=>a+f.v,0), end=flows[flows.length-1].v;
+  const yrs=Math.max(0.2,(flows[flows.length-1].t-flows[0].t)/31557600000);
+  return inv>0&&end>0 ? Math.pow(end/inv,1/yrs)-1 : null;
 }
 function spark(sym){ // 30-day mini price line for a holding row
   const h=state.history[sym]; if(!h||!h.t||h.t.length<3) return '';
@@ -128,7 +167,10 @@ function benchSeries(labels, values){ // "what if the same money had gone into t
   let last=null;
   const prices=labels.map(d=>{ if(px[d]!=null) last=px[d]; return last; });
   if(prices[0]==null||prices[0]<=0) return null;
-  let shares=values[0]/prices[0];
+  // idle cash stays cash in BOTH worlds — only the invested part buys the benchmark
+  // (keeps this overlay consistent with the Insights "same buys" replay, which is lots-only)
+  const cash=cashFor(state.view.acc);
+  let shares=Math.max(0, values[0]-cash)/prices[0];
   const byDay={};
   for(const l of state.lots){
     if(l.div) continue;
@@ -138,7 +180,7 @@ function benchSeries(labels, values){ // "what if the same money had gone into t
   const out=[];
   for(let i=0;i<labels.length;i++){
     if(byDay[labels[i]] && prices[i]>0) shares += byDay[labels[i]]/prices[i];
-    out.push(prices[i]>0 ? shares*prices[i] : null);
+    out.push(prices[i]>0 ? cash + shares*prices[i] : null);
   }
   return out;
 }
