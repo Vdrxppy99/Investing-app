@@ -223,7 +223,7 @@ function animateTotal(){ // one-time count-up on launch
 $('editBtn').onclick = openEdit;
 $('refreshBtn').onclick = ()=>refreshAll(true);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ refreshQuotesOnly(); schedulePoll(); } });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDetail(); $('editModal').classList.add('hidden'); } });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeDetail(); hideOverlay('editModal'); } });
 
 /* glass mini-bar: compact balance appears when the header scrolls away */
 function paintMiniBar(){
@@ -252,6 +252,13 @@ $('miniBar').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
 renderAll();
 animateTotal();
 setTimeout(()=>$('page-portfolio').classList.add('seen'), 600); // launch animation played — don't replay on tab returns
+(function(){ // quiet "you got the new version" note after an auto-update (version read from the footer — no extra bump site)
+  const m=document.querySelector('.foot'), v=m&&(m.textContent.match(/v(\d+\.\d+)/)||[])[1];
+  if(!v) return;
+  const seen=lsGet('pt_ver');
+  if(seen && seen!==v) setTimeout(()=>toast('Updated to v'+v+' ✓'), 1100);
+  lsSet('pt_ver', v);
+})();
 refreshAll(false).then(schedulePoll);
 setInterval(()=>{ if(!state.fetching) setStatus(); }, 1000);
 /* ---- bulletproof auto-update ----

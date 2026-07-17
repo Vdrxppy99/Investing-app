@@ -34,6 +34,17 @@ function openInfoSheet(title, html){
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
 }
+/* animated close for any overlay — entrance had a spring, exit no longer just vanishes.
+   Skips the animation when reduced-motion is on, or when a swipe-dismiss already moved the sheet. */
+function hideOverlay(id){
+  const ov=$(id); if(!ov || ov.classList.contains('hidden') || ov.classList.contains('closing')) return;
+  const sh=ov.querySelector('.sheet');
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches || (sh && sh.style.transform)){
+    ov.classList.add('hidden'); return;
+  }
+  ov.classList.add('closing');
+  setTimeout(()=>{ ov.classList.remove('closing'); ov.classList.add('hidden'); }, 190);
+}
 /* in-app replacements for native alert()/confirm() — they match the design system
    (and never say "localhost says…"). Vault flows keep native dialogs: they run pre-unlock. */
 function toast(msg, bad){

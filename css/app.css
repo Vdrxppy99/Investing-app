@@ -175,6 +175,10 @@ header{margin-top:12px;padding:18px 16px 20px;border-radius:var(--r-xl);border:1
   animation:sheetup .32s cubic-bezier(.26,.9,.28,1)}
 @media(min-width:640px){.overlay{align-items:center}.sheet{border-radius:var(--r-xl);animation:fadein .2s ease}}
 @keyframes sheetup{from{transform:translateY(56px);opacity:.35}to{transform:none;opacity:1}}
+.overlay.closing{animation:fadeout .19s ease forwards}
+.overlay.closing .sheet{animation:sheetdown .19s cubic-bezier(.5,0,.75,.5) forwards}
+@keyframes fadeout{to{opacity:0}}
+@keyframes sheetdown{to{transform:translateY(44px);opacity:0}}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 .sheet-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .xbtn{background:var(--card2);border:none;color:var(--mut);width:34px;height:34px;border-radius:50%;
@@ -465,8 +469,9 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.028;z
 
 /* ---------- vault lock screen ---------- */
 body.locked .wrap,body.locked .tabbar,body.locked #ptr{display:none}
+body.unlocking #lockScreen{opacity:0;pointer-events:none}
 body:not(.locked) #lockScreen{display:none}
-#lockScreen{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+#lockScreen{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;transition:opacity .26s ease;
   padding:24px;background:radial-gradient(700px 380px at 50% -80px, var(--brand-soft), transparent 70%), var(--bg)}
 .lockbox{width:100%;max-width:330px;text-align:center;animation:pagein .4s ease backwards}
 .locklogo{width:74px;height:74px;border-radius:19px;margin-bottom:14px;box-shadow:var(--shadow)}
@@ -488,7 +493,8 @@ body:not(.locked) #lockScreen{display:none}
 .skel-badge{width:42px;height:42px;border-radius:13px;flex-shrink:0}
 .skel-lines{flex:1}
 .skel-lines i{display:block;height:11px;border-radius:6px;margin:6px 0}
-.skel-badge,.skel-lines i{background:linear-gradient(90deg,var(--card2) 25%,color-mix(in srgb,var(--card2) 88%,var(--tx) 12%) 50%,var(--card2) 75%);
+.skel-tile{flex:0 0 132px;height:98px;border-radius:var(--r-md)}
+.skel-tile,.skel-badge,.skel-lines i{background:linear-gradient(90deg,var(--card2) 25%,color-mix(in srgb,var(--card2) 88%,var(--tx) 12%) 50%,var(--card2) 75%);
   background-size:200% 100%;animation:shimmer 1.4s linear infinite}
 @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
 

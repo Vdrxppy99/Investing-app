@@ -165,7 +165,10 @@ function startApp(){
     const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej;
     document.body.appendChild(s);
   })), Promise.resolve())
-  .then(()=>{ document.body.classList.remove('locked'); })
+  .then(()=>{ // dissolve the lock screen into the app instead of snapping (pure UI — crypto untouched)
+    document.body.classList.add('unlocking');
+    setTimeout(()=>{ document.body.classList.remove('locked'); document.body.classList.remove('unlocking'); }, 240);
+  })
   .catch(()=>err('Couldn’t load the app — check your connection and reload.'));
 }
 async function showFaceStepOrStart(){

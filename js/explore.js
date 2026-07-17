@@ -97,7 +97,8 @@ function renderMarkets(){
     const pct=d.prev>0?(d.price/d.prev-1)*100:0;
     return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)}"><div class="n">${x.n}</div><div class="p">${d.price.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="c ${cls(pct)}">${fmtPct(pct)}</div>${sparkArr(d.spark,102,26,pct>=0)}</div>`;
   }).join('');
-  $('idxRow').innerHTML = cards || `<div class="mload">${mkt.fetching?'Loading indices…':'Couldn’t load — tap the Explore tab again to retry.'}</div>`;
+  const skelTiles=n=>Array.from({length:n},()=>'<div class="skel-tile"></div>').join('');
+  $('idxRow').innerHTML = cards || (mkt.fetching ? skelTiles(4) : `<div class="mload">Couldn’t load — tap the Explore tab again to retry.</div>`);
   // sector pulse: every sector ETF, hottest first, heat-tinted like a compact heatmap
   const secs=SECTOR_ETFS.map(([s,n])=>{ const q=state.quotes[s];
       return q&&q.prev>0 ? {s,n,pct:(q.price/q.prev-1)*100} : null; }).filter(Boolean)
@@ -108,7 +109,7 @@ function renderMarkets(){
     return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)} sector (${esc(x.s)})" style="background:${col};flex-basis:118px">
       <div class="n">${esc(x.n)}</div><div class="c ${cls(x.pct)}" style="font-size:15px;font-weight:800;margin-top:4px">${fmtPct(x.pct)}</div>
       <div class="n" style="margin-top:5px;opacity:.7">${esc(x.s)}</div></div>`;
-  }).join('') : (mkt.fetching ? `<div class="mload">Loading sectors…</div>` : `<div class="mload">Couldn’t load — tap Explore again.</div>`);
+  }).join('') : (mkt.fetching ? Array.from({length:5},()=>'<div class="skel-tile" style="flex-basis:118px;height:84px"></div>').join('') : `<div class="mload">Couldn’t load — tap Explore again.</div>`);
   const wl=state.watch||[];
   $('watchWrap').style.display = wl.length ? '' : 'none';
   $('watchList').innerHTML = wl.map(w=>{

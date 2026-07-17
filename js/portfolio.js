@@ -682,7 +682,7 @@ function openDetail(sym){
     wireDetailScrub(detailChart, labels, closes, 'detailRO');
   } else if($('detailMsg')) $('detailMsg').textContent='Price chart appears after the first online update.';
 }
-function closeDetail(){ $('detail').classList.add('hidden'); if(detailChart){ detailChart.destroy(); detailChart=null; } }
+function closeDetail(){ hideOverlay('detail'); setTimeout(()=>{ if(detailChart && $('detail').classList.contains('hidden')){ detailChart.destroy(); detailChart=null; } }, 200); }
 $('detail').addEventListener('click', e=>{ if(e.target.id==='detail') closeDetail(); });
 
 /* ============ EDIT HOLDINGS ============ */
@@ -726,7 +726,7 @@ function openEdit(){
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it.</div>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">`;
   $('editModal').classList.remove('hidden');
-  $('editX').onclick=$('cancelEdit').onclick=()=>$('editModal').classList.add('hidden');
+  $('editX').onclick=$('cancelEdit').onclick=()=>hideOverlay('editModal');
   $('editX').focus({preventScroll:true});
   $('buyAdd').onclick=()=>{
     const acc=$('buyAcc').value, sym=$('buySym').value.trim().toUpperCase().replace('.','-'),
@@ -736,7 +736,7 @@ function openEdit(){
     const h=state.holdings.find(x=>x.acc===acc && x.sym===sym);
     if(h){ h.qty+=qty; h.cost+=cost; } else state.holdings.push({acc,sym,qty,cost});
     if(!div) state.deposits=(+state.deposits||0)+cost; // new money in — adjust in the field below if it came from existing cash
-    markConfirmed(); persist(); $('editModal').classList.add('hidden'); renderAll(); refreshAll(true);
+    markConfirmed(); persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
   };
   $('exportBtn').onclick=exportBackup;
   $('csvBtn').onclick=exportCSV;
@@ -765,13 +765,13 @@ function openEdit(){
   $('addRow').onclick=()=>{ readEditInputs(); state.holdings.push({acc:'brok',sym:'',qty:0,cost:0}); openEdit(); };
   $('resetSeed').onclick=()=>showConfirm('Erase all holdings?',
     'ALL holdings, lots, cash and deposits will be removed from this device. Export a backup first if you might want them back.',
-    'Erase everything', ()=>{ state.holdings=[]; state.lots=[]; state.cash={main:0,brok:0}; state.deposits=0; state.confirmed=''; staleDismissed=false; persist(); $('editModal').classList.add('hidden'); renderAll(); });
+    'Erase everything', ()=>{ state.holdings=[]; state.lots=[]; state.cash={main:0,brok:0}; state.deposits=0; state.confirmed=''; staleDismissed=false; persist(); hideOverlay('editModal'); renderAll(); });
   $('saveEdit').onclick=()=>{
     readEditInputs();
     state.holdings = state.holdings.filter(h=>h.sym && h.qty>0);
     state.cash = { main:+$('cashMain').value||0, brok:+$('cashBrok').value||0 };
     state.deposits = +$('depTotal').value||0;
-    markConfirmed(); persist(); $('editModal').classList.add('hidden'); renderAll(); refreshAll(true);
+    markConfirmed(); persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
   };
 }
 function readEditInputs(){
@@ -822,10 +822,10 @@ function importBackup(file){
       if(Array.isArray(d.watch)) state.watch=d.watch;
       if(d.goal&&d.goal.amt>0) state.goal=d.goal;
       if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
-      persist(); $('editModal').classList.add('hidden'); renderAll(); refreshAll(true);
+      persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){ toast('That file is not a valid portfolio backup.', true); }
   };
   r.readAsText(file);
 }
-$('editModal').addEventListener('click', e=>{ if(e.target.id==='editModal') $('editModal').classList.add('hidden'); });
+$('editModal').addEventListener('click', e=>{ if(e.target.id==='editModal') hideOverlay('editModal'); });
