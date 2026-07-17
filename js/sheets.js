@@ -78,7 +78,7 @@ async function openStockSheet(sym, name){
   const paintWatch=()=>{ const b=$('watchBtn'); if(!b) return;
     b.textContent=inWatch()?'★':'☆';
     b.style.color=inWatch()?'var(--brand)':'';
-    b.title=inWatch()?'Remove from watchlist':'Add to watchlist'; };
+    b.title=b.ariaLabel=inWatch()?'Remove from watchlist':'Add to watchlist'; };
   $('watchBtn').onclick=()=>{
     if(inWatch()) state.watch=state.watch.filter(w=>w.sym!==sym);
     else state.watch=[...(state.watch||[]), {sym, name:name||''}];

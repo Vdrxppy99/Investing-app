@@ -101,7 +101,7 @@ function renderDrawdown(){
   const ddBase=`Worst this year <b class="neg">${worst.toFixed(1)}%</b> · now <b class="${cur<-0.05?'neg':'pos'}">${cur<-0.05?cur.toFixed(1)+'%':'at the peak'}</b>`;
   $('ddStat').innerHTML=ddBase;
   const ddChart=new Chart(el,{type:'line',data:{labels,datasets:[{data:dd,borderColor:cvar('--red'),
-      backgroundColor:`rgba(${cvar('--red-rgb')},.13)`,fill:true,pointRadius:0,borderWidth:1.6,tension:.25}]},
+      backgroundColor:`rgba(${cvar('--red-rgb')},.11)`,fill:true,pointRadius:0,borderWidth:1.8,tension:.25}]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,titleColor:cvar('--mut'),bodyColor:cvar('--tx'),displayColors:false,
         callbacks:{label:c=>c.parsed.y<-0.05?c.parsed.y.toFixed(1)+'% below peak':'At the peak'}}},

@@ -272,7 +272,7 @@ function renderStale(){
   el.innerHTML = `<span class="ic">⚠︎</span>
     <span class="tx">Holdings last confirmed <b>${when}</b> (${days} days ago). Buy anything since? Send your latest Vanguard statement to refresh, or log it here.</span>
     <button class="act" id="staleAct">Update</button>
-    <button class="x" id="staleX" title="Dismiss">✕</button>`;
+    <button class="x" id="staleX" title="Dismiss" aria-label="Dismiss reminder">✕</button>`;
   el.classList.remove('hidden');
   $('staleAct').onclick = openEdit;
   $('staleX').onclick = ()=>{ staleDismissed=true; el.classList.add('hidden'); };
@@ -426,7 +426,7 @@ const scrubLine = { id:'scrubLine',
     g.strokeStyle=cvar('--faint'); g.lineWidth=1; g.setLineDash([3,3]);
     g.beginPath(); g.moveTo(x,c.chartArea.top); g.lineTo(x,c.chartArea.bottom); g.stroke(); g.setLineDash([]);
     for(const [p,col] of dots){
-      g.fillStyle=col; g.beginPath(); g.arc(p.x,p.y,3.5,0,7); g.fill();
+      g.fillStyle=col; g.beginPath(); g.arc(p.x,p.y,4,0,7); g.fill();
       g.strokeStyle=cvar('--card'); g.lineWidth=1.5; g.stroke();
     }
     g.restore();
@@ -470,7 +470,7 @@ function wireDetailScrub(c, labels, closes, roId){ // price readout for holding/
 }
 const heroFx = { id:'heroFx',
   beforeDatasetsDraw(c){ const g=c.ctx; g.save();
-    g.shadowColor=`rgba(${c._up!==false?cvar('--green-rgb'):cvar('--red-rgb')},.30)`; g.shadowBlur=16; g.shadowOffsetY=7; },
+    g.shadowColor=`rgba(${c._up!==false?cvar('--green-rgb'):cvar('--red-rgb')},.34)`; g.shadowBlur=20; g.shadowOffsetY=8; },
   afterDatasetsDraw(c){ const g=c.ctx; g.restore();
     const ds=c.data.datasets[0].data; if(!ds||ds.length<2) return;
     const meta=c.getDatasetMeta(0);
@@ -497,13 +497,14 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
   const rgb = up?cvar('--green-rgb'):cvar('--red-rgb');
   const solid = up?cvar('--green'):cvar('--red');
   const ctx=el.getContext('2d');
+  // three-stop fill: present under the line, gone by mid-chart — the Apple Stocks look
   const g=ctx.createLinearGradient(0,0,0,(el.parentNode.clientHeight||220));
-  g.addColorStop(0, `rgba(${rgb},.20)`); g.addColorStop(1,'rgba(0,0,0,0)');
+  g.addColorStop(0, `rgba(${rgb},.26)`); g.addColorStop(.55, `rgba(${rgb},.07)`); g.addColorStop(1,'rgba(0,0,0,0)');
   let stroke=solid;
   if(hero){ stroke=ctx.createLinearGradient(0,0,(el.parentNode.clientWidth||340),0);
     stroke.addColorStop(0,`rgba(${rgb},.45)`); stroke.addColorStop(1,solid); }
-  const datasets=[{label:'Portfolio', data, borderColor:stroke, backgroundColor:g, fill:true, borderWidth:hero?2.5:2, pointRadius:0, pointHoverRadius:hero?0:4, pointHoverBackgroundColor:solid, tension:.28}];
-  if(bench) datasets.push({label:benchName(), data:bench, borderColor:cvar('--mut'), borderDash:[5,4], borderWidth:1.5, pointRadius:0, pointHoverRadius:hero?0:3, fill:false, tension:.28});
+  const datasets=[{label:'Portfolio', data, borderColor:stroke, backgroundColor:g, fill:true, borderWidth:hero?2.5:1.9, pointRadius:0, pointHoverRadius:hero?0:4, pointHoverBackgroundColor:solid, tension:.28}];
+  if(bench) datasets.push({label:benchName(), data:bench, borderColor:cvar('--mut'), borderDash:[4,4], borderWidth:1.4, pointRadius:0, pointHoverRadius:hero?0:3, fill:false, tension:.28});
   if(markers) datasets.push({label:'Buys', data:markers.data, showLine:false, pointRadius:3.4, pointHoverRadius:5, pointBackgroundColor:cvar('--brand'), pointBorderColor:cvar('--card'), pointBorderWidth:1.5, fill:false});
   const cfg={type:'line', data:{labels, datasets},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:600,easing:'easeOutQuart'},
