@@ -47,7 +47,7 @@ const state = {
   watch:    lsGet('pt_watch')    || [],     // followed symbols [{sym,name}]
   fx:       lsGet('pt_fx')       || {rate:0.86, ts:0},
   // bench: 'off' | 'VOO' (S&P 500) | 'VT' (Total World) | 'QQQ' (Nasdaq 100) — migrates from the old boolean
-  view: { acc:'all', metric:'value', range:'1M', ccy: lsGet('pt_ccy') || 'USD',
+  view: { acc:'all', metric: lsGet('pt_metric') || 'profit', range:'1M', ccy: lsGet('pt_ccy') || 'USD',
           bench: (function(){ const b=lsGet('pt_bench'); return (b==='VOO'||b==='VT'||b==='QQQ') ? b : (b===true ? 'VOO' : 'off'); })(),
           sort: lsGet('pt_sort') || 'value', priv: !!lsGet('pt_priv') },
   live:false, fetching:false

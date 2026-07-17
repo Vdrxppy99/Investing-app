@@ -697,7 +697,7 @@ function openDetail(sym){
         return `<div class="krow"><span class="k">${new Date(l.date+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric',year:'2-digit'})}${l.div?' · dividend':''}</span><span>${l.qty.toFixed(3).replace(/\.?0+$/,'')} sh @ ${fmtPx(l.cost/l.qty)} <span class="${cls(g)}">${fmtSign(g)}</span></span></div>`;
       }).join('');
     })()}<div id="sheetNews" data-sym="${esc(sym)}"></div>`;
-  $('detail').classList.remove('hidden');
+  showOverlay('detail');
   $('detailX').onclick = closeDetail;
   $('detailX').focus({preventScroll:true});
   loadSheetNews(sym);
@@ -762,7 +762,7 @@ function openEdit(){
     <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it.</div>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">`;
-  $('editModal').classList.remove('hidden');
+  showOverlay('editModal');
   $('editX').onclick=$('cancelEdit').onclick=()=>hideOverlay('editModal');
   $('editX').focus({preventScroll:true});
   $('buyAdd').onclick=()=>{

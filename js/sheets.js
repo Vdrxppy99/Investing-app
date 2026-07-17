@@ -30,7 +30,7 @@ const EXPLAIN = {
 };
 function openInfoSheet(title, html){
   $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div><div class="infobody">${html}</div>`;
-  $('detail').classList.remove('hidden');
+  showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
 }
@@ -43,7 +43,15 @@ function hideOverlay(id){
     ov.classList.add('hidden'); return;
   }
   ov.classList.add('closing');
-  setTimeout(()=>{ ov.classList.remove('closing'); ov.classList.add('hidden'); }, 190);
+  ov._hideT=setTimeout(()=>{ ov.classList.remove('closing'); ov.classList.add('hidden'); }, 190);
+}
+/* opening a sheet must cancel any in-flight close — otherwise a rapid close→reopen
+   leaves the .closing animation (and its pending hide timer) on the sheet you just opened,
+   which then flickers out and vanishes. Every open site goes through this. */
+function showOverlay(id){
+  const ov=$(id); if(!ov) return;
+  clearTimeout(ov._hideT);
+  ov.classList.remove('closing','hidden');
 }
 /* in-app replacements for native alert()/confirm() — they match the design system
    (and never say "localhost says…"). Vault flows keep native dialogs: they run pre-unlock. */
@@ -62,7 +70,7 @@ function explainStat(key){ const e=EXPLAIN[key]; if(e) openInfoSheet(e[0], `<p>$
 function openListSheet(title, bodyHtml, note){
   $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>
     ${bodyHtml}${note?`<div class="inc-note">${note}</div>`:''}`;
-  $('detail').classList.remove('hidden');
+  showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
 }
@@ -81,7 +89,7 @@ async function openStockSheet(sym, name){
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats" id="ssStats"></div>
     <div id="sheetNews" data-sym="${esc(sym)}"></div>`;
-  $('detail').classList.remove('hidden');
+  showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
   if(!sym.startsWith('^')) loadSheetNews(sym);

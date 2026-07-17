@@ -192,7 +192,10 @@ $('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → Nasd
   if(next==='VT'||next==='QQQ') ensureBenchHistory(next).then(ok=>{ if(ok) renderChart(); });
   renderChart();
 };
-$('metricSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{ state.view.metric=b.dataset.m; $('metricSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderChart(); });
+$('metricSeg').querySelectorAll('button').forEach(b=>{
+  b.classList.toggle('on', b.dataset.m===state.view.metric); // sync highlight to the saved/default metric
+  b.onclick=()=>{ state.view.metric=b.dataset.m; lsSet('pt_metric',b.dataset.m); $('metricSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderChart(); };
+});
 $('rangeSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{ state.view.range=b.dataset.r; $('rangeSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderChart(); });
 $('ccyBtn').onclick = ()=>{ state.view.ccy = state.view.ccy==='USD'?'EUR':'USD'; lsSet('pt_ccy',state.view.ccy); renderAll(); };
 /* privacy mode — mask YOUR dollar amounts (••••••), keep percentages + market prices */
