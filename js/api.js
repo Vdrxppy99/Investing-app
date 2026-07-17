@@ -113,14 +113,19 @@ async function refreshAll(force){
   $('refreshBtn').classList.add('spinning');
   const syms=uniqSyms();
   const HIST_TTL = 12*3600*1000;
-  const jobs = syms.map(s=>{
+  // PHASE 1 — quotes only (tiny payloads): fresh prices on screen in ~a second,
+  // even after days away, instead of waiting behind 10-year history downloads
+  const qres = await Promise.allSettled(syms.map(fetchQuote));
+  const quotesOk = qres.some(r=>r.status==='fulfilled' && r.value===true);
+  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); renderAll(); }
+  // PHASE 2 — heavy history + FX refresh quietly behind the already-live screen
+  const hjobs = syms.filter(s=>{
     const h=state.history[s];
-    return (force || !h || !h.ts || h.range!=='10y' || Date.now()-h.ts>HIST_TTL) ? fetchHistory(s) : fetchQuote(s);
-  });
-  jobs.push(fetchFx());
-  const results = await Promise.allSettled(jobs);
-  const anyOk = results.slice(0,syms.length).some(r=>r.status==='fulfilled' && r.value===true);
-  state.live = anyOk;
+    return force || !h || !h.ts || h.range!=='10y' || Date.now()-h.ts>HIST_TTL;
+  }).map(fetchHistory);
+  hjobs.push(fetchFx());
+  const results = await Promise.allSettled(hjobs);
+  state.live = quotesOk || results.some(r=>r.status==='fulfilled' && r.value===true);
   state.fetching=false;
   $('refreshBtn').classList.remove('spinning');
   persist(); renderAll();
