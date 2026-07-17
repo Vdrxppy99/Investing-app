@@ -34,6 +34,12 @@ function showPage(p){
   window.scrollTo(0,0);
   // entrance animation plays once per page per session, not on every revisit
   const pg=$('page-'+p); if(pg && !pg.classList.contains('seen')) setTimeout(()=>pg.classList.add('seen'), 450);
+  // money is ALWAYS visible: tabs without the hero pin the glass balance bar (owner request);
+  // on Portfolio it stays scroll-triggered so it never doubles the hero
+  const pin = p!=='portfolio';
+  document.body.classList.toggle('mbfix', pin);
+  if(pin){ paintMiniBar(); $('miniBar').classList.add('show'); }
+  else $('miniBar').classList.toggle('show', window.scrollY>170);
   if(p==='explore') refreshMarkets(false);
   if(p==='news') refreshNews(false);
   if(p==='insights') renderInsights();
@@ -68,6 +74,7 @@ wireSheetDrag('detailSheet', closeDetail);
 wireSheetDrag('editSheet', ()=>$('editModal').classList.add('hidden'));
 wireSearch(); wirePTR();
 $('taxCard').onclick=openTaxSheet;
+$('divTitle').onclick=openDivSheet;
 $('peCard').onclick=openPESheet;
 $('riskCard').onclick=openRiskSheet;
 $('healthCard').onclick=openHealthSheet;
@@ -238,12 +245,16 @@ window.addEventListener('scroll', ()=>{
   if(mbTick) return; mbTick=true;
   setTimeout(()=>{
     mbTick=false;
-    const show=window.scrollY>170 && !$('page-portfolio').classList.contains('hidden') && !document.body.classList.contains('locked');
+    if($('page-portfolio').classList.contains('hidden')) return; // other tabs keep the bar pinned (showPage owns it)
+    const show=window.scrollY>170 && !document.body.classList.contains('locked');
     if(show) paintMiniBar();
     $('miniBar').classList.toggle('show', show);
   }, 80);
 }, {passive:true});
-$('miniBar').onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
+$('miniBar').onclick=()=>{
+  if($('page-portfolio').classList.contains('hidden')) showPage('portfolio'); // tap the balance → jump home
+  else window.scrollTo({top:0,behavior:'smooth'});
+};
 
 (function(){ const h=new Date().getHours();
   const g = h<5?'Good night':h<12?'Good morning':h<18?'Good afternoon':'Good evening';

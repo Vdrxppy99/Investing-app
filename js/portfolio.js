@@ -32,6 +32,8 @@ function renderHeader(){
     } else tl.textContent='';
   }
   $('ccyBtn').textContent = state.view.ccy==='USD' ? '$' : '€';
+  // keep the pinned glass bar in sync with live ticks (it's visible on every non-Portfolio tab)
+  if($('miniBar').classList.contains('show') && typeof paintMiniBar==='function') paintMiniBar();
 }
 function renderChips(){
   $('accChips').innerHTML = ['all','main','brok'].map(a=>
@@ -190,16 +192,17 @@ function openTargetEditor(rs, tot){
 let divsFetching=false;
 async function fetchDivs(sym){
   try{
-    const j=await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1mo&events=div`,true);
+    // 5y of distributions: powers the deep-dive sheet's payout history + growth (r5 flag busts old 1y caches once)
+    const j=await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=5y&interval=1mo&events=div`,true);
     const ev=(j.chart.result[0].events||{}).dividends||{};
-    state.divs[sym]={ list:Object.values(ev).map(e=>[e.date*1000,e.amount]).sort((a,b)=>a[0]-b[0]), ts:Date.now() };
+    state.divs[sym]={ list:Object.values(ev).map(e=>[e.date*1000,e.amount]).sort((a,b)=>a[0]-b[0]), ts:Date.now(), r5:true };
     return true;
   }catch(e){ return false; }
 }
 async function ensureDivs(){
   if(divsFetching) return;
   const TTL=24*3600e3;
-  const stale=uniqSyms().filter(s=>{const d=state.divs[s]; return !d||!d.ts||Date.now()-d.ts>TTL;});
+  const stale=uniqSyms().filter(s=>{const d=state.divs[s]; return !d||!d.ts||!d.r5||Date.now()-d.ts>TTL;});
   if(!stale.length) return;
   divsFetching=true;
   const res=await Promise.allSettled(stale.map(fetchDivs));
@@ -261,6 +264,40 @@ function renderIncome(){
       ro.textContent = i==null ? '' : `${labels[i]} · ~${fmt(data[i])} expected`; });
   }
   ensureDivs();
+}
+/* dividends deep dive — tap the Dividends card title */
+function openDivSheet(){
+  const rs=rows(state.view.acc);
+  const rows12=[]; let tot=0; const byYear={};
+  for(const r of rs){
+    const d=state.divs[r.sym]; if(!d||!d.list||!d.list.length) continue;
+    const perSh=d.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0);
+    if(perSh>0){
+      const inc=perSh*r.qty; tot+=inc;
+      rows12.push({sym:r.sym, inc,
+        yld:priceOf(r.sym)>0 ? perSh/priceOf(r.sym)*100 : 0,
+        yoc:(r.cost>0&&r.qty>0) ? perSh/(r.cost/r.qty)*100 : 0});
+    }
+    for(const e of d.list){ const y=new Date(e[0]).getFullYear(); byYear[y]=(byYear[y]||0)+e[1]*r.qty; }
+  }
+  if(!rows12.length){ openInfoSheet('Dividends','<p>Income details appear after the next online update pulls each fund’s distribution history.</p>'); return; }
+  rows12.sort((a,b)=>b.inc-a.inc);
+  const years=Object.keys(byYear).sort(), curY=new Date().getFullYear();
+  const maxY=Math.max(...years.map(y=>byYear[y]),1);
+  const bars=years.map(y=>`<div class="hbrow"><div class="t"><span>${y}${+y===curY?' · so far':''}</span><span class="p">${fmt(byYear[y])}</span></div>
+    <div class="bar"><i style="width:${(byYear[y]/maxY*100).toFixed(1)}%"></i></div></div>`).join('');
+  let growth='';
+  const full=years.filter(y=>+y<curY);
+  if(full.length>=2){
+    const a=byYear[full[full.length-1]], b=byYear[full[full.length-2]];
+    if(b>0) growth=`<div class="sub-n" style="margin-top:8px">Payouts grew <b class="${cls(a-b)}">${fmtPct((a/b-1)*100)}</b> in ${full[full.length-1]} vs ${full[full.length-2]} — the raise you get for just holding.</div>`;
+  }
+  const body=`<div class="inc-total">${fmt(tot)}<span> projected next 12 mo</span></div>`
+    + rows12.map(x=>`<div class="krow"><span class="k">${esc(x.sym.replace('-','.'))}</span>
+        <span>${fmt(x.inc)}/yr <span style="color:var(--mut)">· ${x.yld.toFixed(2)}% yield · ${x.yoc.toFixed(2)}% on cost</span></span></div>`).join('')
+    + `<div style="font-size:13px;font-weight:700;margin-top:18px">Payout history · at today's share counts</div>${bars}${growth}`;
+  openListSheet('Dividend income', body,
+    'History = each fund’s actual per-share distributions × the shares you hold TODAY (not what you held back then) — it shows the income power of your current position, and growth reflects the funds raising their payouts. Estimates, not advice.');
 }
 let staleDismissed=false;
 function renderStale(){
