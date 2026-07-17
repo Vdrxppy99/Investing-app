@@ -13,12 +13,16 @@ const TICKER_DOMAINS = {
   VOO:'vanguard.com', VTI:'vanguard.com', VXF:'vanguard.com', VXUS:'vanguard.com', VYM:'vanguard.com',
   VT:'vanguard.com', VNQ:'vanguard.com', VGT:'vanguard.com', BND:'vanguard.com',
   SCHD:'schwab.com', QQQ:'invesco.com', AVUV:'avantisinvestors.com', GLDM:'ssga.com',
-  'BRK-B':'berkshirehathaway.com',
   NVDA:'nvidia.com', MSFT:'microsoft.com', AAPL:'apple.com', AMZN:'amazon.com', GOOGL:'google.com',
   META:'meta.com', AVGO:'broadcom.com', TSLA:'tesla.com', JPM:'jpmorganchase.com', TSM:'tsmc.com',
   ASML:'asml.com', SAP:'sap.com', TCEHY:'tencent.com', TM:'toyota.com', AZN:'astrazeneca.com',
   NVS:'novartis.com', SHEL:'shell.com', XOM:'exxonmobil.com', JNJ:'jnj.com', PG:'pg.com',
   HD:'homedepot.com', ABBV:'abbvie.com', KO:'coca-colacompany.com', CVX:'chevron.com', WMT:'walmart.com'
+};
+/* direct logo URLs for tickers whose company site has no favicon (Google's service
+   404s with a generic globe for berkshirehathaway.com) — checked before TICKER_DOMAINS */
+const TICKER_LOGOS = {
+  'BRK-B':'https://assets.parqet.com/logos/symbol/BRK-B?format=png&size=128'
 };
 const COLORS = {'VTI':CAT[0],'VXUS':CAT[1],'VXF':CAT[2],'VOO':CAT[3],'BRK-B':CAT[4],'VYM':CAT[5]};
 /* Personal data no longer ships in this public file — it lives encrypted in the

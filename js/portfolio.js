@@ -105,6 +105,56 @@ function renderAlloc(){
     const v = rs.filter(r=>syms.includes(r.sym)).reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
     return v>0 ? `<span>${k} <b>${(v/tot*100).toFixed(0)}%</b></span>` : '';
   }).join('');
+  renderTargetMix(rs, tot);
+}
+
+/* ---- target mix: the % you WANT each holding at; drift + where new money goes ---- */
+function renderTargetMix(rs, tot){
+  const box=$('tgtWrap'); if(!box) return;
+  if(box.querySelector('.tgtedit')) return; // editor open — don't wipe it on a background refresh
+  const tg=state.targets;
+  if(!tg || !Object.keys(tg).length){
+    box.innerHTML=`<a href="#" id="tgtSet" class="tgtlink">🎛 Set a target mix — see drift and where new money should go ›</a>`;
+    $('tgtSet').onclick=e=>{ e.preventDefault(); openTargetEditor(rs, tot); };
+    return;
+  }
+  const cur={}; rs.forEach(r=>cur[r.sym]=r.qty*priceOf(r.sym)/tot*100);
+  const syms=[...new Set([...Object.keys(tg), ...rs.map(r=>r.sym)])];
+  const maxV=Math.max(10, ...syms.map(s=>Math.max(tg[s]||0, cur[s]||0)));
+  let worst=null;
+  const rowsH=syms.map(sym=>{
+    const t=tg[sym]||0, c=cur[sym]||0, d=c-t;
+    if(worst===null||d<worst.d) worst={sym,d};
+    return `<div class="tgtrow"><span class="dot" style="${bstyle(colorOf(sym))}"></span><span class="tgs">${esc(sym.replace('-','.'))}</span>
+      <div class="tgtrack"><i class="cur" style="width:${(c/maxV*100).toFixed(1)}%"></i><i class="mark" style="left:${(t/maxV*100).toFixed(1)}%"></i></div>
+      <span class="tgd ${Math.abs(d)<=2?'ok':'off'}">${d>=0?'+':'−'}${Math.abs(d).toFixed(1)}%</span></div>`;
+  }).join('');
+  const tip = (worst && worst.d<-1)
+    ? `<div class="tgtnext">Next deposit → <b>${esc(worst.sym.replace('-','.'))}</b> (${Math.abs(worst.d).toFixed(1)}% under target). Buying the laggard rebalances without selling — no taxes.</div>`
+    : `<div class="tgtnext">✓ Everything is within reach of its target.</div>`;
+  box.innerHTML=`<div class="tgthead">Target mix · bar = now, notch = target <a href="#" id="tgtEditLnk">edit</a></div>${rowsH}${tip}`;
+  $('tgtEditLnk').onclick=e=>{ e.preventDefault(); openTargetEditor(rs, tot); };
+}
+function openTargetEditor(rs, tot){
+  const box=$('tgtWrap'), tg=state.targets||{};
+  const rowsH=rs.map(r=>{
+    const v = tg[r.sym]!=null ? tg[r.sym] : Math.round(r.qty*priceOf(r.sym)/tot*100);
+    return `<label class="tgtedit-row">${esc(r.sym.replace('-','.'))}<input type="number" inputmode="decimal" min="0" max="100" step="1" data-tsym="${esc(r.sym)}" value="${v}">%</label>`;
+  }).join('');
+  box.innerHTML=`<div class="tgthead">Target mix — the % you want each holding at</div><div class="tgtedit">${rowsH}</div>
+    <div class="tgtsum" id="tgtSum"></div>
+    <div class="ebtns"><button class="btn pri" id="tgtSave">Save targets</button><button class="btn sec" id="tgtCancel">Cancel</button><button class="btn sec" id="tgtClear">Remove</button></div>`;
+  const sum=()=>{ let s=0; box.querySelectorAll('[data-tsym]').forEach(i=>s+=+i.value||0);
+    $('tgtSum').textContent=`Adds up to ${s.toFixed(0)}%`+(Math.abs(s-100)<=2?' ✓':' — aim for 100%'); return s; };
+  box.querySelectorAll('[data-tsym]').forEach(i=>i.oninput=sum); sum();
+  $('tgtSave').onclick=()=>{
+    const s=sum(); if(Math.abs(s-100)>5){ alert('Targets should add up to roughly 100% (now '+s.toFixed(0)+'%).'); return; }
+    const t={}; box.querySelectorAll('[data-tsym]').forEach(i=>{ const v=+i.value||0; if(v>0) t[i.dataset.tsym]=v; });
+    state.targets=Object.keys(t).length?t:null; lsSet('pt_targets',state.targets);
+    box.innerHTML=''; renderAlloc(); if(typeof renderCoach==='function') renderCoach();
+  };
+  $('tgtCancel').onclick=()=>{ box.innerHTML=''; renderAlloc(); };
+  $('tgtClear').onclick=()=>{ state.targets=null; lsSet('pt_targets',null); box.innerHTML=''; renderAlloc(); if(typeof renderCoach==='function') renderCoach(); };
 }
 let divsFetching=false;
 async function fetchDivs(sym){
@@ -472,8 +522,8 @@ function renderChart(){
   const bench = (state.view.bench!=='off' && benchOK) ? benchSeries(s.labels, s.value) : null;
   $('benchBtn').classList.toggle('on', state.view.bench!=='off' && benchOK);
   $('benchBtn').style.visibility = benchOK ? 'visible' : 'hidden';
-  $('benchBtn').textContent = 'vs ' + (state.view.bench==='VT' ? 'World' : 'S&P 500');
-  $('benchBtn').title = 'Tap to cycle: off → S&P 500 → Total World (VT)';
+  $('benchBtn').textContent = 'vs ' + (state.view.bench==='VT' ? 'World' : state.view.bench==='QQQ' ? 'Nasdaq' : 'S&P 500');
+  $('benchBtn').title = 'Tap to cycle: off → S&P 500 → Total World (VT) → Nasdaq 100 (QQQ)';
   let markers=null;
   if(state.view.range!=='1D'){ // dot on the line for every purchase in view
     const buyByDay={};
@@ -515,11 +565,12 @@ function openDetail(sym){
     cl.push(p);
     if(cl.length>5){ hi52=Math.max(...cl); lo52=Math.min(...cl); }
   }
-  let yld=null, incYr=null;
+  let yld=null, incYr=null, yoc=null;
   const dv=state.divs[sym];
   if(dv&&dv.list&&dv.list.length){
     const perSh=dv.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0);
     if(perSh>0&&p>0){ yld=perSh/p*100; incYr=perSh*r.qty; }
+    if(perSh>0&&r.cost>0&&r.qty>0) yoc=perSh/(r.cost/r.qty)*100; // yield on what YOU paid — rises as the position ages
   }
   const er=(typeof FUND_META!=='undefined'&&FUND_META[sym])?FUND_META[sym].er:null;
   const accLines = Object.keys(r.accs).length>1
@@ -543,6 +594,7 @@ function openDetail(sym){
       <div class="stat"><div class="k">Today</div><div class="v ${cls(dayImp)}">${fmtSign(dayImp)}</div></div>
       ${hi52!=null?`<div class="stat"><div class="k">vs 52w high</div><div class="v ${cls(p-hi52)}">${fmtPct(hi52>0?(p/hi52-1)*100:0)}</div></div>`:''}
       ${yld!=null?`<div class="stat"><div class="k">Dividend yield</div><div class="v">${yld.toFixed(2)}% <span class="statsub">≈${fmt(incYr)}/yr</span></div></div>`:''}
+      ${yoc!=null?`<div class="stat"><div class="k">Yield on cost</div><div class="v">${yoc.toFixed(2)}% <span class="statsub">on what you paid</span></div></div>`:''}
       ${er!=null?`<div class="stat"><div class="k">Fund fee</div><div class="v">${er.toFixed(2)}% <span class="statsub">≈${fmt(val*er/100)}/yr</span></div></div>`:''}
     </div>${hi52!=null&&hi52>lo52?`<div class="rangebar"><div class="rb-track"><i style="left:${Math.min(100,Math.max(0,(p-lo52)/(hi52-lo52)*100)).toFixed(1)}%"></i></div>
       <div class="rb-lbls"><span>${fmtPx(lo52)}</span><span>52-week range</span><span>${fmtPx(hi52)}</span></div></div>`:''}${accLines}${(function(){
@@ -670,7 +722,7 @@ function readEditInputs(){
     h[f] = (f==='qty'||f==='cost') ? (+inp.value||0) : inp.value.trim().toUpperCase().replace('.','-');
   });
 }
-function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_quotes',state.quotes); lsSet('pt_history',state.history); lsSet('pt_intraday',state.intraday); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); }
+function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_quotes',state.quotes); lsSet('pt_history',state.history); lsSet('pt_intraday',state.intraday); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_targets',state.targets); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); }
 function exportCSV(){ // spreadsheet-friendly dump: positions, then every purchase lot
   const lines=['Positions','Account,Symbol,Shares,Cost basis USD,Price USD,Value USD,Profit USD'];
   for(const h of state.holdings){
@@ -687,7 +739,8 @@ function exportCSV(){ // spreadsheet-friendly dump: positions, then every purcha
 }
 function exportBackup(){
   const data={ app:'portfolio-tracker', v:1, exported:new Date().toISOString(),
-    holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed, ccy:state.view.ccy, watch:state.watch };
+    holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed, ccy:state.view.ccy, watch:state.watch,
+    goal:state.goal, targets:state.targets };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='portfolio-backup-'+dayStr(Date.now())+'.json';
@@ -705,6 +758,8 @@ function importBackup(file){
       if(d.confirmed) state.confirmed=d.confirmed;
       if(d.ccy==='USD'||d.ccy==='EUR') state.view.ccy=d.ccy;
       if(Array.isArray(d.watch)) state.watch=d.watch;
+      if(d.goal&&d.goal.amt>0) state.goal=d.goal;
+      if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
       persist(); $('editModal').classList.add('hidden'); renderAll(); refreshAll(true);
       alert('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){ alert('That file is not a valid portfolio backup.'); }

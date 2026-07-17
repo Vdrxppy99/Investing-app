@@ -123,6 +123,25 @@ header{margin-top:12px;padding:18px 16px 20px;border-radius:24px;border:1px soli
 .alloc-classes{display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px 16px;border-top:1px solid var(--line);
   color:var(--mut);font-size:12.5px;font-weight:500}
 .alloc-classes b{color:var(--tx);font-weight:700}
+/* target mix — bar shows where each holding IS, the notch where you WANT it */
+#tgtWrap{padding:0 16px 14px}
+.tgtlink{display:block;padding-top:12px;font-size:12.5px;color:var(--mut);font-weight:600;text-decoration:none;border-top:1px solid var(--line)}
+.tgthead{font-size:12.5px;font-weight:700;margin:12px 0 8px;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;color:var(--mut)}
+.tgthead a{color:var(--brand);font-size:12px;font-weight:700;text-decoration:none}
+.tgtrow{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.tgtrow .dot{width:10px;height:10px;border-radius:3.5px;flex-shrink:0}
+.tgtrow .tgs{width:46px;flex-shrink:0}
+.tgtrack{flex:1;height:9px;border-radius:5px;background:var(--card2);position:relative}
+.tgtrack .cur{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--brand);opacity:.5}
+.tgtrack .mark{position:absolute;top:-3px;bottom:-3px;width:2.5px;border-radius:2px;background:var(--tx);opacity:.85}
+.tgd{width:52px;text-align:right;flex-shrink:0}
+.tgd.ok{color:var(--mut)} .tgd.off{color:#fab219}
+.tgtnext{margin-top:10px;font-size:12.5px;color:var(--mut);line-height:1.55}
+.tgtnext b{color:var(--tx)}
+.tgtedit{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px}
+.tgtedit-row{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;justify-content:space-between}
+.tgtedit-row input{width:62px;background:var(--card2);border:1px solid var(--line);border-radius:9px;color:var(--tx);padding:8px 9px;font-family:inherit;font-size:14px;font-weight:600;text-align:right}
+.tgtsum{font-size:12px;color:var(--mut);margin-top:10px}
 .income-body{padding:8px 16px 16px}
 .inc-total{font-size:24px;font-weight:800;margin:8px 0 10px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .inc-total span{font-size:12px;font-weight:500;color:var(--mut);margin-left:6px;letter-spacing:0}
@@ -346,6 +365,8 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.028;z
 .searchbar input{flex:1;background:none;border:none;color:var(--tx);font-family:inherit;font-size:15px;font-weight:600;
   padding:13px 0;outline:none;min-width:0}
 .searchbar input::placeholder{color:var(--faint);font-weight:500}
+/* the app draws its own ✕ — hide the browser's built-in search-clear so there aren't two */
+.searchbar input::-webkit-search-cancel-button,.searchbar input::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
 .searchbar button{background:var(--card2);border:none;color:var(--mut);width:26px;height:26px;border-radius:50%;
   font-size:12px;cursor:pointer;flex-shrink:0}
 .prstrip{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}

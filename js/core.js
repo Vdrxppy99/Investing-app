@@ -2,7 +2,7 @@
 /* ============ STORAGE ============ */
 /* personal keys live ONLY inside the encrypted vault (see js/vault.js) —
    everything else (quote/history/news caches, view prefs) stays in plain localStorage */
-const PRIVATE_KEYS = new Set(['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal']);
+const PRIVATE_KEYS = new Set(['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets']);
 const mem = {};
 function lsGet(k){
   if(PRIVATE_KEYS.has(k)){ const v=window.VAULT_DATA?window.VAULT_DATA[k]:undefined; return v===undefined?null:v; }
@@ -25,11 +25,12 @@ const state = {
   intraday: lsGet('pt_intraday') || {},   // sym -> {t:[ms], c:[price], ts:fetchedAt} (5-min bars, today)
   divs:     lsGet('pt_divs')     || {},
   goal:     lsGet('pt_goal')     || null,   // savings target { amt }   // sym -> {list:[[ms,perShare]], ts} distribution history
+  targets:  lsGet('pt_targets')  || null,   // target mix { sym: pct } — drives the drift view in Allocation
   watch:    lsGet('pt_watch')    || [],     // followed symbols [{sym,name}]
   fx:       lsGet('pt_fx')       || {rate:0.86, ts:0},
-  // bench: 'off' | 'VOO' (S&P 500) | 'VT' (Total World) — migrates from the old boolean
+  // bench: 'off' | 'VOO' (S&P 500) | 'VT' (Total World) | 'QQQ' (Nasdaq 100) — migrates from the old boolean
   view: { acc:'all', metric:'value', range:'1M', ccy: lsGet('pt_ccy') || 'USD',
-          bench: (function(){ const b=lsGet('pt_bench'); return (b==='VOO'||b==='VT') ? b : (b===true ? 'VOO' : 'off'); })(),
+          bench: (function(){ const b=lsGet('pt_bench'); return (b==='VOO'||b==='VT'||b==='QQQ') ? b : (b===true ? 'VOO' : 'off'); })(),
           sort: lsGet('pt_sort') || 'value', priv: !!lsGet('pt_priv') },
   live:false, fetching:false
 };
@@ -72,8 +73,10 @@ function skel(n){ // shimmer placeholder rows — premium apps never show spinne
 }
 function badge(sym){ return esc(sym.split('-')[0].slice(0,4)); }
 function badgeHtml(sym, small){ // colored letter tile; a real company logo crossfades over it once loaded
-  const d=(typeof TICKER_DOMAINS!=='undefined')&&TICKER_DOMAINS[sym];
-  const logo=d?`<img class="blogo" src="https://www.google.com/s2/favicons?domain=${d}&sz=128" alt="" referrerpolicy="no-referrer" onload="this.classList.add('on')" onerror="this.remove()">`:'';
+  const direct=(typeof TICKER_LOGOS!=='undefined')&&TICKER_LOGOS[sym];
+  const d=!direct&&(typeof TICKER_DOMAINS!=='undefined')&&TICKER_DOMAINS[sym];
+  const src=direct||(d?`https://www.google.com/s2/favicons?domain=${d}&sz=128`:null);
+  const logo=src?`<img class="blogo" src="${src}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('on')" onerror="this.remove()">`:'';
   return `<div class="badge${small?' sm':''}" style="${bstyle(colorOf(sym))}">${badge(sym)}${logo}</div>`;
 }
 function bstyle(c){ return `background:linear-gradient(140deg,${c},color-mix(in srgb,${c} 55%,#000))`; }
@@ -117,8 +120,8 @@ function spark(sym){ // 30-day mini price line for a holding row
   const up=pts[pts.length-1]>=pts[0];
   return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${d}" fill="none" stroke="${up?'var(--green)':'var(--red)'}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/></svg>`;
 }
-function benchSym(){ return state.view.bench==='VT' ? 'VT' : 'VOO'; }
-function benchName(){ return state.view.bench==='VT' ? 'World (VT)' : 'S&P 500'; }
+function benchSym(){ return state.view.bench==='VT' ? 'VT' : state.view.bench==='QQQ' ? 'QQQ' : 'VOO'; }
+function benchName(){ return state.view.bench==='VT' ? 'World (VT)' : state.view.bench==='QQQ' ? 'Nasdaq 100 (QQQ)' : 'S&P 500'; }
 function benchSeries(labels, values){ // "what if the same money had gone into the benchmark instead"
   const voo=state.history[benchSym()]; if(!voo||!voo.t||voo.t.length<2||values.length<2) return null;
   const px={}; for(let i=0;i<voo.t.length;i++) if(voo.c[i]!=null) px[dayStr(voo.t[i])]=voo.c[i];

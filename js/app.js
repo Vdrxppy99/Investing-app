@@ -94,14 +94,11 @@ function renderGoal(){
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.15):0.08; // cap optimism
   let eta='';
   if(remain>0){
-    // months to reach goal at rate r with current monthly contribution
-    const buys=state.lots.filter(l=>!l.div);
-    const months=buys.length?Math.max(1,(Date.now()-new Date(buys.map(l=>l.date).sort()[0]).getTime())/2629800000):12;
-    const pmt=buys.reduce((a,l)=>a+l.cost,0)/months;
+    // months for TODAY'S money alone to compound to the goal — no future deposits assumed (owner request)
     const rm=Math.pow(1+r,1/12)-1; let v=t.value, m=0;
-    while(v<goal && m<720){ v=v*(1+rm)+pmt; m++; }
+    while(v<goal && m<720){ v=v*(1+rm); m++; }
     const yr=new Date(); yr.setMonth(yr.getMonth()+m);
-    eta = m<720 ? `On track for <span class="eta">${yr.toLocaleDateString([],{month:'short',year:'numeric'})}</span> at ~${(r*100).toFixed(0)}%/yr + your ${fmt(pmt)}/mo pace.` : `Increase contributions to reach this within 60 years.`;
+    eta = (m<720 && t.value>0) ? `Today's money alone gets there <span class="eta">${yr.toLocaleDateString([],{month:'short',year:'numeric'})}</span> at ~${(r*100).toFixed(0)}%/yr — every new buy pulls that date closer.` : `Today's balance alone won't compound to this within 60 years — new deposits will do the heavy lifting.`;
   } else { eta=`<span class="eta">Goal reached</span> — ${fmt(-remain)} past target. Time for a bigger one?`; }
   card.querySelector('.card-title').style.display='none';
   $('goalBody').innerHTML=`<div class="goalwrap">
@@ -177,10 +174,10 @@ function renderAll(){
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-explore').classList.contains('hidden')) renderMarkets();
 }
-$('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → off
-  const next = state.view.bench==='off' ? 'VOO' : state.view.bench==='VOO' ? 'VT' : 'off';
+$('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → Nasdaq 100 → off
+  const next = state.view.bench==='off' ? 'VOO' : state.view.bench==='VOO' ? 'VT' : state.view.bench==='VT' ? 'QQQ' : 'off';
   state.view.bench=next; lsSet('pt_bench', next);
-  if(next==='VT') ensureBenchHistory('VT').then(ok=>{ if(ok) renderChart(); });
+  if(next==='VT'||next==='QQQ') ensureBenchHistory(next).then(ok=>{ if(ok) renderChart(); });
   renderChart();
 };
 $('metricSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{ state.view.metric=b.dataset.m; $('metricSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderChart(); });

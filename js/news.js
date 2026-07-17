@@ -18,6 +18,8 @@ const JUNK_TITLE = /net asset value|form 8\.[35]|form 6-k|holding\(s\) in compan
 const JUNK_PUB = /business wire|pr newswire|globe ?newswire|newsfile|accesswire|acn newswire|prweb/i;
 /* listicle mills — allowed, but they shouldn't outrank real reporting */
 const LISTICLE_PUB = /insider monkey|motley fool|zacks|benzinga|24\/7 wall st|simply wall st/i;
+/* analyst-note wire spam ("X Adjusts Price Target on Y…") — one is signal, six in a row is noise */
+const ANALYST_RE = /adjusts price target|raises price target|lowers price target|maintains .{0,30}rating|reiterates|initiates coverage|upgrades? .{0,30} to |downgrades? .{0,30} to /i;
 /* themes that actually move this portfolio (broad index funds + Berkshire) */
 const HOT_TERMS = /vanguard|s&p ?500|etf|index fund|dividend|berkshire|buffett|\bfed\b|federal reserve|interest rate|inflation|nasdaq|dow jones|tariff|earnings|jobs report|treasury yield|bull market|bear market|recession|all-time high|sell-?off/i;
 
@@ -82,6 +84,7 @@ function newsScore(i, owned, look){
   else s += 0.5;                                    // general market
   if(HOT_TERMS.test(i.title)) s += 1.5;             // theme that moves index portfolios
   if(LISTICLE_PUB.test(i.pub)) s -= 1.5;            // rank real reporting above listicles
+  if(ANALYST_RE.test(i.title)) s -= 2;              // analyst price-target chatter sinks below reporting
   return s;
 }
 function newsMeta(i){
@@ -104,6 +107,19 @@ function renderNews(){
   else if(newsSt.filter!=='all') items = items.filter(i=>i.tags.includes(newsSt.filter));
   items = items.map(i=>({ ...i, _s: newsScore(i, owned, look) }));
   items.sort(newsSt.sort==='top' ? (a,b)=>b._s-a._s || b.t-a.t : (a,b)=>b.t-a.t);
+  // collapse analyst-note pileups on the broad feeds: max one per company, two total —
+  // under a specific ticker chip (or Saved) you asked for them, so show everything
+  if(newsSt.filter==='all'||newsSt.filter==='__inside'||newsSt.filter==='Market'){
+    let n=0; const seen=new Set();
+    items = items.filter(i=>{
+      if(!ANALYST_RE.test(i.title)) return true;
+      const m=i.title.match(/price target (?:on|for) (.+?) (?:to|at|from)\b/i);
+      const key=m?m[1].toLowerCase():'';
+      if(key && seen.has(key)) return false;
+      if(key) seen.add(key);
+      return ++n<=2;
+    });
+  }
   // hoist the best illustrated story into a hero card
   let hero = null;
   const hi = items.findIndex((x,k)=>k<4 && x.th);

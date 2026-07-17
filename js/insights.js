@@ -426,6 +426,19 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.12):0.07;
   if(cashPct>0.05) items.push({ic:'💵', title:'Deploy idle cash', detail:`${fmt(cash)} · ${(cashPct*100).toFixed(0)}% uninvested`, sev:'warn', t:'Put idle cash to work',
     b:`${fmt(cash)} (${(cashPct*100).toFixed(0)}% of the portfolio) is uninvested. At your ~${(r*100).toFixed(0)}%/yr pace that's ≈${fmt(cash*r)} of growth per year sitting out.`});
+  // drift vs the target mix set on the Allocation card
+  if(state.targets && Object.keys(state.targets).length){
+    const inv=rs.reduce((a,x)=>a+x.qty*priceOf(x.sym),0);
+    if(inv>0){
+      let worst=null;
+      for(const [sym,tgt] of Object.entries(state.targets)){
+        const c=(rs.find(x=>x.sym===sym)||{qty:0}).qty*priceOf(sym)/inv*100;
+        const d=c-tgt; if(worst===null||d<worst.d) worst={sym,d};
+      }
+      if(worst && worst.d<-3) items.push({ic:'🎛️', title:'Feed the laggard', detail:`${worst.sym.replace('-','.')} is ${Math.abs(worst.d).toFixed(0)}% under target`, sev:'warn', t:'Rebalance with new money',
+        b:`${worst.sym.replace('-','.')} sits ${Math.abs(worst.d).toFixed(1)}% below the target mix you set. Pointing the next deposit at it restores your chosen balance — no selling, no taxes.`});
+    }
+  }
   // single-company weight (index funds are already diversified)
   const DIV=new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']); // BRK.B = diversified conglomerate
   const singles=rs.filter(x=>!DIV.has(x.sym)).map(x=>({sym:x.sym, w:x.qty*priceOf(x.sym)/Math.max(1,t.value)})).sort((a,b)=>b.w-a.w);
@@ -453,7 +466,7 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   if(lastBuy){
     const days=Math.floor((now-new Date(lastBuy+'T12:00:00').getTime())/86400e3);
     if(days>40) items.push({ic:'🔁', title:'Keep investing', detail:`${days} days since your last buy`, sev:'warn', t:'Keep the contribution streak',
-      b:`Last buy was ${days} days ago. The projections below assume your ${fmt(pmt)}/mo pace continues — consistency is the whole engine.`});
+      b:`Last buy was ${days} days ago. Your pace so far has been ~${fmt(pmt)}/mo. The projection below shows what today's money does on its own — every new buy lifts the whole fan.`});
   }
   if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', title:'Set a goal', detail:'No target set yet', sev:'info', t:'Set a goal',
     b:'Give the money a number. A target unlocks the progress ring and a projected finish date on the Portfolio tab.'});
@@ -475,14 +488,15 @@ function renderProjection(){
   const el=$('projChart'); if(!el||!window.Chart) return;
   const o=Chart.getChart(el); if(o) o.destroy();
   const V0=totals('all').value;
-  const {pmt}=contribPace();
   const scen=[['Cautious 4%',0.04],['Average 7%',0.07],['Strong 10%',0.10]];
   const N=projYears*12, y0=new Date().getFullYear();
   const labels=[], data=scen.map(()=>[]);
+  // pure compounding of what's invested TODAY — no future contributions (owner request:
+  // "I want to see what my money can turn into")
   for(let m=0;m<=N;m++){
     labels.push(m);
     scen.forEach((sc,s)=>{ const rm=Math.pow(1+sc[1],1/12)-1;
-      data[s].push(m ? data[s][m-1]*(1+rm)+pmt : V0); });
+      data[s].push(m ? data[s][m-1]*(1+rm) : V0); });
   }
   const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
   const ds=[
@@ -511,7 +525,7 @@ function renderProjection(){
   { let fwd=0; for(const r2 of rows('all')){ const dv=state.divs[r2.sym]; if(!dv||!dv.list) continue;
       fwd+=r2.qty*dv.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0); }
     if(fwd>0 && V0>0) divLine=`Dividends alone could grow from ${fmt(fwd)}/yr today to ~${fmt(fwd*data[1][N]/V0)}/yr by ${y0+projYears}. `; }
-  $('projNote').textContent=divLine+`Assumes your real ${fmt(pmt)}/mo contribution pace continues, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ${goal?'Gold dashed line = your goal. ':''}Not advice.`;
+  $('projNote').textContent=divLine+`What today's ${cfmt(V0)} can turn into on its own — no future deposits counted, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ${goal?'Gold dashed line = your goal. ':''}Not advice.`;
 }
 if($('projSeg')) $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{
   projYears=+b.dataset.y;
