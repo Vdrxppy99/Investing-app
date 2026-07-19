@@ -151,7 +151,9 @@ async function refreshAll(force){
   $('refreshBtn').classList.remove('spinning');
   lsSet('pt_history', state.history); // persist() no longer carries the heavy caches
   persist(); renderAll();
+  if(typeof maybeShowMonthlyRecap==='function') maybeShowMonthlyRecap(); // month first — daily recap yields if a sheet is open
   if(typeof maybeShowRecap==='function') maybeShowRecap();
+  if(typeof cloudBackupSoon==='function') cloudBackupSoon();
   pushSyncSoon(); // keep the push server's fallback prices warm (no-op unless reports are on)
 }
 /* --- live polling: every few seconds while the US market is open --- */
@@ -221,7 +223,14 @@ function pushSnapshot(){
   const prices={};
   for(const s of Object.keys(hs)){ const q=state.quotes[s]; if(q && q.price>0) prices[s]={price:q.price, prev:q.prev||0}; }
   return { holdings:Object.entries(hs).map(([sym,qty])=>({sym,qty})),
-           cash:(+state.cash.main||0)+(+state.cash.brok||0), prices, ts:Date.now() };
+           cash:(+state.cash.main||0)+(+state.cash.brok||0), prices,
+           goal:(state.goal&&state.goal.amt>0)?+state.goal.amt:0, dep:+state.deposits||0, // for milestone alerts (user-approved)
+           ts:Date.now() };
+}
+function ensurePushToken(){
+  const p=lsGet('pt_push')||{};
+  if(!p.token){ const a=new Uint8Array(24); crypto.getRandomValues(a); p.token=Array.from(a,x=>x.toString(16).padStart(2,'0')).join(''); lsSet('pt_push',p); }
+  return p;
 }
 function pushCall(path, body){
   const p=lsGet('pt_push');
@@ -253,9 +262,7 @@ async function pushEnable(){
     let sub = await reg.pushManager.getSubscription();
     if(!sub) sub = await reg.pushManager.subscribe({userVisibleOnly:true,
       applicationServerKey:Uint8Array.from(atob(PUSH_VAPID.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0))});
-    const p = lsGet('pt_push') || {};
-    if(!p.token){ const a=new Uint8Array(24); crypto.getRandomValues(a); p.token=Array.from(a,x=>x.toString(16).padStart(2,'0')).join(''); }
-    lsSet('pt_push', p); // token first — pushCall reads it
+    const p = ensurePushToken(); // token first — pushCall reads it
     const r = await pushCall('/subscribe', {sub:sub.toJSON(), snapshot:pushSnapshot()});
     if(!r.ok) throw new Error('server '+r.status);
     p.on=true; lsSet('pt_push', p); pushSyncLast=Date.now();
@@ -274,4 +281,44 @@ function pushTest(){
     if(d && d.sent) toast('Test report sent — check your lock screen in a few seconds.');
     else toast('Server replied: '+(d && (d.skip||d.error) || 'unknown'), true);
   }).catch(()=>toast('Couldn’t reach the report server.', true));
+}
+
+/* ============ CLOUD BACKUP — encrypted ON THIS DEVICE, stored on the owner's worker ============
+   The blob is AES-256 encrypted with a key derived from the passcode BEFORE upload — the
+   server (and Cloudflare) only ever see unreadable bytes. Restore lives on the lock screen
+   of a fresh install (vault.js): enter the old passcode → download → decrypt → re-vault.
+   pt_bk {k,tag,salt,last} lives in the encrypted vault like every personal key. */
+function b64buf(buf){ const u=new Uint8Array(buf); let s=''; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); }
+function cloudPayload(){
+  return { app:'portfolio-tracker', v:1, cloud:1, exported:new Date().toISOString(),
+    holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed,
+    ccy:state.view.ccy, watch:state.watch, goal:state.goal, targets:state.targets, push:lsGet('pt_push') };
+}
+async function cloudBackupNow(){
+  const bk=lsGet('pt_bk'); if(!bk||!bk.k) return false;
+  try{
+    const key=await crypto.subtle.importKey('raw',Uint8Array.from(atob(bk.k),c=>c.charCodeAt(0)),{name:'AES-GCM'},false,['encrypt']);
+    const iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(JSON.stringify(cloudPayload())));
+    ensurePushToken();
+    const r=await pushCall('/backup',{tag:bk.tag,salt:bk.salt,iv:b64buf(iv),ct:b64buf(ct),ts:Date.now()});
+    if(r.ok){ bk.last=Date.now(); lsSet('pt_bk',bk); return true; }
+  }catch(e){ /* offline or server hiccup — the next nudge retries */ }
+  return false;
+}
+let cloudT=null;
+function cloudBackupSoon(){ // nudged by persist() and refreshAll — actually uploads at most ~once a day
+  const bk=lsGet('pt_bk'); if(!bk||!bk.k) return;
+  if(bk.last && Date.now()-bk.last<20*3600e3) return;
+  clearTimeout(cloudT); cloudT=setTimeout(()=>{ cloudBackupNow(); }, 12000);
+}
+async function cloudEnable(pass){ // pass is verified inside vaultCloudKeys (throws if wrong)
+  const kk=await window.vaultCloudKeys(pass);
+  ensurePushToken();
+  lsSet('pt_bk',{k:kk.k,tag:kk.tag,salt:kk.salt});
+  return cloudBackupNow();
+}
+async function cloudDisable(){
+  try{ await pushCall('/backup',{off:true}); }catch(e){}
+  lsSet('pt_bk',null);
 }

@@ -26,7 +26,8 @@
       <input id="setPass1" type="password" placeholder="Create passcode (min 6 characters)" autocomplete="new-password" aria-label="Create passcode">
       <input id="setPass2" type="password" placeholder="Repeat passcode" autocomplete="new-password" aria-label="Repeat passcode">
       <button class="btn pri" id="setupBtn">Create passcode</button>
-      <div class="locknote">Your holdings are encrypted with this passcode on this device — nothing is sent anywhere. If you forget it, only an exported backup (⚙︎) can bring the data back.</div>
+      <div class="locknote">Your holdings are encrypted with this passcode on this device — nothing is sent anywhere. If you forget it, only a backup can bring the data back.</div>
+      <a href="#" id="cloudRestoreLink" class="locknote" style="display:block;text-align:center;margin-top:12px">Moving from another phone? Restore from cloud backup</a>
     </div>
     <div id="lockEnter" style="display:none">
       <input id="unlockPass" type="password" placeholder="Passcode" autocomplete="current-password" aria-label="Passcode">
@@ -115,7 +116,7 @@
 
   <section class="card" id="goalCard"><div class="card-title">Goal</div><div id="goalBody"></div></section>
 
-  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v10.8.1</div>
+  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v10.9</div>
 </div><!-- /page-portfolio -->
 
 <!-- ================= NEWS ================= -->
@@ -179,6 +180,8 @@
     <div class="icard wide" id="hmCard"><div class="it">Monthly Returns</div><div id="hmBody"></div><div class="estnote">Deposit-adjusted (modified Dietz) — measures market performance, not your contributions.</div></div>
     <div class="icard" id="riskCard"><div class="it">Risk</div></div>
     <div class="icard" id="peCard"><div class="it">Portfolio P/E</div></div>
+    <div class="icard wide" id="crashCard" style="cursor:pointer"><div class="it">Crash Test <span class="chev">›</span></div><div id="crashBody"></div>
+      <div class="estnote">If history's worst markets replayed tomorrow — and how long each took to heal.</div></div>
   </div>
 
   <div class="eyebrow">Looking ahead</div>

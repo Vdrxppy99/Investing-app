@@ -14,22 +14,23 @@ import { etNow, tradingDay, money, signed } from './shared.js';
 
 const MOVE_PCT = 2;                                    // day move that counts as "big"
 const SD_MULT = 2;                                     // band width = mean ± 2σ
-const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1 }; // days before the same alert may repeat
-const PRIORITY = { atl: 5, ath: 4, lo: 3, hi: 2, mv: 1 };
+const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1 }; // days before the same alert may repeat
+const PRIORITY = { 'm$': 7, mg: 6, atl: 5, ath: 4, dv: 4, lo: 3, hi: 2, mv: 1 }; // milestones top, then lows, dividends/highs, bands, movers
 const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', 'Accept': 'application/json' };
 const money0 = v => '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
 
-async function fetchSeries(sym, qs) {
+async function fetchChartResult(sym, qs) {
   for (const host of ['query1', 'query2']) {
     try {
       const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?${qs}`, { headers: UA });
       if (!r.ok) continue;
       const res = (await r.json())?.chart?.result?.[0];
-      if (res?.indicators?.quote?.[0]) return res.indicators.quote[0];
+      if (res) return res;
     } catch (_) { /* try next host */ }
   }
   return null;
 }
+const fetchSeries = async (sym, qs) => (await fetchChartResult(sym, qs))?.indicators?.quote?.[0] || null;
 
 /* Per-day stats per owned symbol: usual band (mean ± 2σ of last 60 closes) + all-time
    high/low (monthly bars over the fund's full life — true intra-period extremes).
@@ -77,9 +78,11 @@ export async function checkAlerts(env, force) {
   const ok = key => force || !sent[key] || daysApart(et.date, sent[key]) >= COOLDOWN[key.split(':')[1]];
 
   const found = [], evaluated = [];
+  let total = +snap.cash || 0, priced = 0;
   for (const h of snap.holdings) {
     const q = await fetchQuote(h.sym);
     if (!q || !(q.price > 0) || !(q.prev > 0)) continue;
+    total += h.qty * q.price; priced++;
     const name = h.sym.replace('-', '.');
     const dayUsd = h.qty * (q.price - q.prev);
     const stake = h.qty * q.price;
@@ -99,10 +102,60 @@ export async function checkAlerts(env, force) {
       add('mv', `${name} ${(pct >= 0 ? '+' : '')}${pct.toFixed(1)}% today`, `${signed(dayUsd)} on your shares`);
     if (b && q.price > b.ath) { b.ath = q.price; bands.dirty = true; }  // ratchet so tomorrow compares against today
   }
+
+  /* ---- milestones: first time the portfolio crosses a $5k line, or a goal-progress line.
+     High-water marks in KV 'mstone' — an alert can never repeat. First run seeds silently. */
+  if (priced === snap.holdings.length && total > 0) {
+    const ms = await env.KV.get('mstone', 'json') || {};
+    const STEP = 5000, GOALS = [25, 50, 75, 90, 100];
+    if (ms.top$ === undefined) { ms.top$ = Math.floor(total / STEP) * STEP; ms.dirty = 1; }
+    else if (total >= ms.top$ + STEP) {
+      const line = Math.floor(total / STEP) * STEP;
+      const growth = snap.dep > 0 && total > snap.dep ? ` — ${money(total - snap.dep)} of that is growth your money made on its own` : '';
+      found.push({ sym: 'PORT', name: 'PORT', type: 'm$', p: PRIORITY['m$'], impact: total,
+        title: `You just crossed ${money0(line)}`, body: `Your portfolio reached ${money(total)} today${growth}.` });
+      ms.top$ = line; ms.dirty = 1;
+    }
+    const goal = +snap.goal || 0;
+    if (goal > 0) {
+      const hit = GOALS.filter(g => total / goal * 100 >= g).pop() || 0;
+      if (ms.topG === undefined) { ms.topG = hit; ms.dirty = 1; }
+      else if (hit > ms.topG) {
+        found.push({ sym: 'PORT', name: 'PORT', type: 'mg', p: PRIORITY.mg, impact: total,
+          title: hit >= 100 ? 'You reached your goal 🎉' : `You're ${hit}% of the way to your goal`,
+          body: hit >= 100 ? `${money(total)} — past your ${money0(goal)} target. Time to dream bigger.`
+                           : `${money(total)} of your ${money0(goal)} target — steady progress.` });
+        ms.topG = hit; ms.dirty = 1;
+      }
+    }
+    if (ms.dirty) { delete ms.dirty; await env.KV.put('mstone', JSON.stringify(ms)); }
+  }
+
+  /* ---- dividend declarations: once a day, look for a NEW payout event on each fund.
+     First sighting of a fund just records its latest event (no back-alerts). */
+  const dvs = await env.KV.get('divs', 'json') || { seen: {} };
+  if (dvs.date !== et.date) {
+    for (const h of snap.holdings) {
+      const evs = (await fetchChartResult(h.sym, 'range=3mo&interval=1d&events=div'))?.events?.dividends;
+      if (!evs) continue;
+      const latest = Object.values(evs).reduce((a, e) => (e && e.date > (a ? a.date : 0) ? e : a), null);
+      if (!latest || !(latest.amount > 0)) continue;
+      if (dvs.seen[h.sym] && latest.date > dvs.seen[h.sym] && ok(`${h.sym}:dv`)) {
+        const cut = h.qty * latest.amount, name = h.sym.replace('-', '.');
+        found.push({ sym: h.sym, name, type: 'dv', p: PRIORITY.dv, impact: cut,
+          title: `${name} is paying you a dividend`,
+          body: `~${money(cut)} for your ${h.qty % 1 ? h.qty.toFixed(2) : h.qty} shares (${money(latest.amount)}/share) — cash lands in your account within days.` });
+      }
+      dvs.seen[h.sym] = latest.date;
+    }
+    dvs.date = et.date;
+    await env.KV.put('divs', JSON.stringify(dvs)); // one write per day
+  }
+
   if (!found.length) return { skip: 'nothing notable', evaluated };
   found.sort((a, z) => z.p - a.p || z.impact - a.impact);
   const top = found[0];
-  const extras = found.slice(1, 3).map(a => a.type === 'mv' ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range' })[a.type]}`);
+  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
   const body = top.body + (extras.length ? ` · Also: ${extras.join(', ')}` : '');
   const res = await sendWebPush(env, sub, JSON.stringify({ title: top.title, body, tag: 'alert' }), 'alert');
   if (res.status === 404 || res.status === 410) { await env.KV.delete('sub'); return { error: 'subscription expired — re-enable in the app', status: res.status }; }

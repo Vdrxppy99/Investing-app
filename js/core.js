@@ -4,7 +4,7 @@
    everything else (quote/history/news caches, view prefs) stays in plain localStorage */
 /* ⚠ MUST stay identical to PRIVATE_KEYS in js/vault.js (vault loads alone, pre-unlock).
    Adding a key? Change BOTH lists + exportBackup(). */
-const PRIVATE_KEYS = new Set(['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push']);
+const PRIVATE_KEYS = new Set(['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push','pt_bk']);
 const mem = {};
 let quotesRev=0, qDirty=false; // bumped by setQuote only when a price actually changed
 window.storageFull=false;

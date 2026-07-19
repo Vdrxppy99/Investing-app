@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v10.8.1'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
+const V = 'pt-v10.9'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

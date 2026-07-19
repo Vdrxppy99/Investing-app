@@ -15,7 +15,7 @@ const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 /* ⚠ MUST stay identical to PRIVATE_KEYS in js/core.js (this file loads alone, pre-unlock,
    so it cannot share core's copy). Adding a key? Change BOTH lists + exportBackup(). */
-const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push'];
+const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push','pt_bk'];
 const APP_SCRIPTS=['js/boot.js','js/seed.js','js/core.js','js/portfolio.js','js/api.js',
                    'js/explore.js','js/insights.js','js/sheets.js','js/news.js','js/app.js'];
 let MK=null; // master key — memory only, gone when the page closes
@@ -152,7 +152,52 @@ window.vaultChangePass=async(oldp,newp)=>{
   const salt=crypto.getRandomValues(new Uint8Array(16));
   const w=await wrapMK(await kekFromPass(newp,salt));
   LS.setItem('pt_v_pass',JSON.stringify({salt:b64(salt),...w}));
+  // cloud backup is keyed to the passcode — re-derive so the next upload matches the new one
+  if(window.VAULT_DATA && window.VAULT_DATA.pt_bk && window.VAULT_DATA.pt_bk.k){
+    try{ const kk=await window.vaultCloudKeys(newp); window.VAULT_DATA.pt_bk={k:kk.k,tag:kk.tag,salt:kk.salt}; window.vaultPersist(); }catch(e){}
+  }
 };
+
+/* ---------- cloud backup crypto (see api.js CLOUD BACKUP) ----------
+   Verifies the passcode, then derives the backup key + auth tag from it. The raw key is
+   handed back to the app to store in the vault so nightly uploads work from any unlock. */
+const CLOUD_ITER=310000, CLOUD_TAG_SALT='pt-cloud-tag-v1';
+async function cloudKm(pass){ return crypto.subtle.importKey('raw',enc.encode(pass),'PBKDF2',false,['deriveKey','deriveBits']); }
+async function cloudTagOf(km){
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(CLOUD_TAG_SALT),iterations:CLOUD_ITER,hash:'SHA-256'},km,256);
+  return Array.from(new Uint8Array(bits),x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function cloudKeyOf(km,salt){
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:CLOUD_ITER,hash:'SHA-256'},km,{name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+}
+window.vaultCloudKeys=async(pass)=>{
+  const o=JSON.parse(LS.getItem('pt_v_pass'));
+  await unwrapMK(await kekFromPass(pass,ub64(o.salt)), o); // throws if the passcode is wrong
+  const km=await cloudKm(pass);
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const key=await cloudKeyOf(km,salt);
+  return { k:b64(await crypto.subtle.exportKey('raw',key)), tag:await cloudTagOf(km), salt:b64(salt) };
+};
+const PUSH_URL_V='https://portfolio-push.vdrxppy99.workers.dev'; // duplicated from api.js — this file loads alone, pre-unlock
+async function cloudRestore(pass){
+  const km=await cloudKm(pass);
+  const tag=await cloudTagOf(km);
+  const r=await fetch(PUSH_URL_V+'/restore',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tag})});
+  if(!r.ok) throw new Error(r.status===429?'rate':'none');
+  const bkp=await r.json(); // {salt, iv, ct}
+  const key=await cloudKeyOf(km,ub64(bkp.salt));
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(bkp.iv)},key,ub64(bkp.ct));
+  const d=JSON.parse(dec.decode(pt));
+  if(!d || !Array.isArray(d.holdings)) throw new Error('bad');
+  // seed plaintext keys, then doSetup(pass) migrates them into a fresh vault (its normal path)
+  const put=(k,v)=>{ if(v!==undefined&&v!==null) LS.setItem(k,JSON.stringify(v)); };
+  put('pt_holdings',d.holdings); put('pt_lots',d.lots||[]); put('pt_cash',d.cash||{main:0,brok:0});
+  put('pt_deposits',+d.deposits||0); put('pt_confirmed',d.confirmed); put('pt_goal',d.goal);
+  put('pt_targets',d.targets); put('pt_push',d.push); put('pt_watch',d.watch); put('pt_ccy',d.ccy);
+  put('pt_bk',{k:b64(await crypto.subtle.exportKey('raw',key)),tag,salt:bkp.salt,last:Date.now()}); // backups stay on
+  await doSetup(pass);
+  return d.holdings.length;
+}
 window.vaultWipe=()=>{
   ['pt_vault_data','pt_v_pass','pt_v_prf',...PRIVATE_KEYS].forEach(k=>LS.removeItem(k));
   location.reload();
@@ -188,6 +233,17 @@ function boot(){
   if(!hasVault){
     $id('lockSetup').style.display='';
     $id('lockSub').textContent='Create a passcode to encrypt your data on this device';
+    const rl=$id('cloudRestoreLink');
+    if(rl) rl.onclick=async e=>{
+      e.preventDefault();
+      const p=prompt('Enter the passcode from your old phone'); if(p==null||!p) return;
+      err(''); $id('lockSub').textContent='Restoring your encrypted backup…';
+      try{ const n=await cloudRestore(p); $id('lockSetup').style.display='none'; await showFaceStepOrStart(); }
+      catch(ex){
+        $id('lockSub').textContent='Create a passcode to encrypt your data on this device';
+        err(ex&&ex.message==='rate' ? 'Too many tries — wait an hour and try again.' : 'No cloud backup found for that passcode.');
+      }
+    };
     $id('setupBtn').onclick=async()=>{
       const a=$id('setPass1').value, b=$id('setPass2').value;
       if(a.length<6){ err('Use at least 6 characters.'); return; }

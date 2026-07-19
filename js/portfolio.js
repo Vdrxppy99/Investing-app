@@ -759,8 +759,8 @@ function openEdit(){
     <div class="ebtns"><button class="btn pri" id="saveEdit">Save</button><button class="btn sec" id="cancelEdit">Cancel</button></div>
     <div class="ebtns"><button class="btn sec" id="exportBtn">⬇ Export backup</button><button class="btn sec" id="importBtn">⬆ Import backup</button><button class="btn sec" id="csvBtn">⬇ CSV</button><button class="btn warn" id="resetSeed">Erase all holdings</button></div>
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Security</div>
-    <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button></div>
-    <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it.</div>
+    <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button><button class="btn sec" id="cloudTgl"></button></div>
+    <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it. Cloud backup keeps an encrypted copy on your own server — unreadable without your passcode, so a lost phone loses nothing.</div>
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Daily reports</div>
     <div class="ebtns"><button class="btn sec" id="pushTgl"></button><button class="btn sec" id="pushTest" style="display:none">Send test now</button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Lock-screen notification at US market open (~15:35) and close (~22:15) with your day's dollars and biggest movers — even while the app is closed. Notifications are end-to-end encrypted.</div>
@@ -800,6 +800,25 @@ function openEdit(){
     try{ await vaultChangePass(o,n); alert('Passcode changed.'); }
     catch(e){ alert('Current passcode was wrong.'); }
   };
+  const paintCloud=()=>{ const b=lsGet('pt_bk'); $('cloudTgl').textContent = (b&&b.k) ? '☁️ Cloud backup: on' : '☁️ Cloud backup: off'; };
+  paintCloud();
+  $('cloudTgl').onclick=()=>{
+    const b=lsGet('pt_bk');
+    if(b&&b.k){
+      showConfirm('Turn off cloud backup?','The encrypted copy on your server will be deleted. Everything stays on this phone.','Turn off',
+        async()=>{ await cloudDisable(); paintCloud(); toast('Cloud backup off.'); });
+    } else {
+      (async()=>{
+        const p=prompt('Confirm your passcode to enable encrypted cloud backup'); if(p==null) return;
+        $('cloudTgl').textContent='Encrypting…';
+        try{
+          const ok=await cloudEnable(p);
+          toast(ok ? 'Cloud backup on — your data now survives a lost phone.' : 'Cloud backup on — the first upload will finish when you’re online.');
+        }catch(e){ toast('Wrong passcode.', true); }
+        paintCloud();
+      })();
+    }
+  };
   const paintPush=()=>{
     const on=!!(lsGet('pt_push')||{}).on;
     $('pushTgl').textContent = on ? 'Turn off reports' : '🔔 Turn on reports';
@@ -837,7 +856,7 @@ function readEditInputs(){
 /* persist = the SMALL personal/pref keys only. The heavy caches (quotes, history,
    intraday, divs) are saved at their fetch sites — re-stringifying ~300KB of history
    here on every refresh was the main-thread cost, not a safety net. */
-function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_targets',state.targets); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); if(typeof pushSyncSoon==='function') pushSyncSoon(); /* holdings changed → keep the report server's copy current */ }
+function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_targets',state.targets); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); if(typeof pushSyncSoon==='function') pushSyncSoon(); /* holdings changed → keep the report server's copy current */ if(typeof cloudBackupSoon==='function') cloudBackupSoon(); }
 function exportCSV(){ // spreadsheet-friendly dump: positions, then every purchase lot
   const lines=['Positions','Account,Symbol,Shares,Cost basis USD,Price USD,Value USD,Profit USD'];
   for(const h of state.holdings){
@@ -855,7 +874,7 @@ function exportCSV(){ // spreadsheet-friendly dump: positions, then every purcha
 function exportBackup(){
   const data={ app:'portfolio-tracker', v:1, exported:new Date().toISOString(),
     holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed, ccy:state.view.ccy, watch:state.watch,
-    goal:state.goal, targets:state.targets, push:lsGet('pt_push') };
+    goal:state.goal, targets:state.targets, push:lsGet('pt_push'), bk:lsGet('pt_bk') };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='portfolio-backup-'+dayStr(Date.now())+'.json';
@@ -876,6 +895,7 @@ function importBackup(file){
       if(d.goal&&d.goal.amt>0) state.goal=d.goal;
       if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
       if(d.push&&d.push.token) lsSet('pt_push', d.push); // keeps the report server's token — same account, no re-pairing
+      if(d.bk&&d.bk.k) lsSet('pt_bk', d.bk);            // keeps cloud backup armed too
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){ toast('That file is not a valid portfolio backup.', true); }

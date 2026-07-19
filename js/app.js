@@ -313,6 +313,52 @@ function lastCloseKey(){ // YYYY-MM-DD of the most recently COMPLETED US trading
   do{ d.setUTCDate(d.getUTCDate()-1); }while(!isTrading(d));
   return d.toISOString().slice(0,10);
 }
+function maybeShowMonthlyRecap(){
+  // "Your June in review" — once, on the first open of a new month (skips if the month's half over)
+  if(lsGet('pt_recap_off')) return;
+  if(document.body.classList.contains('locked')) return;
+  if(!$('detail').classList.contains('hidden') || !$('editModal').classList.contains('hidden')) return;
+  const now=new Date();
+  const ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  if(lsGet('pt_recap_month')===ym) return;
+  if(now.getDate()>14){ lsSet('pt_recap_month', ym); return; }
+  if(!state.lots.length) return;
+  const md=typeof monthlyDietzReturns==='function' ? monthlyDietzReturns() : null;
+  const p0=new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const pm=p0.getFullYear()+'-'+String(p0.getMonth()+1).padStart(2,'0');
+  if(!md || md.ret[pm]==null) return;             // needs a full prior month of history
+  const pct=md.ret[pm];
+  // dollar gain = V1 − V0 − deposits (same window the heatmap uses)
+  const s=buildSeries('all'); const eom={};
+  for(let i=0;i<s.labels.length;i++) eom[s.labels[i].slice(0,7)]=s.value[i];
+  const months=Object.keys(eom).sort(), pi=months.indexOf(pm);
+  let divs=0, deps=0;
+  for(const l of state.lots){ if(l.date.slice(0,7)!==pm) continue; if(l.div) divs+=l.cost; else deps+=l.cost; }
+  const gain = pi>0 ? eom[pm]-eom[months[pi-1]]-deps : null;
+  const perf=[];
+  for(const r of rows('all')){
+    const h=state.history[r.sym]; if(!h||!h.t||h.t.length<40) continue;
+    let a=null,b=null;
+    for(let i=0;i<h.t.length;i++){ const mm=dayStr(h.t[i]).slice(0,7);
+      if(mm===months[pi-1]) a=h.c[i]; else if(mm===pm) b=h.c[i]; }
+    if(a>0&&b>0) perf.push({sym:r.sym, pct:(b/a-1)*100});
+  }
+  perf.sort((x,y)=>y.pct-x.pct);
+  const best=perf[0], worst=perf[perf.length-1];
+  const sp=perf.find(x=>x.sym===benchSym()) || perf.find(x=>x.sym==='VOO');
+  const mName=p0.toLocaleDateString([], now.getFullYear()!==p0.getFullYear() ? {month:'long',year:'numeric'} : {month:'long'});
+  const krow=(k,v)=>`<div class="krow"><span class="k">${k}</span><span>${v}</span></div>`;
+  openInfoSheet(`Your ${mName} in review`, `
+    <div style="font-size:28px;font-weight:800;margin:4px 0 2px" class="${cls(gain!=null?gain:pct)}">${gain!=null?fmtSign(gain):fmtPct(pct)}</div>
+    <p style="margin-top:4px">Your investments ${pct>=0?'returned':'gave back'} <b class="${cls(pct)}">${fmtPct(pct)}</b> in ${mName}${sp?` — the S&P 500 did ${fmtPct(sp.pct)}`:''}.</p>
+    ${best?krow('Best fund',`<b class="pos">${best.sym.replace('-','.')} ${fmtPct(best.pct)}</b>`):''}
+    ${worst&&perf.length>1?krow('Toughest fund',`<b class="${cls(worst.pct)}">${worst.sym.replace('-','.')} ${fmtPct(worst.pct)}</b>`):''}
+    ${divs>0?krow('Dividends collected',`<b class="pos">${fmt(divs)}</b>`):''}
+    ${deps>0?krow('New money invested',`<b>${fmt(deps)}</b>`):''}
+    ${state.goal&&state.goal.amt>0?krow('Goal progress',`<b>${Math.min(100,totals('all').value/state.goal.amt*100).toFixed(0)}%</b>`):''}
+    <div class="inc-note" style="margin-top:14px">Shows once a month. Return is deposit-adjusted — it measures the market, not your contributions.</div>`);
+  lsSet('pt_recap_month', ym);
+}
 function maybeShowRecap(){
   if(lsGet('pt_recap_off')) return;
   if(document.body.classList.contains('locked')) return;

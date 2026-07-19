@@ -318,7 +318,35 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
   });
 }
-function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderCrashCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+
+/* ---- Crash Test: what past crashes would do to TODAY's portfolio (and that they all healed) ---- */
+const CRASH_SCENARIOS=[
+  {n:'2008 financial crisis', d:.55, rec:'~4 years'},
+  {n:'2020 COVID crash',      d:.34, rec:'~5 months'},
+  {n:'2022 rate shock',       d:.25, rec:'~2 years'}
+];
+function renderCrashCard(){
+  const el=$('crashBody'); if(!el) return;
+  const t=totals('all');
+  if(!(t.value>0)){ el.innerHTML='<div class="sub-n">Add holdings to run the stress test.</div>'; return; }
+  const rk=riskStats();
+  const beta=(rk&&rk.beta>0)?Math.min(rk.beta,1.3):1; // your funds move a bit less/more than the index
+  el.innerHTML = CRASH_SCENARIOS.map(c=>{ const hit=t.value*c.d*beta;
+    return `<div class="krow"><span class="k">${c.n}</span><span><b class="neg">−${fmt(hit).replace('-','')}</b> <span style="color:var(--faint);font-size:11px">healed in ${c.rec}</span></span></div>`; }).join('');
+  const cc=$('crashCard'); if(cc) cc.onclick=openCrashSheet;
+}
+function openCrashSheet(){
+  const t=totals('all'); if(!(t.value>0)) return;
+  const rk=riskStats(); const beta=(rk&&rk.beta>0)?Math.min(rk.beta,1.3):1;
+  const rows=CRASH_SCENARIOS.map(c=>{ const hit=t.value*c.d*beta;
+    return `<div class="krow"><span class="k">${c.n}</span><span><b class="neg">−${fmt(hit).replace('-','')}</b> → <b>${fmt(t.value-hit)}</b></span></div>`; }).join('');
+  openInfoSheet('Crash test', `
+    <p>If history's worst markets replayed <b>tomorrow</b>, here's roughly where today's ${fmt(t.value)} would land (scaled to your funds' actual sensitivity):</p>
+    ${rows}
+    <p style="margin-top:12px">The other half of the story: <b>every one of these fully recovered</b> — in ${CRASH_SCENARIOS.map(c=>c.rec.replace('~','about ')).join(', ')}. Money you won't need for years can afford to ride it out; panic-selling at the bottom is the only move that makes the loss permanent.</p>
+    <div class="inc-note" style="margin-top:10px">Estimates: index drawdown × your portfolio's measured sensitivity (beta ${beta.toFixed(2)}). Not financial advice.</div>`);
+}
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */
 function renderTaxCard(){
@@ -472,7 +500,21 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   }
   if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', title:'Set a goal', detail:'No target set yet', sev:'info', t:'Set a goal',
     b:'Give the money a number. A target unlocks the progress ring and a projected finish date on the Portfolio tab.'});
+  // vs a savings account — what taking the market ride has actually been worth
+  const sav=savingsAlt();
+  if(sav && Math.abs(sav.ahead)>100) items.push({ic:'🏦', title:'Beating the bank', detail:`${fmtSign(sav.ahead)} vs a savings account`, sev:'info', t:'Your money vs a savings account',
+    b:`If every deposit had gone into a 3%/yr savings account instead, you'd have <b>${fmt(sav.alt)}</b> today. You have <b>${fmt(sav.val)}</b> — <b class="${cls(sav.ahead)}">${fmtSign(sav.ahead)}</b> ${sav.ahead>=0?'ahead':'behind'} for taking the market ride. Over decades this gap is where wealth actually comes from.`});
   return items.slice(0,4);
+}
+function savingsAlt(){ // replay every real deposit into a 3%/yr savings account
+  const t=totals('all'); if(!(t.value>0)) return null;
+  let alt=0; const now=Date.now();
+  for(const l of state.lots){ if(l.div) continue;
+    const yrs=(now-new Date(l.date+'T12:00:00').getTime())/31557600000;
+    if(yrs>=0) alt+=l.cost*Math.pow(1.03,yrs); }
+  if(!alt) return null;
+  alt+=(+state.cash.main||0)+(+state.cash.brok||0);
+  return {alt, val:t.value, ahead:t.value-alt};
 }
 function renderCoach(){
   const grid=$('coachGrid'); if(!grid) return;
