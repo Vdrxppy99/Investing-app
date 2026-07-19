@@ -358,6 +358,7 @@ function renderSectorDonut(){
   const items=Object.entries(per).sort((a,b)=>b[1]-a[1]);
   const top=items.slice(0,6); other += items.slice(6).reduce((a,x)=>a+x[1],0);
   if(other>0) top.push(['Other',other]);
+  if(!top.length){ const ss=$('sectorSub'); if(ss) ss.textContent=''; $('sectorBars').innerHTML='<div class="sub-n">Add holdings to see your sector mix.</div>'; return; }
   const tot=top.reduce((a,x)=>a+x[1],0)||1; const max=top[0][1]||1;
   const ss=$('sectorSub');
   if(ss && top.length) ss.textContent=`${top[0][0]} is your biggest bet at ${(top[0][1]/tot*100).toFixed(0)}% — every ${top[0][0].toLowerCase()} rally works for you.`;
