@@ -1,41 +1,114 @@
-/* Intraday mover alerts — a lock-screen push the moment a holding swings ±2% on the day.
-   Runs on the 20-minute cron ("*&#47;20 13-21 * * 1-5" — see wrangler.jsonc); each symbol
-   alerts at most ONCE per trading day (KV 'moved'), and the daily open/close reports
-   stay the morning/evening story — movers only fire between 10:00 and 15:55 ET. */
+/* Intraday alerts for OWNED funds only — lock-screen pushes when something notable happens:
+     · all-time high / all-time low (full price history, ratchets forward)
+     · price breaking out of its usual trading band (mean ± 2σ of the last 60 daily closes —
+       the "usually sits $95–$105, now at $108" signal)
+     · big day move (±2% — the original mover alert)
+   Runs on the 20-minute cron ("*&#47;20 13-21 * * 1-5" — see wrangler.jsonc), gated to
+   10:00–15:55 ET so the daily open/close reports keep the morning/evening story.
+   ONE push per run (top alert headlines, others tagged on), and per-symbol cooldowns in
+   KV 'alerts' stop the same story repeating: ATH/ATL 3 trading days, band 5, mover 1.
+   Wording rule (owner): plain finance speak with real dollar amounts — never stats jargon. */
 import { fetchQuote } from './quotes.js';
 import { sendWebPush } from './webpush.js';
-import { etNow, tradingDay, signed } from './shared.js';
+import { etNow, tradingDay, money, signed } from './shared.js';
 
-const THRESHOLD = 2; // ±% on the day that counts as a "big move" (owner's chosen bar)
+const MOVE_PCT = 2;                                    // day move that counts as "big"
+const SD_MULT = 2;                                     // band width = mean ± 2σ
+const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1 }; // days before the same alert may repeat
+const PRIORITY = { atl: 5, ath: 4, lo: 3, hi: 2, mv: 1 };
+const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', 'Accept': 'application/json' };
+const money0 = v => '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
 
-export async function checkMovers(env) {
+async function fetchSeries(sym, qs) {
+  for (const host of ['query1', 'query2']) {
+    try {
+      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?${qs}`, { headers: UA });
+      if (!r.ok) continue;
+      const res = (await r.json())?.chart?.result?.[0];
+      if (res?.indicators?.quote?.[0]) return res.indicators.quote[0];
+    } catch (_) { /* try next host */ }
+  }
+  return null;
+}
+
+/* Per-day stats per owned symbol: usual band (mean ± 2σ of last 60 closes) + all-time
+   high/low (monthly bars over the fund's full life — true intra-period extremes).
+   Built once per ET day, cached in KV 'bands' + warm-isolate memory (KV write budget). */
+let bandsMem = null;
+async function ensureBands(env, syms, etDate) {
+  if (bandsMem && bandsMem.date === etDate) return bandsMem;
+  const stored = await env.KV.get('bands', 'json');
+  if (stored && stored.date === etDate) return (bandsMem = stored);
+  const data = stored && stored.data ? { ...stored.data } : {};
+  let built = 0;
+  for (const sym of syms) {
+    const recent = await fetchSeries(sym, 'range=3mo&interval=1d');
+    const life = await fetchSeries(sym, 'range=max&interval=1mo');
+    const closes = (recent?.close || []).filter(v => v > 0).slice(-60);
+    const highs = (life?.high || []).filter(v => v > 0);
+    const lows = (life?.low || []).filter(v => v > 0);
+    if (closes.length < 30 || !highs.length) continue; // too young / fetch failed — skip today
+    const mean = closes.reduce((a, v) => a + v, 0) / closes.length;
+    const sd = Math.sqrt(closes.reduce((a, v) => a + (v - mean) * (v - mean), 0) / closes.length);
+    data[sym] = { lo: mean - SD_MULT * sd, hi: mean + SD_MULT * sd, ath: Math.max(...highs), atl: Math.min(...lows) };
+    built++;
+  }
+  if (!built && !stored) return null;               // nothing usable yet — retry next run
+  bandsMem = { date: etDate, data };
+  await env.KV.put('bands', JSON.stringify(bandsMem)); // one write per day
+  return bandsMem;
+}
+
+const daysApart = (a, b) => Math.round((Date.parse(a) - Date.parse(b)) / 864e5);
+
+export async function checkAlerts(env, force) {
   const et = etNow();
-  if (!tradingDay(et)) return { skip: 'not a trading day' };
-  if (et.hm < 600 || et.hm > 955) return { skip: `outside alert window (${et.hm} min ET)` };
+  if (!force) {
+    if (!tradingDay(et)) return { skip: 'not a trading day' };
+    if (et.hm < 600 || et.hm > 955) return { skip: `outside alert window (${et.hm} min ET)` };
+  }
   const sub = await env.KV.get('sub', 'json');
   if (!sub || !sub.endpoint) return { skip: 'no device subscribed yet' };
   const snap = await env.KV.get('snapshot', 'json');
   if (!snap || !Array.isArray(snap.holdings) || !snap.holdings.length) return { skip: 'no snapshot' };
-  const moved = await env.KV.get('moved', 'json') || {};
-  const done = moved.date === et.date ? (moved.syms || []) : [];
-  const alerts = [];
+  const syms = snap.holdings.map(h => h.sym);
+  const bands = await ensureBands(env, syms, et.date);
+  const sent = await env.KV.get('alerts', 'json') || {};   // {"VOO:ath":"2026-07-20", ...}
+  const ok = key => force || !sent[key] || daysApart(et.date, sent[key]) >= COOLDOWN[key.split(':')[1]];
+
+  const found = [], evaluated = [];
   for (const h of snap.holdings) {
-    if (done.includes(h.sym)) continue; // already alerted today — one push per symbol per day
     const q = await fetchQuote(h.sym);
     if (!q || !(q.price > 0) || !(q.prev > 0)) continue;
+    const name = h.sym.replace('-', '.');
+    const dayUsd = h.qty * (q.price - q.prev);
+    const stake = h.qty * q.price;
     const pct = (q.price / q.prev - 1) * 100;
-    if (Math.abs(pct) < THRESHOLD) continue;
-    alerts.push({ sym: h.sym.replace('-', '.'), raw: h.sym, pct, usd: h.qty * (q.price - q.prev) });
+    const b = bands && bands.data[h.sym];
+    evaluated.push({ sym: name, price: q.price, band: b ? [+b.lo.toFixed(2), +b.hi.toFixed(2)] : null, ath: b && b.ath, atl: b && b.atl });
+    const add = (type, title, body) => { if (ok(`${h.sym}:${type}`)) found.push({ sym: h.sym, name, type, title, body, p: PRIORITY[type], impact: Math.abs(dayUsd) }); };
+    if (b && q.price > b.ath)
+      add('ath', `${name} just set an all-time high`, `${money(q.price)} — its highest price ever. Your stake: ${money(stake)} (${signed(dayUsd)} today)`);
+    else if (b && q.price < b.atl)
+      add('atl', `${name} fell to an all-time low`, `${money(q.price)} — its lowest price on record. Your stake: ${money(stake)} (${signed(dayUsd)} today)`);
+    else if (b && q.price > b.hi)
+      add('hi', `${name} is breaking out above its usual range`, `${money(q.price)}, above its typical ${money0(b.lo)}–${money0(b.hi)} band — strong momentum. ${signed(dayUsd)} on your shares today`);
+    else if (b && q.price < b.lo)
+      add('lo', `${name} slipped below its usual range`, `${money(q.price)}, below its typical ${money0(b.lo)}–${money0(b.hi)} band — unusual weakness. ${signed(dayUsd)} on your shares today`);
+    if (Math.abs(pct) >= MOVE_PCT)
+      add('mv', `${name} ${(pct >= 0 ? '+' : '')}${pct.toFixed(1)}% today`, `${signed(dayUsd)} on your shares`);
+    if (b && q.price > b.ath) { b.ath = q.price; bands.dirty = true; }  // ratchet so tomorrow compares against today
   }
-  if (!alerts.length) return { skip: 'no new movers' };
-  alerts.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
-  const top = alerts[0];
-  const fp = p => (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
-  const extra = alerts.slice(1).map(a => `${a.sym} ${fp(a.pct)}`).join(' · ');
-  const title = `${top.sym} ${fp(top.pct)} today`;
-  const body = `${signed(top.usd)} on your shares${extra ? ` · also ${extra}` : ''}`; // full dollars — owner pref
-  const res = await sendWebPush(env, sub, JSON.stringify({ title, body, tag: 'mover' }), 'mover');
+  if (!found.length) return { skip: 'nothing notable', evaluated };
+  found.sort((a, z) => z.p - a.p || z.impact - a.impact);
+  const top = found[0];
+  const extras = found.slice(1, 3).map(a => a.type === 'mv' ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range' })[a.type]}`);
+  const body = top.body + (extras.length ? ` · Also: ${extras.join(', ')}` : '');
+  const res = await sendWebPush(env, sub, JSON.stringify({ title: top.title, body, tag: 'alert' }), 'alert');
   if (res.status === 404 || res.status === 410) { await env.KV.delete('sub'); return { error: 'subscription expired — re-enable in the app', status: res.status }; }
-  await env.KV.put('moved', JSON.stringify({ date: et.date, syms: [...done, ...alerts.map(a => a.raw)] }));
-  return { sent: 'mover', status: res.status, title, body };
+  for (const a of found) sent[`${a.sym}:${a.type}`] = et.date;
+  for (const k of Object.keys(sent)) if (daysApart(et.date, sent[k]) > 30) delete sent[k]; // keep the map small
+  await env.KV.put('alerts', JSON.stringify(sent));
+  if (bands && bands.dirty) { delete bands.dirty; await env.KV.put('bands', JSON.stringify(bands)); }
+  return { sent: top.type, status: res.status, title: top.title, body, evaluated };
 }

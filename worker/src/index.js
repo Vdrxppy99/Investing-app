@@ -13,7 +13,7 @@
    and the ET wall-clock window check below picks whichever is correct that day. */
 import { sendWebPush } from './webpush.js';
 import { handleQuoteProxy, fetchQuote } from './quotes.js';
-import { checkMovers } from './alerts.js';
+import { checkAlerts } from './alerts.js';
 import { etNow, tradingDay, money, signed, pctS, ORIGINS } from './shared.js';
 
 async function buildReport(env, kind) {
@@ -113,12 +113,16 @@ export default {
       return j({ ok: true }, 200, cors);
     }
     if (path === '/unsubscribe') { await env.KV.delete('sub'); return j({ ok: true }, 200, cors); }
-    if (path === '/test') { return j(await sendReport(env, 'close', true), 200, cors); }
+    if (path === '/test') {
+      let b = null; try { b = await req.json(); } catch (_) { /* empty body = report test */ }
+      if (b && b.kind === 'alerts') return j(await checkAlerts(env, true), 200, cors);
+      return j(await sendReport(env, 'close', true), 200, cors);
+    }
     return j({ error: 'not found' }, 404, cors);
   },
   async scheduled(ev, env, ctx) {
-    if (ev.cron && ev.cron.startsWith('*/')) { // the every-20-min cron is the intraday mover check
-      ctx.waitUntil(checkMovers(env).then(r => console.log('mover', JSON.stringify(r))));
+    if (ev.cron && ev.cron.startsWith('*/')) { // the every-20-min cron is the intraday alert check
+      ctx.waitUntil(checkAlerts(env, false).then(r => console.log('alerts', JSON.stringify(r))));
       return;
     }
     const kind = etNow().hm < 720 ? 'open' : 'close'; // before/after noon ET decides which report this cron is
