@@ -1,0 +1,18 @@
+{
+  // portfolio-push — free-tier Worker that sends the daily lock-screen reports.
+  // Deploy: npx wrangler deploy --config worker/wrangler.jsonc   (from the repo root)
+  "name": "portfolio-push",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "workers_dev": true,
+  "kv_namespaces": [
+    { "binding": "KV", "id": "425224ee89044fe0b40254e84365552f" }
+  ],
+  // UTC crons, two per report so US daylight-saving never misses:
+  //   13:36+14:36 UTC → one of them is 9:36 AM ET (market open)
+  //   20:12+21:12 UTC → one of them is 4:12 PM ET (market close)
+  // The worker's ET wall-clock check runs only the correct one.
+  // */20 13-21 UTC weekdays → intraday mover check (alerts.js gates it to 10:00–15:55 ET).
+  "triggers": { "crons": ["36 13 * * 1-5", "36 14 * * 1-5", "12 20 * * 1-5", "12 21 * * 1-5", "*/20 13-21 * * 1-5"] },
+  "vars": { "VAPID_PUB": "BOMmoU1mLZ74CNAjtn1gm2Sna5vu0ZtValfGhBkhdDmvv8Q-vhdZcVoxUWwcxZwvnL-eZ9JqdCfdAe3xPwPGP9E" }
+}

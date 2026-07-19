@@ -15,7 +15,7 @@ const b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 /* ⚠ MUST stay identical to PRIVATE_KEYS in js/core.js (this file loads alone, pre-unlock,
    so it cannot share core's copy). Adding a key? Change BOTH lists + exportBackup(). */
-const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets'];
+const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push'];
 const APP_SCRIPTS=['js/boot.js','js/seed.js','js/core.js','js/portfolio.js','js/api.js',
                    'js/explore.js','js/insights.js','js/sheets.js','js/news.js','js/app.js'];
 let MK=null; // master key — memory only, gone when the page closes

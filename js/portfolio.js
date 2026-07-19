@@ -761,6 +761,9 @@ function openEdit(){
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Security</div>
     <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it.</div>
+    <div style="font-size:12.5px;font-weight:700;margin-top:18px">Daily reports</div>
+    <div class="ebtns"><button class="btn sec" id="pushTgl"></button><button class="btn sec" id="pushTest" style="display:none">Send test now</button></div>
+    <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Lock-screen notification at US market open (~15:35) and close (~22:15) with your day's dollars and biggest movers — even while the app is closed. Notifications are end-to-end encrypted.</div>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">`;
   showOverlay('editModal');
   $('editX').onclick=$('cancelEdit').onclick=()=>hideOverlay('editModal');
@@ -797,6 +800,19 @@ function openEdit(){
     try{ await vaultChangePass(o,n); alert('Passcode changed.'); }
     catch(e){ alert('Current passcode was wrong.'); }
   };
+  const paintPush=()=>{
+    const on=!!(lsGet('pt_push')||{}).on;
+    $('pushTgl').textContent = on ? 'Turn off reports' : '🔔 Turn on reports';
+    $('pushTest').style.display = on ? '' : 'none';
+  };
+  paintPush();
+  $('pushTgl').onclick=async()=>{
+    const on=!!(lsGet('pt_push')||{}).on;
+    $('pushTgl').textContent='…';
+    if(on) await pushDisable(); else await pushEnable();
+    paintPush();
+  };
+  $('pushTest').onclick=()=>{ $('pushTest').disabled=true; pushTest().finally(()=>{ $('pushTest').disabled=false; }); };
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
   $('editSheet').querySelectorAll('.del').forEach(b=> b.onclick=()=>{ readEditInputs(); state.holdings.splice(+b.dataset.i,1); openEdit(); });
   $('addRow').onclick=()=>{ readEditInputs(); state.holdings.push({acc:'brok',sym:'',qty:0,cost:0}); openEdit(); };
@@ -821,7 +837,7 @@ function readEditInputs(){
 /* persist = the SMALL personal/pref keys only. The heavy caches (quotes, history,
    intraday, divs) are saved at their fetch sites — re-stringifying ~300KB of history
    here on every refresh was the main-thread cost, not a safety net. */
-function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_targets',state.targets); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); }
+function persist(){ lsSet('pt_holdings',state.holdings); lsSet('pt_lots',state.lots); lsSet('pt_cash',state.cash); lsSet('pt_deposits',state.deposits); lsSet('pt_confirmed',state.confirmed); lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal); lsSet('pt_targets',state.targets); lsSet('pt_watch',state.watch); lsSet('pt_fx',state.fx); lsSet('pt_ccy',state.view.ccy); if(typeof pushSyncSoon==='function') pushSyncSoon(); /* holdings changed → keep the report server's copy current */ }
 function exportCSV(){ // spreadsheet-friendly dump: positions, then every purchase lot
   const lines=['Positions','Account,Symbol,Shares,Cost basis USD,Price USD,Value USD,Profit USD'];
   for(const h of state.holdings){
@@ -839,7 +855,7 @@ function exportCSV(){ // spreadsheet-friendly dump: positions, then every purcha
 function exportBackup(){
   const data={ app:'portfolio-tracker', v:1, exported:new Date().toISOString(),
     holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed, ccy:state.view.ccy, watch:state.watch,
-    goal:state.goal, targets:state.targets };
+    goal:state.goal, targets:state.targets, push:lsGet('pt_push') };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='portfolio-backup-'+dayStr(Date.now())+'.json';
@@ -859,6 +875,7 @@ function importBackup(file){
       if(Array.isArray(d.watch)) state.watch=d.watch;
       if(d.goal&&d.goal.amt>0) state.goal=d.goal;
       if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
+      if(d.push&&d.push.token) lsSet('pt_push', d.push); // keeps the report server's token — same account, no re-pairing
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){ toast('That file is not a valid portfolio backup.', true); }

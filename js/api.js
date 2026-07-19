@@ -1,13 +1,21 @@
 'use strict';
 /* ============ DATA FETCHING (browser-side, multiple fallbacks) ============ */
-const PROXIES = [ u=>u, u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u), u=>'https://corsproxy.io/?url='+encodeURIComponent(u) ];
+const PUSH_URL='https://portfolio-push.vdrxppy99.workers.dev'; // our own Cloudflare Worker (worker/ in this repo)
+/* Yahoo requests go through OUR worker first (/q — origin-locked, edge-cached, no third
+   party sees them); direct + public proxies stay as fallbacks. Non-Yahoo URLs (stooq CSV,
+   frankfurter FX) return null here — the worker only whitelists Yahoo — so they skip it. */
+const PROXIES = [ u=>/^https:\/\/query[12]\.finance\.yahoo\.com\//.test(u) ? PUSH_URL+'/q?u='+encodeURIComponent(u) : null,
+                  u=>u,
+                  u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),
+                  u=>'https://corsproxy.io/?url='+encodeURIComponent(u) ];
 let goodProxy = 0; // remember which source worked last, try it first next time
 async function tryFetch(url, asJson){
   const order = [goodProxy, ...PROXIES.map((_,i)=>i).filter(i=>i!==goodProxy)];
   for(const pi of order){
     try{
+      const pu = PROXIES[pi](url); if(!pu) continue; // this source doesn't serve this URL
       const ctl = new AbortController(); const to = setTimeout(()=>ctl.abort(), 10000);
-      const r = await fetch(PROXIES[pi](url), {cache:'no-store', signal:ctl.signal});
+      const r = await fetch(pu, {cache:'no-store', signal:ctl.signal});
       clearTimeout(to);
       if(!r.ok) continue;
       const tx = await r.text();
@@ -144,6 +152,7 @@ async function refreshAll(force){
   lsSet('pt_history', state.history); // persist() no longer carries the heavy caches
   persist(); renderAll();
   if(typeof maybeShowRecap==='function') maybeShowRecap();
+  pushSyncSoon(); // keep the push server's fallback prices warm (no-op unless reports are on)
 }
 /* --- live polling: every few seconds while the US market is open --- */
 let failStreak=0, pollTimer=null;
@@ -198,4 +207,71 @@ function updateChartLive(){
     else if(state.view.metric==='profit' && chartBaseV>0) pct=` (${fmtPct(diff/chartBaseV*100)})`;
     $('chartDelta').innerHTML = `<span class="${cls(diff)}">${fmtSign(diff)}${pct}</span> <span class="rng">· ${state.view.metric} · ${state.view.range}</span>`;
   }
+}
+
+/* ============ PUSH REPORTS — daily open/close lock-screen notifications ============
+   Server: worker/ in this repo, deployed to the owner's own free Cloudflare account.
+   The server stores only tickers + share counts + cash (enough to compute the dollar
+   text); every notification payload is end-to-end encrypted (RFC 8291), so Apple's
+   relay moves bytes it can't read. pt_push {token,on} lives in the encrypted vault. */
+const PUSH_VAPID='BOMmoU1mLZ74CNAjtn1gm2Sna5vu0ZtValfGhBkhdDmvv8Q-vhdZcVoxUWwcxZwvnL-eZ9JqdCfdAe3xPwPGP9E'; // PUSH_URL is defined at the top of this file (shared with the quote proxy)
+function pushSnapshot(){
+  const hs={};
+  for(const h of state.holdings){ if(h.sym && h.qty>0) hs[h.sym]=(hs[h.sym]||0)+h.qty; }
+  const prices={};
+  for(const s of Object.keys(hs)){ const q=state.quotes[s]; if(q && q.price>0) prices[s]={price:q.price, prev:q.prev||0}; }
+  return { holdings:Object.entries(hs).map(([sym,qty])=>({sym,qty})),
+           cash:(+state.cash.main||0)+(+state.cash.brok||0), prices, ts:Date.now() };
+}
+function pushCall(path, body){
+  const p=lsGet('pt_push');
+  if(!p || !p.token) return Promise.reject(new Error('no token'));
+  return fetch(PUSH_URL+path,{method:'POST',
+    headers:{'content-type':'application/json','authorization':'Bearer '+p.token},
+    body: body?JSON.stringify(body):'{}'});
+}
+let pushSyncT=null, pushSyncLast=0;
+function pushSyncSoon(){
+  const p=lsGet('pt_push'); if(!p || !p.on) return;
+  if(Date.now()-pushSyncLast<10*60000) return; // at most every 10 min — the server only needs day-fresh numbers
+  clearTimeout(pushSyncT);
+  pushSyncT=setTimeout(()=>{ pushSyncLast=Date.now(); pushCall('/snapshot', pushSnapshot()).catch(()=>{}); }, 8000);
+}
+async function pushEnable(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
+    toast('This browser can’t do push — use the installed app.', true); return false;
+  }
+  // iOS only grants web push to Home-Screen apps — a Safari tab would fail with a confusing error
+  const standalone = navigator.standalone===true || matchMedia('(display-mode: standalone)').matches;
+  if(!standalone && /iPhone|iPad/.test(navigator.userAgent)){
+    toast('Open the app from your Home Screen icon to turn on reports.', true); return false;
+  }
+  const perm = await Notification.requestPermission(); // first await — must stay inside the tap gesture
+  if(perm!=='granted'){ toast('Notifications are blocked — allow them in iOS Settings → Notifications → My Portfolio.', true); return false; }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({userVisibleOnly:true,
+      applicationServerKey:Uint8Array.from(atob(PUSH_VAPID.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0))});
+    const p = lsGet('pt_push') || {};
+    if(!p.token){ const a=new Uint8Array(24); crypto.getRandomValues(a); p.token=Array.from(a,x=>x.toString(16).padStart(2,'0')).join(''); }
+    lsSet('pt_push', p); // token first — pushCall reads it
+    const r = await pushCall('/subscribe', {sub:sub.toJSON(), snapshot:pushSnapshot()});
+    if(!r.ok) throw new Error('server '+r.status);
+    p.on=true; lsSet('pt_push', p); pushSyncLast=Date.now();
+    toast('Daily reports on — market open & close, right on your lock screen.');
+    return true;
+  }catch(e){ toast('Couldn’t reach the report server — check your connection and try again.', true); return false; }
+}
+async function pushDisable(){
+  try{ const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}
+  try{ await pushCall('/unsubscribe'); }catch(e){}
+  const p=lsGet('pt_push')||{}; p.on=false; lsSet('pt_push', p);
+  toast('Daily reports off.');
+}
+function pushTest(){
+  return pushCall('/test').then(r=>r.json()).then(d=>{
+    if(d && d.sent) toast('Test report sent — check your lock screen in a few seconds.');
+    else toast('Server replied: '+(d && (d.skip||d.error) || 'unknown'), true);
+  }).catch(()=>toast('Couldn’t reach the report server.', true));
 }

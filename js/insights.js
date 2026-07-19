@@ -21,13 +21,18 @@ function donutLegend(el, items, total){
 }
 function renderGainsTable(){
   const rs=rows('all');
+  // dividends actually received per fund (recorded reinvestment lots) — replaces the old
+  // always-$0 "Realized" column: nothing has ever been sold, but dividends ARE realized cash
+  const divBy={}; let divTot=0;
+  for(const l of state.lots){ if(l.div){ divBy[l.sym]=(divBy[l.sym]||0)+l.cost; divTot+=l.cost; } }
   let unrl=0;
   const trs=rs.map(r=>{
     const u=r.qty*priceOf(r.sym)-r.cost; unrl+=u;
-    return `<tr data-sym="${esc(r.sym)}"><td>${esc(r.sym.replace('-','.'))} <span style="color:var(--mut)">›</span></td><td>${r.qty.toFixed(2)}</td><td>${fmt(0)}</td><td class="${cls(u)}">${fmtSign(u)}</td></tr>`;
+    const dv=divBy[r.sym]||0;
+    return `<tr data-sym="${esc(r.sym)}"><td>${esc(r.sym.replace('-','.'))} <span style="color:var(--mut)">›</span></td><td>${r.qty.toFixed(2)}</td><td class="${dv>0?'pos':''}">${fmt(dv)}</td><td class="${cls(u)}">${fmtSign(u)}</td></tr>`;
   }).join('');
-  $('gainsTable').innerHTML = `<tr><th>Asset</th><th>Owned</th><th>Realized</th><th>Unrealized</th></tr>${trs}
-    <tr><td>Total</td><td></td><td>${fmt(0)}</td><td class="${cls(unrl)}"><b>${fmtSign(unrl)}</b></td></tr>`;
+  $('gainsTable').innerHTML = `<tr><th>Asset</th><th>Owned</th><th>Dividends</th><th>Unrealized</th></tr>${trs}
+    <tr><td>Total</td><td></td><td class="${divTot>0?'pos':''}">${fmt(divTot)}</td><td class="${cls(unrl)}"><b>${fmtSign(unrl)}</b></td></tr>`;
   $('gainsTable').querySelectorAll('tr[data-sym]').forEach(tr=> tr.onclick=()=>openDetail(tr.dataset.sym));
 }
 function stackBar(el, items){ // part-of-whole as a single stacked bar
@@ -127,11 +132,11 @@ function riskStats(){
   const H={};
   for(const r of rs){ const h=state.history[r.sym]; if(!h) continue; const m={}; for(let i=0;i<h.t.length;i++) if(h.c[i]!=null) m[dayStr(h.t[i])]=h.c[i]; H[r.sym]=m; }
   const days=[...new Set([].concat(...Object.values(H).map(m=>Object.keys(m))))].sort().slice(-253);
-  const rets=[], voo=[];
+  const rets=[], voo=[], retDays=[];
   for(let i=1;i<days.length;i++){
     let rp=0;
     for(const s of Object.keys(H)){ const a=H[s][days[i-1]], b=H[s][days[i]]; if(a&&b) rp+=(w[s]||0)*(b/a-1); }
-    rets.push(rp);
+    rets.push(rp); retDays.push(days[i]);
     const va=H.VOO&&H.VOO[days[i-1]], vb=H.VOO&&H.VOO[days[i]];
     voo.push(va&&vb?vb/va-1:null);
   }
@@ -145,17 +150,23 @@ function riskStats(){
   const beta=vx>0?cov/vx:1;
   let peak=0, mdd=0; const s=buildSeries('all');
   if(s) for(const v of s.value){ if(v>peak) peak=v; if(peak>0){ const dd=(v-peak)/peak; if(dd<mdd) mdd=dd; } }
-  return {vol, beta, mdd:mdd*100};
+  // your actual daily extremes over the last year — the swing size to expect on big news days
+  let bi=0, wi=0;
+  for(let i=1;i<rets.length;i++){ if(rets[i]>rets[bi]) bi=i; if(rets[i]<rets[wi]) wi=i; }
+  return {vol, beta, mdd:mdd*100, best:{d:retDays[bi], p:rets[bi]*100}, worst:{d:retDays[wi], p:rets[wi]*100}};
 }
 function renderRiskCard(){
   const r=riskStats();
   if(!r){ $('riskCard').innerHTML='<div class="it">Risk <span class="chev">›</span></div><div class="sub-n">Needs a year of price history — connect once.</div>'; return; }
   const lvl = r.vol<10?['Low',cvar('--green')]:r.vol<18?['Moderate',cvar('--warn')]:r.vol<28?['Elevated','#ec835a']:['High',cvar('--red')];
+  const dstr=d=>new Date(d+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric'});
   $('riskCard').innerHTML='<div class="it">Risk <span class="chev">›</span></div>'+
     `<span class="risk-badge" style="background:${lvl[1]}22;color:${lvl[1]}">${lvl[0]}</span>`+
     `<div class="krow"><span class="k">Volatility (1Y)</span><span>${r.vol.toFixed(1)}%</span></div>
      <div class="krow"><span class="k">Beta vs S&P 500</span><span>${r.beta.toFixed(2)}</span></div>
-     <div class="krow"><span class="k">Max drawdown</span><span class="neg">${r.mdd.toFixed(1)}%</span></div>`+
+     <div class="krow"><span class="k">Max drawdown</span><span class="neg">${r.mdd.toFixed(1)}%</span></div>
+     <div class="krow"><span class="k">Best day</span><span class="pos">${fmtPct(r.best.p)} · ${dstr(r.best.d)}</span></div>
+     <div class="krow"><span class="k">Worst day</span><span class="neg">${fmtPct(r.worst.p)} · ${dstr(r.worst.d)}</span></div>`+
     `<div class="sub-n" style="margin-top:9px">${r.beta<0.995?`You swing ${Math.round((1-r.beta)*100)}% less than the market.`:r.beta>1.005?`You swing ${Math.round((r.beta-1)*100)}% more than the market.`:'You move in lockstep with the market.'}</div>`;
 }
 function renderWorthChart(){
@@ -196,11 +207,14 @@ function openPESheet(){
 function openRiskSheet(){
   const r=riskStats();
   if(!r){ openInfoSheet('Risk','<p>Needs a year of price history — connect once and check back.</p>'); return; }
+  const dstr=d=>new Date(d+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric'});
   const body = `<p>How much your portfolio swings, measured from your real price history.</p>
     <div class="krow"><span class="k">Volatility (1Y)</span><span>${r.vol.toFixed(1)}%</span></div>
     <div class="krow"><span class="k">Beta vs S&P 500</span><span>${r.beta.toFixed(2)}</span></div>
     <div class="krow"><span class="k">Max drawdown</span><span class="neg">${r.mdd.toFixed(1)}%</span></div>
-    <p style="margin-top:12px"><b>Volatility</b> is the size of your typical swing — under 15% is calm for stocks. <b>Beta</b> of ${r.beta.toFixed(2)} means you move ${r.beta<1?'less':'more'} than the S&P 500 (1.0 = in lockstep). <b>Max drawdown</b> is the worst peak-to-trough drop you\'ve lived through.</p>`;
+    <div class="krow"><span class="k">Best day</span><span class="pos">${fmtPct(r.best.p)} · ${dstr(r.best.d)}</span></div>
+    <div class="krow"><span class="k">Worst day</span><span class="neg">${fmtPct(r.worst.p)} · ${dstr(r.worst.d)}</span></div>
+    <p style="margin-top:12px"><b>Volatility</b> is the size of your typical swing — under 15% is calm for stocks. <b>Beta</b> of ${r.beta.toFixed(2)} means you move ${r.beta<1?'less':'more'} than the S&P 500 (1.0 = in lockstep). <b>Max drawdown</b> is the worst peak-to-trough drop you\'ve lived through. <b>Best / worst day</b> are your real single-day extremes this past year — the swing size to expect when big news hits.</p>`;
   openInfoSheet('Risk', body);
 }
 function openHealthSheet(){

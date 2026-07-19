@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v10.6'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
+const V = 'pt-v10.8'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
@@ -25,6 +25,25 @@ self.addEventListener('activate', e => {
       .then(() => self.clients.claim())
   );
 });
+/* ---- daily report notifications (see worker/ — the payload arrives as ready-to-show
+   JSON text, already decrypted by the browser from its end-to-end encryption) ---- */
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data.json(); } catch (_) { d = { body: (e.data && e.data.text()) || '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'My Portfolio', {
+    body: d.body || '',
+    tag: d.tag || 'portfolio',   // same-tag replaces: never a pile of stale reports
+    data: { url: './' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
+    for (const w of ws) { if ('focus' in w) return w.focus(); }
+    return clients.openWindow('./');
+  }));
+});
+
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
