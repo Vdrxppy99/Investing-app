@@ -19,7 +19,6 @@ function wirePTR(){
     if(!pulling) return; pulling=false;
     if(ptr.classList.contains('armed')){
       ptr.classList.remove('armed'); ptr.classList.add('loading'); ptr.style.height=TH*0.7+'px';
-      if(!$('page-news').classList.contains('hidden')) refreshNews(true);
       if(!$('page-explore').classList.contains('hidden')) refreshMarkets(true);
       refreshAll(true).then(()=>{ ptr.classList.remove('loading'); ptr.style.height='0px'; });
     } else { ptr.style.height='0px'; }
@@ -41,7 +40,6 @@ function showPage(p){
   if(pin){ paintMiniBar(); $('miniBar').classList.add('show'); }
   else $('miniBar').classList.toggle('show', window.scrollY>170);
   if(p==='explore') refreshMarkets(false);
-  if(p==='news') refreshNews(false);
   if(p==='insights') renderInsights();
 }
 document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>showPage(b.dataset.page));
