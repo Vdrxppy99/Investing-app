@@ -23,11 +23,16 @@
     <div class="locktitle">My Portfolio</div>
     <div class="locksub" id="lockSub">Unlocking…</div>
     <div id="lockSetup" style="display:none">
+      <div id="restoreFirst" style="border:1px solid var(--brand);border-radius:14px;padding:14px;margin-bottom:16px;background:rgba(38,208,124,.06)">
+        <div style="font-weight:700;font-size:14px;margin-bottom:3px">Reinstalling or on a new phone?</div>
+        <div class="locknote" style="margin:0 0 10px">Don't make a new passcode — bring your saved data back instead.</div>
+        <button class="btn pri" id="cloudRestoreLink" style="width:100%">☁️ Restore my data from backup</button>
+      </div>
+      <div class="locknote" style="text-align:center;margin-bottom:10px">— or start fresh —</div>
       <input id="setPass1" type="password" placeholder="Create passcode (min 6 characters)" autocomplete="new-password" aria-label="Create passcode">
       <input id="setPass2" type="password" placeholder="Repeat passcode" autocomplete="new-password" aria-label="Repeat passcode">
-      <button class="btn pri" id="setupBtn">Create passcode</button>
+      <button class="btn sec" id="setupBtn">Create passcode</button>
       <div class="locknote">Your holdings are encrypted with this passcode on this device — nothing is sent anywhere. If you forget it, only a backup can bring the data back.</div>
-      <a href="#" id="cloudRestoreLink" class="locknote" style="display:block;text-align:center;margin-top:12px">Moving from another phone? Restore from cloud backup</a>
     </div>
     <div id="lockEnter" style="display:none">
       <input id="unlockPass" type="password" placeholder="Passcode" autocomplete="current-password" aria-label="Passcode">
@@ -116,7 +121,7 @@
 
   <section class="card" id="goalCard"><div class="card-title">Goal</div><div id="goalBody"></div></section>
 
-  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v3.0.0</div>
+  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v3.0.1</div>
 </div><!-- /page-portfolio -->
 
 <!-- ================= EXPLORE ================= -->
