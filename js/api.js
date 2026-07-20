@@ -307,7 +307,7 @@ function paintPushIfOpen(){ // self-contained (openEdit's paintPush is a closure
   const el=document.getElementById('pushTgl'); if(!el) return;
   const on=!!(lsGet('pt_push')||{}).on;
   el.textContent = on ? 'Turn off reports' : '🔔 Turn on reports';
-  const test=document.getElementById('pushTest'); if(test) test.style.display=on?'':'none';
+  const test=document.getElementById('pushTest'); if(test){ test.style.display=''; test.style.opacity=on?'1':'.5'; }
 }
 
 /* Ask the open-ended AI (Cloudflare Workers AI on the owner's own worker, free daily cap).

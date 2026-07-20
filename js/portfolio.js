@@ -845,7 +845,7 @@ function openEdit(){
   const paintPush=()=>{
     const on=!!(lsGet('pt_push')||{}).on;
     $('pushTgl').textContent = on ? 'Turn off reports' : '🔔 Turn on reports';
-    $('pushTest').style.display = on ? '' : 'none';
+    $('pushTest').style.display=''; $('pushTest').style.opacity = on ? '1' : '.5'; // always visible — never looks "removed"
   };
   paintPush();
   $('pushTgl').onclick=async()=>{
@@ -854,7 +854,10 @@ function openEdit(){
     try{ if(on) await pushDisable(); else await pushEnable(); }catch(e){}
     $('pushTgl').disabled=false; paintPush(); // always re-sync the label, even if the call failed
   };
-  $('pushTest').onclick=()=>{ $('pushTest').disabled=true; pushTest().finally(()=>{ $('pushTest').disabled=false; }); };
+  $('pushTest').onclick=()=>{
+    if(!(lsGet('pt_push')||{}).on){ toast('Turn on Daily reports first, then tap Send test.', true); return; }
+    $('pushTest').disabled=true; pushTest().finally(()=>{ $('pushTest').disabled=false; });
+  };
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
   $('editSheet').querySelectorAll('.del').forEach(b=> b.onclick=()=>{ readEditInputs(); state.holdings.splice(+b.dataset.i,1); openEdit(); });
   $('addRow').onclick=()=>{ readEditInputs(); state.holdings.push({acc:'brok',sym:'',qty:0,cost:0}); openEdit(); };
