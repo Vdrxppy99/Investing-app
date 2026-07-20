@@ -143,7 +143,7 @@ export default {
       return j({ salt: bk.salt, iv: bk.iv, ct: bk.ct, ts: bk.ts }, 200, cors);
     }
     const isSub = path === '/subscribe';
-    if (!await auth(env, req, isSub || path === '/backup')) return j({ error: 'unauthorized' }, 403, cors);
+    if (!await auth(env, req, isSub || path === '/backup' || path === '/ask')) return j({ error: 'unauthorized' }, 403, cors);
     if (path === '/backup') { // encrypted on the phone before upload — the server only stores bytes
       let b; try { b = await req.json(); } catch (_) { return j({ error: 'bad json' }, 400, cors); }
       if (b && b.off) { await env.KV.delete('backup'); return j({ ok: true }, 200, cors); }
@@ -166,6 +166,28 @@ export default {
       return j({ ok: true }, 200, cors);
     }
     if (path === '/unsubscribe') { await env.KV.delete('sub'); return j({ ok: true }, 200, cors); }
+    if (path === '/ask') { // in-app AI assistant via Workers AI (free daily allocation), capped so it stays $0
+      if (!env.AI) return j({ error: 'ai not enabled' }, 503, cors);
+      let b; try { b = await req.json(); } catch (_) { return j({ error: 'bad json' }, 400, cors); }
+      const qn = (b && typeof b.question === 'string') ? b.question.trim().slice(0, 500) : '';
+      if (!qn) return j({ error: 'no question' }, 400, cors);
+      const today = etNow().date, u = await env.KV.get('ai', 'json') || {};
+      const n = u.date === today ? (u.n || 0) : 0, CAP = 25;
+      if (n >= CAP) return j({ error: 'limit', left: 0 }, 429, cors);
+      const ctx = (b.context && typeof b.context === 'string') ? b.context.slice(0, 2000) : '';
+      const sys = 'You are a concise, friendly assistant inside a personal investing app. Answer ONLY from the portfolio snapshot given. The owner is a long-term index-fund investor who never sells and does not want to be told to buy or sell. Plain language, at most 4 sentences, include the relevant figures from the snapshot, and never invent numbers that are not in it. No tax or legal advice.';
+      let answer = '';
+      try {
+        const out = await env.AI.run('@cf/meta/llama-4-scout-17b-16e-instruct', { max_tokens: 300, messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: `Portfolio snapshot: ${ctx}\n\nQuestion: ${qn}` }
+        ] });
+        answer = ((out && (out.response || out.result)) || '').toString().trim();
+      } catch (_) { return j({ error: 'ai failed' }, 502, cors); }
+      if (!answer) return j({ error: 'ai empty' }, 502, cors);
+      await env.KV.put('ai', JSON.stringify({ date: today, n: n + 1 }));
+      return j({ answer, left: CAP - n - 1 }, 200, cors);
+    }
     if (path === '/test') {
       let b = null; try { b = await req.json(); } catch (_) { /* empty body = report test */ }
       if (b && b.kind === 'alerts') return j(await checkAlerts(env, true), 200, cors);

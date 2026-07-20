@@ -850,9 +850,9 @@ function openEdit(){
   paintPush();
   $('pushTgl').onclick=async()=>{
     const on=!!(lsGet('pt_push')||{}).on;
-    $('pushTgl').textContent='…';
-    if(on) await pushDisable(); else await pushEnable();
-    paintPush();
+    $('pushTgl').disabled=true; $('pushTgl').textContent='…';
+    try{ if(on) await pushDisable(); else await pushEnable(); }catch(e){}
+    $('pushTgl').disabled=false; paintPush(); // always re-sync the label, even if the call failed
   };
   $('pushTest').onclick=()=>{ $('pushTest').disabled=true; pushTest().finally(()=>{ $('pushTest').disabled=false; }); };
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
@@ -990,7 +990,7 @@ function importBackup(file){
       if(d.confirmed) state.confirmed=d.confirmed;
       if(d.ccy==='USD'||d.ccy==='EUR') state.view.ccy=d.ccy;
       if(Array.isArray(d.watch)) state.watch=d.watch;
-      if(d.goal&&d.goal.amt>0) state.goal=d.goal;
+      if(d.goal&&(d.goal.amt>0||d.goal.fimo>0)) state.goal=d.goal;
       if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
       if(d.push&&d.push.token) lsSet('pt_push', d.push); // keeps the report server's token — same account, no re-pairing
       if(d.bk&&d.bk.k) lsSet('pt_bk', d.bk);            // keeps cloud backup armed too

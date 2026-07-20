@@ -153,7 +153,10 @@ function riskStats(){
   // your actual daily extremes over the last year — the swing size to expect on big news days
   let bi=0, wi=0;
   for(let i=1;i<rets.length;i++){ if(rets[i]>rets[bi]) bi=i; if(rets[i]<rets[wi]) wi=i; }
-  return {vol, beta, mdd:mdd*100, best:{d:retDays[bi], p:rets[bi]*100}, worst:{d:retDays[wi], p:rets[wi]*100}};
+  // Sharpe = reward per unit of risk: (annualized return − 4% cash rate) ÷ annualized volatility
+  const annRet=mu*252*100, RF=4;
+  const sharpe=vol>0?(annRet-RF)/vol:0;
+  return {vol, beta, mdd:mdd*100, best:{d:retDays[bi], p:rets[bi]*100}, worst:{d:retDays[wi], p:rets[wi]*100}, sharpe, annRet};
 }
 function renderRiskCard(){
   const r=riskStats();
@@ -166,7 +169,8 @@ function renderRiskCard(){
      <div class="krow"><span class="k">Beta vs S&P 500</span><span>${r.beta.toFixed(2)}</span></div>
      <div class="krow"><span class="k">Max drawdown</span><span class="neg">${r.mdd.toFixed(1)}%</span></div>
      <div class="krow"><span class="k">Best day</span><span class="pos">${fmtPct(r.best.p)} · ${dstr(r.best.d)}</span></div>
-     <div class="krow"><span class="k">Worst day</span><span class="neg">${fmtPct(r.worst.p)} · ${dstr(r.worst.d)}</span></div>`+
+     <div class="krow"><span class="k">Worst day</span><span class="neg">${fmtPct(r.worst.p)} · ${dstr(r.worst.d)}</span></div>
+     <div class="krow"><span class="k">Sharpe ratio</span><span class="${r.sharpe>=1?'pos':''}">${r.sharpe.toFixed(2)}${r.sharpe>=1?' · strong':r.sharpe>=0.5?' · decent':''}</span></div>`+
     `<div class="sub-n" style="margin-top:9px">${r.beta<0.995?`You swing ${Math.round((1-r.beta)*100)}% less than the market.`:r.beta>1.005?`You swing ${Math.round((r.beta-1)*100)}% more than the market.`:'You move in lockstep with the market.'}</div>`;
 }
 function renderWorthChart(){
@@ -303,6 +307,8 @@ function renderPerf(){
       html += `<div class="krow"><span class="k">Same buys, all world (VT)</span><span>${fmt(wp.value)} <span class="${cls(wd)}" style="font-size:11px">(${fmtSign(wd)})</span></span></div>`;
     } else ensureBenchHistory('VT').then(ok=>{ if(ok && !$('page-insights').classList.contains('hidden')) renderPerf(); });
     if(rr!=null) html += `<div class="krow"><span class="k">Money-weighted return</span><span class="${cls(rr)}">${fmtPct(rr*100)} / yr</span></div>`;
+    const real=realReturn();
+    if(real) html += `<div class="krow"><span class="k">After inflation (real)</span><span class="${cls(real.realTot)}">${fmtPct(real.realTot)} <span style="color:var(--faint);font-size:11px">vs ${fmtPct(real.nomTot)} on paper</span></span></div>`;
   }
   html += `<div class="inc-note">Your returns are deposit-adjusted (new money doesn't inflate them); S&P 500 = VOO price change over the same window, excluding its dividends. "Same buys" replays each of your ${state.lots.filter(l=>!l.div).length} purchases into VOO on the same dates — the honest benchmark for your timing. Tap a period to see it on the chart.</div>`;
   $('perfBody').innerHTML=html;
@@ -318,7 +324,7 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
   });
 }
-function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderCrashCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+function renderInsights(){ wireAsk(); renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderFI(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderCrashCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
 
 /* ---- Crash Test: what past crashes would do to TODAY's portfolio (and that they all healed) ---- */
 const CRASH_SCENARIOS=[
@@ -346,6 +352,205 @@ function openCrashSheet(){
     ${rows}
     <p style="margin-top:12px">The other half of the story: <b>every one of these fully recovered</b> — in ${CRASH_SCENARIOS.map(c=>c.rec.replace('~','about ')).join(', ')}. Money you won't need for years can afford to ride it out; panic-selling at the bottom is the only move that makes the loss permanent.</p>
     <div class="inc-note" style="margin-top:10px">Estimates: index drawdown × your portfolio's measured sensitivity (beta ${beta.toFixed(2)}). Not financial advice.</div>`);
+}
+
+/* ---- inflation-adjusted "real" return: what your all-time gain is worth in today's money ---- */
+const INFLATION = 0.025; // ~ECB/Fed long-run target; the erosion your paper return hides
+function realReturn(){
+  const pr=periodReturns(); const all=pr.find(x=>x.k==='All');
+  if(!all || all.p==null) return null;
+  const lots=state.lots.filter(l=>!l.div).map(l=>l.date).filter(Boolean).sort();
+  if(!lots.length) return null;
+  const years=Math.max(0.5,(Date.now()-new Date(lots[0]+'T12:00:00').getTime())/31557600000);
+  const realTot=((1+all.p/100)/Math.pow(1+INFLATION,years)-1)*100;
+  return {nomTot:all.p, realTot, years};
+}
+
+/* ---- Financial Independence: the 4%-rule read on today's money ---- */
+function growthRate(){ let g=personalReturn('all'); return (g!=null && g>0 && g<0.15) ? g : 0.07; }
+function renderFI(){
+  const el=$('fiBody'); if(!el) return;
+  const t=totals('all');
+  if(!(t.value>0)){ el.innerHTML='<div class="sub-n">Add holdings to see this.</div>'; return; }
+  const monthly=t.value*0.04/12;
+  const need=+((state.goal||{}).fimo)||0;
+  let h=`<div class="big-n">${fmt(monthly)}<span style="font-size:14px;font-weight:500;color:var(--mut)"> /mo</span></div>
+    <div class="sub-n">What your portfolio could safely pay you today — for life, without adding a cent.</div>`;
+  if(need>0){
+    const fiNum=need*12/0.04, pct=Math.min(100,t.value/fiNum*100);
+    h+=`<div class="krow" style="margin-top:10px"><span class="k">Your freedom number</span><span><b>${fmt(fiNum)}</b></span></div>
+      <div class="krow"><span class="k">You're here</span><span><b class="pos">${pct.toFixed(0)}%</b></span></div>
+      <div class="fi-track"><i style="width:${pct.toFixed(1)}%"></i></div>`;
+    if(t.value<fiNum){ const yrs=Math.log(fiNum/t.value)/Math.log(1+growthRate());
+      h+=`<div class="sub-n" style="margin-top:8px">At your ~${(growthRate()*100).toFixed(0)}%/yr pace, work could be optional in about <b>${yrs<1?'under a year':Math.round(yrs)+' years'}</b> — on today's money alone.</div>`;
+    } else h+=`<div class="sub-n pos" style="margin-top:8px">🎉 You've already passed your freedom number.</div>`;
+  } else {
+    h+=`<div class="sub-n" style="margin-top:8px;color:var(--brand)">Tap to set your monthly “freedom number” and see when work becomes optional.</div>`;
+  }
+  el.innerHTML=h;
+  const c=$('fiCard'); if(c) c.onclick=openFISheet;
+}
+function openFISheet(){
+  const t=totals('all'); if(!(t.value>0)) return;
+  const monthly=t.value*0.04/12, need=+((state.goal||{}).fimo)||0, gr=growthRate();
+  let body=`<p>The <b>4% rule</b> comes from decades of market history: a diversified portfolio can pay out about 4% of its value a year, keep rising with inflation, and still outlast a long retirement. It's the math behind “financial independence” — the point where your money can cover your life and working becomes a choice.</p>
+    <div class="krow"><span class="k">Your portfolio</span><span><b>${fmt(t.value)}</b></span></div>
+    <div class="krow"><span class="k">Safe income today</span><span><b class="pos">${fmt(monthly)}/mo</b></span></div>`;
+  if(need>0){
+    const fiNum=need*12/0.04, pct=Math.min(100,t.value/fiNum*100);
+    body+=`<div class="krow"><span class="k">Freedom number (${fmt(need)}/mo)</span><span><b>${fmt(fiNum)}</b></span></div>
+      <div class="krow"><span class="k">Progress</span><span><b class="pos">${pct.toFixed(0)}%</b></span></div>`;
+    if(t.value<fiNum){ const yrs=Math.log(fiNum/t.value)/Math.log(1+gr);
+      body+=`<p style="margin-top:10px">At your ~${(gr*100).toFixed(0)}%/yr growth on <b>today's money alone</b> (no new deposits assumed), you'd get there in about <b>${Math.round(yrs)} years</b>. Every euro you add pulls it closer.</p>`;
+    } else body+=`<p class="pos" style="margin-top:10px">🎉 You've already passed your freedom number — the market is paying your way.</p>`;
+  }
+  body+=`<div class="ebtns" style="margin-top:14px"><button class="btn pri" id="fiSet">${need>0?'Change':'Set'} my monthly target</button></div>
+    <div class="inc-note">Today's holdings compounded at your own growth rate — no assumed future deposits (your rule). Not advice.</div>`;
+  openInfoSheet('Financial Independence', body);
+  const b=$('fiSet'); if(b) b.onclick=()=>{
+    const v=prompt('What monthly income would make work optional for you?', need||'');
+    if(v==null) return; const n=parseFloat(String(v).replace(',','.'));
+    state.goal=Object.assign({amt:0}, state.goal||{}, {fimo:n>0?n:0}); persist();
+    closeDetail(); renderFI();
+  };
+}
+
+/* ============ ASK — a private, on-device assistant that answers from YOUR numbers ============
+   Free + local: no data leaves the phone. Open-ended questions it can't match fall through
+   to askAI() (Cloudflare Workers AI, api.js) which the caller wires up. */
+function fundReturn(sym){ const r=rows('all').find(x=>x.sym===sym); if(!r||!(r.cost>0)) return null; const g=r.qty*priceOf(sym)-r.cost; return {g, pct:g/r.cost*100, val:r.qty*priceOf(sym)}; }
+function annualIncome(){ let inc=0; for(const r of rows('all')){ const dv=state.divs[r.sym]; if(dv&&dv.list){ const perSh=dv.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0); inc+=perSh*r.qty; } } return inc; }
+function askLocal(qRaw){
+  const q=' '+qRaw.toLowerCase().replace(/[^a-z0-9%$.\- ]/g,' ').replace(/\s+/g,' ')+' ';
+  const has=(...w)=>w.some(x=>q.includes(x));
+  const t=totals('all'), cash=cashFor('all'), mine=t.value-cash;
+  const dayBase=t.value-t.day, dayPct=dayBase>0?t.day/dayBase*100:0;
+  const A=inner=>({confident:true, html:inner});
+  if(!(t.value>0) && !has('hello','hi ','help','what can you')) return A(`Add some holdings first and I'll be able to answer that.`);
+
+  // a specific fund by ticker or name?
+  const sym=uniqSyms().find(s=>{ const a=s.toLowerCase(); return q.includes(' '+a+' ')||q.includes(' '+a.replace('-','.')+' ')||q.includes(' '+a.replace('-','')+' ')||(NAMES[s]&&NAMES[s].toLowerCase().split(/[ ]/).some(w=>w.length>3&&q.includes(w))); });
+  if(sym && has('how','doing','up','down','return','gain','much','worth','performance')){
+    const f=fundReturn(sym), q2=state.quotes[sym], dp=q2&&q2.prev>0?(q2.price/q2.prev-1)*100:0;
+    if(f) return A(`<b>${sym.replace('-','.')}</b> is worth <b>${fmt(f.val)}</b> — ${f.g>=0?'up':'down'} <b class="${cls(f.g)}">${fmtSign(f.g)} (${fmtPct(f.pct)})</b> since you bought, and ${dp>=0?'+':''}${dp.toFixed(1)}% today. It's ${(f.val/mine*100).toFixed(0)}% of your holdings.`);
+  }
+
+  // overall standing
+  if(has('how am i','how are we','how is my','how am i doing','overall','summary','how much have i made','how much did i make','total return','how is it going','how it going')){
+    const pr=periodReturns(), all=pr.find(x=>x.k==='All'), ytd=pr.find(x=>x.k==='YTD');
+    const gain=mine-rows('all').reduce((a,r)=>a+r.cost,0);
+    return A(`Your portfolio is worth <b>${fmt(t.value)}</b>. All-time you're ${gain>=0?'up':'down'} <b class="${cls(gain)}">${fmtSign(gain)}</b>${all&&all.p!=null?` (a ${fmtPct(all.p)} market return)`:''}${ytd&&ytd.p!=null?`, and <b class="${cls(ytd.p)}">${fmtPct(ytd.p)}</b> so far this year`:''}. Today it's <b class="${cls(t.day)}">${fmtSign(t.day)} (${fmtPct(dayPct)})</b>.`);
+  }
+  // today
+  if(has('today',"today's",'right now','so far today')){
+    const movers=rows('all').map(r=>({s:r.sym,imp:r.qty*(priceOf(r.sym)-prevOf(r.sym))})).filter(m=>Math.abs(m.imp)>0.5).sort((a,b)=>Math.abs(b.imp)-Math.abs(a.imp));
+    const m=movers[0];
+    return A(`Today you're <b class="${cls(t.day)}">${fmtSign(t.day)} (${fmtPct(dayPct)})</b>, now at <b>${fmt(t.value)}</b>.${m?` Biggest move: <b>${m.s.replace('-','.')}</b> ${m.imp>=0?'+':''}${fmt(m.imp).replace('-','−')} on your shares.`:''}`);
+  }
+  // best / worst
+  if(has('best','worst','winner','loser','biggest','top perform','worst perform','which fund')){
+    const fr=rows('all').map(r=>({s:r.sym,...(fundReturn(r.sym)||{pct:0,g:0})})).filter(x=>x.g!=null).sort((a,b)=>b.pct-a.pct);
+    if(fr.length){ const b=fr[0], w=fr[fr.length-1];
+      if(has('worst','loser')) return A(`Your softest holding is <b>${w.s.replace('-','.')}</b> at <b class="${cls(w.pct)}">${fmtPct(w.pct)}</b> (${fmtSign(w.g)}). For a long-term index investor that's usually noise, not a reason to sell.`);
+      return A(`Your best performer is <b>${b.s.replace('-','.')}</b>, up <b class="pos">${fmtPct(b.pct)}</b> (${fmtSign(b.g)}) since you bought it.${fr.length>1?` Your softest is ${w.s.replace('-','.')} at ${fmtPct(w.pct)}.`:''}`);
+    }
+  }
+  // dividends / income
+  if(has('dividend','income','pay me','passive','yield')){
+    const inc=annualIncome(), yld=mine>0?inc/mine*100:0;
+    return A(`Your funds pay you about <b class="pos">${fmt(inc)}/yr</b> in dividends right now (~${fmt(inc/12)}/mo, a ${yld.toFixed(2)}% yield) — and you reinvest it, so it compounds. In 4%-rule terms your whole portfolio could safely provide <b>${fmt(t.value*0.04/12)}/mo</b> for life.`);
+  }
+  // FI / retire
+  if(has('retire','financial independence',' fi ','freedom','work optional','quit my job','never work','enough to live')){
+    const monthly=t.value*0.04/12, need=+((state.goal||{}).fimo)||0, gr=growthRate();
+    if(need>0){ const fiNum=need*12/0.04;
+      if(t.value>=fiNum) return A(`You've hit it 🎉 — at your ${fmt(need)}/mo target, your ${fmt(t.value)} already covers financial independence.`);
+      const yrs=Math.log(fiNum/t.value)/Math.log(1+gr);
+      return A(`For <b>${fmt(need)}/mo</b> of freedom you need about <b>${fmt(fiNum)}</b> (the 4% rule). You're at ${fmt(t.value)} — <b>${(t.value/fiNum*100).toFixed(0)}%</b> there. On today's money growing ~${(gr*100).toFixed(0)}%/yr, that's roughly <b>${Math.round(yrs)} years</b> away, no new deposits needed.`);
+    }
+    return A(`Today your portfolio could safely pay you about <b class="pos">${fmt(monthly)}/mo</b> for life (the 4% rule). Tell me your target monthly spending — open the Financial Independence card and set it — and I'll tell you exactly how far away “work is optional” is.`);
+  }
+  // risk / volatility
+  if(has('risk','risky','volatil','safe','how much can i lose','crash','drop','swing','sharpe')){
+    const r=riskStats();
+    if(r) return A(`Your volatility is <b>${r.vol.toFixed(1)}%/yr</b> — ${r.vol<15?'moderate':r.vol<25?'elevated':'high'}, normal for an all-stock mix. You swing ${r.beta<1?Math.round((1-r.beta)*100)+'% less':Math.round((r.beta-1)*100)+'% more'} than the S&P, your worst-ever dip was <b class="neg">${r.mdd.toFixed(0)}%</b>, and your risk-adjusted return (Sharpe) is <b>${r.sharpe.toFixed(2)}</b>${r.sharpe>=1?' — strong':''}. Tap Crash Test to see the dollar impact of past crashes.`);
+  }
+  // real / inflation
+  if(has('inflation','real return','really worth','buying power','after inflation')){
+    const rr=realReturn();
+    if(rr) return A(`On paper you're up <b class="${cls(rr.nomTot)}">${fmtPct(rr.nomTot)}</b> all-time. After ~${(INFLATION*100).toFixed(1)}%/yr inflation over ${rr.years.toFixed(1)} years, that's <b class="${cls(rr.realTot)}">${fmtPct(rr.realTot)}</b> in real buying power — the honest number. Still well ahead of cash.`);
+  }
+  // diversification / concentration
+  if(has('diversif','concentrat','spread out','too much','allocation','balanced','sectors')){
+    const fr=rows('all').map(r=>({s:r.sym,w:r.qty*priceOf(r.sym)/Math.max(1,mine)})).sort((a,b)=>b.w-a.w);
+    const big=fr[0];
+    return A(`Your biggest single position is <b>${big.s.replace('-','.')}</b> at <b>${(big.w*100).toFixed(0)}%</b>${big.w>0.35&&!DIVERSIFIED_FUNDS.has(big.s)?' — a bit concentrated':''}. ${fr.filter(x=>DIVERSIFIED_FUNDS.has(x.s)).length?'Most of your money is in broad index funds, which each already hold hundreds of companies — so you\'re more diversified than the ticker count suggests.':''} See the Sectors and Where-Your-Money-Lives cards for the full picture.`);
+  }
+  // fees
+  if(has('fee','expense ratio','cost me','paying in fees','advisory')){
+    let wsum=0, fee=0; for(const r of rows('all')){ const m=FUND_META[r.sym]; const v=r.qty*priceOf(r.sym); if(m&&m.er!=null){ wsum+=v; fee+=v*m.er/100; } }
+    const advis=(state.cash.main!=null)?0:0;
+    const er=wsum>0?fee/wsum*100:0;
+    return A(`Your funds' blended fee is about <b>${er.toFixed(2)}%/yr</b> ≈ <b>${fmt(fee)}/yr</b> — remarkably cheap (Vanguard index funds). Over 30 years as the balance grows, that's a tiny drag versus the ~1% many advisors charge, which on ${fmt(t.value)} would be ${fmt(t.value*0.01)}/yr.`);
+  }
+  // value / how much
+  if(has('how much do i have','net worth','total value','worth','how much money','my money','balance')){
+    return A(`You have <b>${fmt(t.value)}</b> total — ${fmt(mine)} invested across ${rows('all').length} funds${cash>0?` plus ${fmt(cash)} in cash`:''}.`);
+  }
+  // buy/sell advice — deflect gently, give data
+  if(has('should i buy','should i sell','should i invest','what should i do','buy more','sell')){
+    return A(`I can't give buy/sell advice — but here's the lens that fits your strategy: you're a long-term index investor who never sells, and history rewards staying invested. Your portfolio is ${fmt(t.value)}, ${dayPct>=0?'up':'down'} today. If you have cash to add, the Target Mix card shows which fund is furthest below target — feeding that keeps you balanced without selling.`);
+  }
+  // greeting / help
+  if(has('hello','hi ','hey','what can you','help','who are you','what do you')){
+    return A(`I'm your portfolio assistant — I answer from your real numbers, all on your phone. Try: <i>“How am I doing this year?”</i>, <i>“What's my best fund?”</i>, <i>“When can I retire?”</i>, <i>“Am I diversified?”</i>, or <i>“How risky am I?”</i>`);
+  }
+  return {confident:false, html:''};
+}
+
+let askBusy=false;
+const ASK_CHIPS=['How am I doing?','Best fund?','When can I retire?','Am I diversified?','How risky am I?'];
+function renderAskChips(){
+  const el=$('askChips'); if(!el) return;
+  el.innerHTML=ASK_CHIPS.map(c=>`<button type="button" data-ask="${esc(c)}">${esc(c)}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=> b.onclick=()=>{ $('askInput').value=b.dataset.ask; doAsk(); });
+}
+function paintAsk(html, kind){
+  const box=$('askAnswer'); if(!box) return;
+  box.innerHTML=`<div class="aska"><div class="askbody">${html}</div>${kind?`<div class="asksrc">${kind}</div>`:''}</div>`;
+}
+async function doAsk(){
+  const inp=$('askInput'); if(!inp||askBusy) return;
+  const qq=inp.value.trim(); if(!qq) return;
+  const local=askLocal(qq);
+  if(local.confident){ paintAsk(local.html, '🔒 answered on your phone'); return; }
+  // fall through to Cloudflare AI if the app wired it and reports are on (shares the push token)
+  if(typeof askAI!=='function' || !(lsGet('pt_push')||{}).token){
+    paintAsk(`I can answer things like your returns, best/worst fund, dividends, risk, diversification, fees, and when you could retire. For open-ended questions, turn on Daily reports (⚙︎) to unlock the AI assistant.`, '🔒 on your phone');
+    return;
+  }
+  askBusy=true; paintAsk('<span class="askthinking">Thinking…</span>','');
+  try{
+    const r=await askAI(qq, askContext());
+    paintAsk(esc(r.answer).replace(/\n/g,'<br>'), r.left!=null?`✨ AI · ${r.left} left today`:'✨ AI');
+  }catch(e){
+    paintAsk(e&&e.message==='limit'?`You've used today's free AI questions — they reset tomorrow. I can still answer the built-in ones (returns, risk, dividends, retirement…) any time.`:`Couldn't reach the AI just now — check your connection. The built-in answers still work offline.`,'');
+  }
+  askBusy=false;
+}
+/* compact, on-device summary sent to the user's own Cloudflare AI (they opted in) */
+function askContext(){
+  const t=totals('all'), mine=t.value-cashFor('all'), pr=periodReturns(), r=riskStats();
+  const funds=rows('all').map(x=>{ const f=fundReturn(x.sym)||{}; return `${x.sym.replace('-','.')}: ${fmt(x.qty*priceOf(x.sym))} (${f.pct!=null?fmtPct(f.pct):'n/a'} all-time, ${(x.qty*priceOf(x.sym)/Math.max(1,mine)*100).toFixed(0)}% of portfolio)`; }).join('; ');
+  const g=state.goal||{};
+  return `Total ${fmt(t.value)}; invested ${fmt(mine)}; today ${fmtSign(t.day)} (${fmtPct((t.value-t.day)>0?t.day/(t.value-t.day)*100:0)}). Holdings: ${funds}. All-time ${pr.find(x=>x.k==='All')?.p?.toFixed(1)||'?'}%, YTD ${pr.find(x=>x.k==='YTD')?.p?.toFixed(1)||'?'}%. Dividends ~${fmt(annualIncome())}/yr. ${r?`Volatility ${r.vol.toFixed(0)}%, beta ${r.beta.toFixed(2)}, worst drawdown ${r.mdd.toFixed(0)}%, Sharpe ${r.sharpe.toFixed(2)}.`:''} ${g.amt>0?`Goal ${fmt(g.amt)}.`:''}${g.fimo>0?` FI target ${fmt(g.fimo)}/mo.`:''} Long-term index investor who never sells; contributions not assumed in projections.`;
+}
+function wireAsk(){
+  const btn=$('askBtn'), inp=$('askInput'); if(!btn||!inp||btn._wired) return;
+  btn._wired=true;
+  btn.onclick=doAsk;
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') doAsk(); });
+  renderAskChips();
 }
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */

@@ -121,7 +121,7 @@
 
   <section class="card" id="goalCard"><div class="card-title">Goal</div><div id="goalBody"></div></section>
 
-  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v3.0.1</div>
+  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v3.1.0</div>
 </div><!-- /page-portfolio -->
 
 <!-- ================= EXPLORE ================= -->
@@ -160,6 +160,14 @@
 <!-- ================= INSIGHTS ================= -->
 <div id="page-insights" class="page hidden">
   <div class="pagehead" style="margin-top:14px">Insights</div>
+
+  <section class="card" id="askCard">
+    <div class="it" style="margin-bottom:8px">💬 Ask about your money</div>
+    <div class="askrow"><input id="askInput" type="text" placeholder="e.g. How am I doing this year?" autocomplete="off" aria-label="Ask a question about your portfolio"><button class="btn pri" id="askBtn">Ask</button></div>
+    <div id="askChips" class="chips" style="margin-top:9px"></div>
+    <div id="askAnswer" style="margin-top:12px"></div>
+  </section>
+
   <div class="eyebrow" style="margin-top:6px">Your standing</div>
   <h2>Portfolio Health</h2>
   <section class="card" id="healthCard"><div id="healthBody"></div></section>
@@ -191,6 +199,8 @@
       <div class="estnote" id="projNote"></div>
       <div class="estnote" id="projMC" style="color:var(--mut)"></div>
     </div>
+    <div class="icard wide" id="fiCard" style="cursor:pointer"><div class="it">Financial Independence <span class="chev">›</span></div><div id="fiBody"></div>
+      <div class="estnote">The "4% rule": a portfolio can safely pay out ~4%/yr for life. This is what yours could cover — and when.</div></div>
   </div>
 
   <div class="eyebrow">What you own</div>

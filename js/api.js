@@ -154,6 +154,7 @@ async function refreshAll(force){
   if(typeof maybeShowMonthlyRecap==='function') maybeShowMonthlyRecap(); // month first — daily recap yields if a sheet is open
   if(typeof maybeShowRecap==='function') maybeShowRecap();
   if(typeof cloudBackupSoon==='function') cloudBackupSoon();
+  if(!window._pushReconciled){ window._pushReconciled=true; if(typeof pushReconcile==='function') pushReconcile(); } // heal a restored "on" with no live subscription
   // Siri Shortcut opened us with ?brief=1 → speak the day once quotes are real
   if(/[?&]brief=1/.test(location.search) && !window._briefed && state.live && typeof speakBriefing==='function'){ window._briefed=true; speakBriefing(); }
   pushSyncSoon(); // keep the push server's fallback prices warm (no-op unless reports are on)
@@ -281,8 +282,44 @@ async function pushEnable(){
 async function pushDisable(){
   try{ const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}
   try{ await pushCall('/unsubscribe'); }catch(e){}
-  const p=lsGet('pt_push')||{}; p.on=false; lsSet('pt_push', p);
+  const p=lsGet('pt_push')||{}; p.on=false; lsSet('pt_push', p); // off is set even if the network calls failed
   toast('Daily reports off.');
+}
+/* Reconcile after a restore or reinstall: the backup can bring back {on:true} while THIS
+   install has no live push subscription (so the server is pushing to a dead endpoint and
+   nothing arrives). Re-create the subscription + re-pair the server, or flip to off so the
+   toggle tells the truth. Safe to call on every load — it's a no-op when already paired. */
+async function pushReconcile(){
+  const p=lsGet('pt_push')||{};
+  if(!p.on || !p.token) return;
+  if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){ p.on=false; lsSet('pt_push',p); return; }
+  try{
+    if(Notification.permission!=='granted'){ p.on=false; lsSet('pt_push',p); return; } // permission lost on reinstall → honest off
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,
+      applicationServerKey:Uint8Array.from(atob(PUSH_VAPID.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0))});
+    const r=await pushCall('/subscribe', {sub:sub.toJSON(), snapshot:pushSnapshot()}); // idempotent — points KV 'sub' at THIS install
+    if(r.ok){ pushSyncLast=Date.now(); paintPushIfOpen(); }
+  }catch(e){ /* subscribe blocked (e.g. not installed) — leave as-is; user can re-toggle */ }
+}
+function paintPushIfOpen(){ // self-contained (openEdit's paintPush is a closure) — keeps the ⚙︎ toggle honest
+  const el=document.getElementById('pushTgl'); if(!el) return;
+  const on=!!(lsGet('pt_push')||{}).on;
+  el.textContent = on ? 'Turn off reports' : '🔔 Turn on reports';
+  const test=document.getElementById('pushTest'); if(test) test.style.display=on?'':'none';
+}
+
+/* Ask the open-ended AI (Cloudflare Workers AI on the owner's own worker, free daily cap).
+   Only the compact on-device summary + question are sent — the owner opted in. */
+async function askAI(question, context){
+  ensurePushToken();
+  const r=await pushCall('/ask', {question, context});
+  if(r.status===429) throw new Error('limit');
+  if(!r.ok) throw new Error('ai');
+  const d=await r.json();
+  if(!d || !d.answer) throw new Error('ai');
+  return {answer:d.answer, left:d.left};
 }
 function pushTest(){
   return pushCall('/test').then(r=>r.json()).then(d=>{

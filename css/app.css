@@ -552,3 +552,20 @@ body.mbfix .wrap{padding-top:calc(56px + env(safe-area-inset-top,0px))}
 .cmove .ctitle{font-weight:700;font-size:14.5px;margin-top:11px;letter-spacing:-.01em}
 .cmove .cdetail{color:var(--mut);font-size:11.5px;margin-top:4px;line-height:1.45;font-weight:500}
 .cmove.sev-warn{border-color:color-mix(in srgb,var(--warn) 26%,var(--line))}
+
+/* ---- Ask assistant + Financial Independence (v3.1) ---- */
+#askCard{margin-top:14px}
+.askrow{display:flex;gap:8px;align-items:stretch}
+#askInput{flex:1;min-width:0;background:var(--card2);border:1px solid var(--line);color:var(--tx);
+  border-radius:var(--r-md);padding:11px 13px;font-size:14px;font-family:inherit;outline:none}
+#askInput:focus{border-color:var(--brand)}
+#askBtn{flex:0 0 auto;padding:0 18px;font-size:14px}
+#askChips{flex-wrap:wrap;margin-top:10px}
+#askChips button{font-size:12px;padding:6px 12px;min-height:32px}
+.aska .askbody{font-size:14px;line-height:1.5;color:var(--tx);background:var(--card2);
+  border:1px solid var(--line);border-radius:var(--r-md);padding:12px 13px}
+.aska .askbody b{font-weight:700}
+.aska .asksrc{font-size:11px;color:var(--faint);margin-top:6px;padding-left:2px}
+.askthinking{color:var(--mut)}
+.fi-track{height:8px;border-radius:999px;background:var(--card2);border:1px solid var(--line);overflow:hidden;margin-top:8px}
+.fi-track i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),#5ee7a5);border-radius:999px}

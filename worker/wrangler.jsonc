@@ -8,6 +8,8 @@
   "kv_namespaces": [
     { "binding": "KV", "id": "425224ee89044fe0b40254e84365552f" }
   ],
+  // Workers AI (free daily allocation) powers the in-app "Ask" assistant — see /ask in src/index.js
+  "ai": { "binding": "AI" },
   // UTC crons, two per report so US daylight-saving never misses:
   //   13:36+14:36 UTC → one of them is 9:36 AM ET (market open)
   //   20:12+21:12 UTC → one of them is 4:12 PM ET (market close)
