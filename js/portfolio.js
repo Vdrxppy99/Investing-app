@@ -848,6 +848,7 @@ function openEdit(){
     $('pushTest').style.display=''; $('pushTest').style.opacity = on ? '1' : '.5'; // always visible — never looks "removed"
   };
   paintPush();
+  if(typeof pushVerify==='function') pushVerify().then(paintPush); // correct the label against the real subscription
   $('pushTgl').onclick=async()=>{
     const on=!!(lsGet('pt_push')||{}).on;
     $('pushTgl').disabled=true; $('pushTgl').textContent='…';

@@ -309,6 +309,21 @@ function paintPushIfOpen(){ // self-contained (openEdit's paintPush is a closure
   el.textContent = on ? 'Turn off reports' : '🔔 Turn on reports';
   const test=document.getElementById('pushTest'); if(test){ test.style.display=''; test.style.opacity=on?'1':'.5'; }
 }
+/* Truth check: the stored on-flag can drift out of sync after a restore/reinstall. Compare it
+   against the ACTUAL browser subscription + permission and correct the toggle so it never lies. */
+async function pushVerify(){
+  try{
+    const p=lsGet('pt_push')||{};
+    if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+    // no OS permission → reports are definitely off (the common reinstall case); correct instantly, no SW wait
+    if(Notification.permission!=='granted'){ if(p.on){ p.on=false; lsSet('pt_push',p); paintPushIfOpen(); } return; }
+    // permission granted → confirm a live subscription exists, but never hang on serviceWorker.ready
+    const reg=await Promise.race([navigator.serviceWorker.ready, new Promise((_,rej)=>setTimeout(()=>rej(new Error('sw-timeout')),2500))]);
+    const sub=await reg.pushManager.getSubscription();
+    const reallyOn=!!(sub && p.token);
+    if(!!p.on !== reallyOn){ p.on=reallyOn; lsSet('pt_push', p); paintPushIfOpen(); }
+  }catch(e){ /* SW slow/unavailable — leave the label as-is */ }
+}
 
 /* Ask the open-ended AI (Cloudflare Workers AI on the owner's own worker, free daily cap).
    Only the compact on-device summary + question are sent — the owner opted in. */
