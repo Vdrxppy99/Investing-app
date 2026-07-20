@@ -154,6 +154,8 @@ async function refreshAll(force){
   if(typeof maybeShowMonthlyRecap==='function') maybeShowMonthlyRecap(); // month first — daily recap yields if a sheet is open
   if(typeof maybeShowRecap==='function') maybeShowRecap();
   if(typeof cloudBackupSoon==='function') cloudBackupSoon();
+  // Siri Shortcut opened us with ?brief=1 → speak the day once quotes are real
+  if(/[?&]brief=1/.test(location.search) && !window._briefed && state.live && typeof speakBriefing==='function'){ window._briefed=true; speakBriefing(); }
   pushSyncSoon(); // keep the push server's fallback prices warm (no-op unless reports are on)
 }
 /* --- live polling: every few seconds while the US market is open --- */
@@ -225,7 +227,13 @@ function pushSnapshot(){
   return { holdings:Object.entries(hs).map(([sym,qty])=>({sym,qty})),
            cash:(+state.cash.main||0)+(+state.cash.brok||0), prices,
            goal:(state.goal&&state.goal.amt>0)?+state.goal.amt:0, dep:+state.deposits||0, // for milestone alerts (user-approved)
+           alerts:(lsGet('pt_alerts')||[]).filter(a=>a&&a.sym&&a.at>0),                    // custom price alerts
            ts:Date.now() };
+}
+function pushSyncNow(){ // immediate snapshot sync — used when a price alert is set/removed
+  const p=lsGet('pt_push'); if(!p||!p.on) return;
+  pushSyncLast=Date.now();
+  pushCall('/snapshot', pushSnapshot()).catch(()=>{});
 }
 function ensurePushToken(){
   const p=lsGet('pt_push')||{};
@@ -292,7 +300,7 @@ function b64buf(buf){ const u=new Uint8Array(buf); let s=''; for(let i=0;i<u.len
 function cloudPayload(){
   return { app:'portfolio-tracker', v:1, cloud:1, exported:new Date().toISOString(),
     holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed,
-    ccy:state.view.ccy, watch:state.watch, goal:state.goal, targets:state.targets, push:lsGet('pt_push') };
+    ccy:state.view.ccy, watch:state.watch, goal:state.goal, targets:state.targets, push:lsGet('pt_push'), alerts:lsGet('pt_alerts') };
 }
 async function cloudBackupNow(){
   const bk=lsGet('pt_bk'); if(!bk||!bk.k) return false;

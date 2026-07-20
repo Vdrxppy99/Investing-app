@@ -25,6 +25,19 @@ function wirePTR(){
   });
 }
 
+/* iOS 17.4+ gives web apps a native haptic tick on switch toggles — borrow it for tab taps */
+let haptEl=null;
+function haptic(){
+  try{
+    if(!haptEl){ haptEl=document.createElement('input'); haptEl.type='checkbox'; haptEl.setAttribute('switch',''); haptEl.style.cssText='position:fixed;left:-99px;opacity:0;pointer-events:none'; document.body.appendChild(haptEl); }
+    haptEl.click();
+  }catch(e){}
+}
+/* opening the app clears the icon badge — you've seen the news */
+function clearBadge(){ try{ if(navigator.clearAppBadge) navigator.clearAppBadge(); }catch(e){} }
+clearBadge();
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) clearBadge(); });
+
 /* ============ PAGE SWITCHING ============ */
 function showPage(p){
   if(p!=='explore' && $('searchResults')){ $('searchResults').style.display='none'; if($('mktSearch')) $('mktSearch').value=''; if($('mktSearchX')) $('mktSearchX').style.display='none'; }
@@ -42,7 +55,7 @@ function showPage(p){
   if(p==='explore') refreshMarkets(false);
   if(p==='insights') renderInsights();
 }
-document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>showPage(b.dataset.page));
+document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{ haptic(); showPage(b.dataset.page); });
 /* one delegated tap handler for every symbol row/card on Explore — survives any re-render */
 $('page-explore').addEventListener('click', e=>{
   const el=e.target.closest('.mrow, .idx-card');

@@ -696,10 +696,29 @@ function openDetail(sym){
         const g=l.qty*p-l.cost;
         return `<div class="krow"><span class="k">${new Date(l.date+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric',year:'2-digit'})}${l.div?' · dividend':''}</span><span>${l.qty.toFixed(3).replace(/\.?0+$/,'')} sh @ ${fmtPx(l.cost/l.qty)} <span class="${cls(g)}">${fmtSign(g)}</span></span></div>`;
       }).join('');
+    })()}${(function(){
+      const al=(lsGet('pt_alerts')||[]).find(a=>a.sym===sym);
+      return `<div style="font-size:13px;font-weight:700;margin-top:16px">Price alert</div>
+        <div class="krow"><span class="k">${al?`Push me at ${fmtPx(al.at)} (${al.dir==='up'?'on the way up':'on the way down'})`:'Get a push when it hits a price you pick'}</span>
+        <span><button class="btn sec" id="alertBtn" style="padding:6px 12px;font-size:12px">${al?'Remove':'🔔 Set'}</button></span></div>`;
     })()}<div id="sheetNews" data-sym="${esc(sym)}"></div>`;
   showOverlay('detail');
   $('detailX').onclick = closeDetail;
   $('detailX').focus({preventScroll:true});
+  const ab=$('alertBtn');
+  if(ab) ab.onclick=()=>{
+    const list=lsGet('pt_alerts')||[];
+    const i=list.findIndex(a=>a.sym===sym);
+    if(i>-1){ list.splice(i,1); lsSet('pt_alerts',list); toast('Price alert removed.'); if(typeof pushSyncNow==='function') pushSyncNow(); openDetail(sym); return; }
+    const v=prompt(`Push me when ${sym.replace('-','.')} reaches $`); if(v==null) return;
+    const at=parseFloat(String(v).replace(',','.'));
+    if(!(at>0)){ toast('Enter a price like 700 or 89.50', true); return; }
+    const dir=at>=priceOf(sym)?'up':'down';
+    list.push({sym, at, dir}); lsSet('pt_alerts',list);
+    toast(`You'll get a push when ${sym.replace('-','.')} ${dir==='up'?'climbs to':'falls to'} ${fmtPx(at)}.`);
+    if(typeof pushSyncNow==='function') pushSyncNow();
+    openDetail(sym);
+  };
   loadSheetNews(sym);
   if(detailChart){ detailChart.destroy(); detailChart=null; }
   const h=state.history[sym];
@@ -758,6 +777,8 @@ function openEdit(){
     <div style="color:var(--mut);font-size:12px;margin-top:8px">Total deposited = all money you've put in (Vanguard performance page). Used for "Total earnings", which includes dividends and realized gains.</div>
     <div class="ebtns"><button class="btn pri" id="saveEdit">Save</button><button class="btn sec" id="cancelEdit">Cancel</button></div>
     <div class="ebtns"><button class="btn sec" id="exportBtn">⬇ Export backup</button><button class="btn sec" id="importBtn">⬆ Import backup</button><button class="btn sec" id="csvBtn">⬇ CSV</button><button class="btn warn" id="resetSeed">Erase all holdings</button></div>
+    <div class="ebtns"><button class="btn sec" id="shareBtn">📤 Share performance card</button><button class="btn sec" id="speakBtn">🗣️ Speak my briefing</button></div>
+    <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">The share card shows percentages only — never your dollar amounts. Tip: a Siri Shortcut that opens the app with <b>?brief=1</b> makes it speak on command.</div>
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Security</div>
     <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button><button class="btn sec" id="cloudTgl"></button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it. Cloud backup keeps an encrypted copy on your own server — unreadable without your passcode, so a lost phone loses nothing.</div>
@@ -780,6 +801,8 @@ function openEdit(){
   };
   $('exportBtn').onclick=exportBackup;
   $('csvBtn').onclick=exportCSV;
+  $('shareBtn').onclick=sharePerfCard;
+  $('speakBtn').onclick=speakBriefing;
   $('importBtn').onclick=()=>$('importFile').click();
   $('lockNow').onclick=()=>vaultLock();
   const ft=$('faceTgl');
@@ -871,10 +894,85 @@ function exportCSV(){ // spreadsheet-friendly dump: positions, then every purcha
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
 }
+/* ---- share card: a branded performance image for the iOS share sheet.
+   PERCENTAGES ONLY — this image is designed to leave the phone, so no dollar amounts. */
+async function sharePerfCard(){
+  const md=typeof monthlyDietzReturns==='function'?monthlyDietzReturns():null;
+  if(!md||!Object.keys(md.ret).length){ toast('Needs a bit more price history first.', true); return; }
+  const yr=String(new Date().getFullYear());
+  const comp=ms=>ms.reduce((a,m)=>a*(1+md.ret[m]/100),1)-1;
+  const all=comp(Object.keys(md.ret))*100;
+  const ytdMs=Object.keys(md.ret).filter(m=>m.startsWith(yr));
+  const ytd=ytdMs.length?comp(ytdMs)*100:null;
+  let sp=null; // S&P YTD from VOO's own price history
+  const vh=state.history.VOO;
+  if(vh&&vh.t&&vh.t.length){
+    let a=null; const jan=Date.parse(yr+'-01-01');
+    for(let i=0;i<vh.t.length;i++){ if(vh.t[i]<jan) a=vh.c[i]; }
+    const pNow=priceOf('VOO');
+    if(a>0&&pNow>0) sp=(pNow/a-1)*100;
+  }
+  const cv=document.createElement('canvas'); cv.width=1080; cv.height=1350;
+  const x=cv.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,1350); g.addColorStop(0,'#0a0f0d'); g.addColorStop(1,'#10201a');
+  x.fillStyle=g; x.fillRect(0,0,1080,1350);
+  const glow=x.createRadialGradient(870,1120,60,870,1120,700); glow.addColorStop(0,'rgba(38,208,124,.16)'); glow.addColorStop(1,'rgba(38,208,124,0)');
+  x.fillStyle=glow; x.fillRect(0,0,1080,1350);
+  // normalized 1-year curve — pure shape, no axes, no numbers
+  const s=buildSeries('all'); const cut=Date.now()-365*86400e3;
+  const pts=[]; for(let i=0;i<s.labels.length;i++){ const t=Date.parse(s.labels[i]+'T12:00:00'); if(t>=cut&&s.value[i]>0) pts.push(s.value[i]); }
+  if(pts.length>10){
+    const mn=Math.min(...pts), mx=Math.max(...pts), sp2=mx-mn||1;
+    x.beginPath();
+    pts.forEach((v,i)=>{ const px=80+i/(pts.length-1)*920, py=1120-((v-mn)/sp2)*300; i?x.lineTo(px,py):x.moveTo(px,py); });
+    x.strokeStyle='#26d07c'; x.lineWidth=10; x.lineCap='round'; x.lineJoin='round';
+    x.shadowColor='rgba(38,208,124,.55)'; x.shadowBlur=28; x.stroke(); x.shadowBlur=0;
+    const lp=[80+920,1120-((pts[pts.length-1]-mn)/sp2)*300];
+    x.fillStyle='#5ee7a5'; x.beginPath(); x.arc(lp[0],lp[1],16,0,7); x.fill();
+    x.fillStyle='#fff'; x.beginPath(); x.arc(lp[0],lp[1],7,0,7); x.fill();
+  }
+  x.textAlign='left'; x.fillStyle='#8fa39a'; x.font='600 40px -apple-system,Inter,sans-serif';
+  x.fillText('MY PORTFOLIO',80,150);
+  x.fillStyle=all>=0?'#26d07c':'#ff6b6b'; x.font='800 190px -apple-system,Inter,sans-serif';
+  x.fillText((all>=0?'+':'')+all.toFixed(1)+'%',72,390);
+  x.fillStyle='#e7efe9'; x.font='600 46px -apple-system,Inter,sans-serif';
+  x.fillText('all-time return · every deposit counted',80,470);
+  x.fillStyle='#8fa39a'; x.font='500 44px -apple-system,Inter,sans-serif';
+  let ln=590;
+  if(ytd!=null){ x.fillText(`This year: ${(ytd>=0?'+':'')+ytd.toFixed(1)}%${sp!=null?`   ·   S&P 500: ${(sp>=0?'+':'')+sp.toFixed(1)}%`:''}`,80,ln); ln+=70; }
+  x.fillText('Long-term index investor · dividends reinvested',80,ln);
+  x.fillStyle='#5b6f66'; x.font='500 36px -apple-system,Inter,sans-serif';
+  x.fillText('tracked with an app I built with AI — $0, private, mine',80,1270);
+  cv.toBlob(async b=>{
+    try{
+      const f=new File([b],'my-portfolio.png',{type:'image/png'});
+      if(navigator.canShare&&navigator.canShare({files:[f]})){ await navigator.share({files:[f],title:'My Portfolio'}); return; }
+    }catch(e){ if(e&&e.name==='AbortError') return; }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='my-portfolio.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('Card saved — sharing straight to apps works on your phone.');
+  },'image/png');
+}
+/* ---- Siri briefing: the day, spoken with Apple's built-in voices ---- */
+function briefingText(){
+  const t=totals('all');
+  const movers=rows('all').map(r=>({sym:r.sym, imp:r.qty*(priceOf(r.sym)-prevOf(r.sym))})).filter(m=>Math.abs(m.imp)>0.5).sort((a,b)=>Math.abs(b.imp)-Math.abs(a.imp));
+  const m=movers[0];
+  const g=(state.goal&&state.goal.amt>0)?` You're ${Math.min(100,t.value/state.goal.amt*100).toFixed(0)} percent of the way to your goal.`:'';
+  return `Your portfolio is worth ${Math.round(t.value).toLocaleString('en-US')} dollars, ${t.day>=0?'up':'down'} ${Math.abs(Math.round(t.day))} dollars today.`
+    +(m?` Biggest mover: ${String(NAMES[m.sym]||m.sym).split(' ')[0]}, ${m.imp>=0?'adding':'costing'} ${Math.abs(Math.round(m.imp))} dollars.`:'')+g;
+}
+function speakBriefing(){
+  try{
+    const u=new SpeechSynthesisUtterance(briefingText());
+    u.lang='en-US'; u.rate=1.02;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }catch(e){ toast('Speech isn’t available in this browser.', true); }
+}
 function exportBackup(){
   const data={ app:'portfolio-tracker', v:1, exported:new Date().toISOString(),
     holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed, ccy:state.view.ccy, watch:state.watch,
-    goal:state.goal, targets:state.targets, push:lsGet('pt_push'), bk:lsGet('pt_bk') };
+    goal:state.goal, targets:state.targets, push:lsGet('pt_push'), bk:lsGet('pt_bk'), alerts:lsGet('pt_alerts') };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='portfolio-backup-'+dayStr(Date.now())+'.json';
@@ -896,6 +994,7 @@ function importBackup(file){
       if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
       if(d.push&&d.push.token) lsSet('pt_push', d.push); // keeps the report server's token — same account, no re-pairing
       if(d.bk&&d.bk.k) lsSet('pt_bk', d.bk);            // keeps cloud backup armed too
+      if(Array.isArray(d.alerts)) lsSet('pt_alerts', d.alerts);
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){ toast('That file is not a valid portfolio backup.', true); }

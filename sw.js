@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v10.10'; // ⚠ bump on EVERY deploy — js/css are cache-first, so clients only refetch them when V changes
+const V = 'pt-v3.0.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
@@ -30,14 +30,19 @@ self.addEventListener('activate', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data.json(); } catch (_) { d = { body: (e.data && e.data.text()) || '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'My Portfolio', {
-    body: d.body || '',
-    tag: d.tag || 'portfolio',   // same-tag replaces: never a pile of stale reports
-    data: { url: './' }
-  }));
+  e.waitUntil((async () => {
+    await self.registration.showNotification(d.title || 'My Portfolio', {
+      body: d.body || '',
+      tag: d.tag || 'portfolio',   // same-tag replaces: never a pile of stale reports
+      data: { url: './' }
+    });
+    // iOS 16.4+: red badge on the app icon = number of unread cards on the lock screen
+    try { if (navigator.setAppBadge) await navigator.setAppBadge((await self.registration.getNotifications()).length); } catch (_) {}
+  })());
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  try { if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (_) {}
   e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
     for (const w of ws) { if ('focus' in w) return w.focus(); }
     return clients.openWindow('./');

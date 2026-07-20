@@ -14,8 +14,8 @@ import { etNow, tradingDay, money, signed } from './shared.js';
 
 const MOVE_PCT = 2;                                    // day move that counts as "big"
 const SD_MULT = 2;                                     // band width = mean ± 2σ
-const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1 }; // days before the same alert may repeat
-const PRIORITY = { 'm$': 7, mg: 6, atl: 5, ath: 4, dv: 4, lo: 3, hi: 2, mv: 1 }; // milestones top, then lows, dividends/highs, bands, movers
+const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1, tgt: 1 }; // days before the same alert may repeat
+const PRIORITY = { 'm$': 7, mg: 6, tgt: 6, atl: 5, ath: 4, dv: 4, lo: 3, hi: 2, mv: 1 }; // milestones/your-own-targets top, then lows, dividends/highs, bands, movers
 const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', 'Accept': 'application/json' };
 const money0 = v => '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
 
@@ -100,6 +100,16 @@ export async function checkAlerts(env, force) {
       add('lo', `${name} slipped below its usual range`, `${money(q.price)}, below its typical ${money0(b.lo)}–${money0(b.hi)} band — unusual weakness. ${signed(dayUsd)} on your shares today`);
     if (Math.abs(pct) >= MOVE_PCT)
       add('mv', `${name} ${(pct >= 0 ? '+' : '')}${pct.toFixed(1)}% today`, `${signed(dayUsd)} on your shares`);
+    /* user-set price targets from the app ("push me at $700") — one-shot per target */
+    for (const tg of (snap.alerts || [])) {
+      if (tg.sym !== h.sym || !(tg.at > 0)) continue;
+      if (!((tg.dir === 'up' && q.price >= tg.at) || (tg.dir !== 'up' && q.price <= tg.at))) continue;
+      const key = `${h.sym}:tgt:${tg.at}`;
+      if (!force && sent[key]) continue; // fired already — stays quiet until the app changes the target
+      found.push({ sym: h.sym, name, type: 'tgt', p: PRIORITY.tgt, impact: stake, key,
+        title: `${name} just hit your ${money(tg.at)} alert`,
+        body: `Trading at ${money(q.price)} — the level you asked to hear about. Your stake: ${money(stake)} (${signed(dayUsd)} today).` });
+    }
     if (b && q.price > b.ath) { b.ath = q.price; bands.dirty = true; }  // ratchet so tomorrow compares against today
   }
 
@@ -155,12 +165,15 @@ export async function checkAlerts(env, force) {
   if (!found.length) return { skip: 'nothing notable', evaluated };
   found.sort((a, z) => z.p - a.p || z.impact - a.impact);
   const top = found[0];
-  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
+  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg', 'tgt'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
   const body = top.body + (extras.length ? ` · Also: ${extras.join(', ')}` : '');
   const res = await sendWebPush(env, sub, JSON.stringify({ title: top.title, body, tag: 'alert' }), 'alert');
   if (res.status === 404 || res.status === 410) { await env.KV.delete('sub'); return { error: 'subscription expired — re-enable in the app', status: res.status }; }
-  for (const a of found) sent[`${a.sym}:${a.type}`] = et.date;
-  for (const k of Object.keys(sent)) if (daysApart(et.date, sent[k]) > 30) delete sent[k]; // keep the map small
+  for (const a of found) sent[a.key || `${a.sym}:${a.type}`] = et.date;
+  for (const k of Object.keys(sent)) { // keep the map small; fired targets vanish once the app drops them
+    if (k.includes(':tgt:')) { if (!(snap.alerts || []).some(t => `${t.sym}:tgt:${t.at}` === k)) delete sent[k]; }
+    else if (daysApart(et.date, sent[k]) > 30) delete sent[k];
+  }
   await env.KV.put('alerts', JSON.stringify(sent));
   if (bands && bands.dirty) { delete bands.dirty; await env.KV.put('bands', JSON.stringify(bands)); }
   return { sent: top.type, status: res.status, title: top.title, body, evaluated };
