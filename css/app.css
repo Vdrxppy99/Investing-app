@@ -553,19 +553,42 @@ body.mbfix .wrap{padding-top:calc(56px + env(safe-area-inset-top,0px))}
 .cmove .cdetail{color:var(--mut);font-size:11.5px;margin-top:4px;line-height:1.45;font-weight:500}
 .cmove.sev-warn{border-color:color-mix(in srgb,var(--warn) 26%,var(--line))}
 
-/* ---- Ask assistant + Financial Independence (v3.1) ---- */
-#askCard{margin-top:14px}
-.askrow{display:flex;gap:8px;align-items:stretch}
-#askInput{flex:1;min-width:0;background:var(--card2);border:1px solid var(--line);color:var(--tx);
-  border-radius:var(--r-md);padding:11px 13px;font-size:14px;font-family:inherit;outline:none}
-#askInput:focus{border-color:var(--brand)}
-#askBtn{flex:0 0 auto;padding:0 18px;font-size:14px}
-#askChips{flex-wrap:wrap;margin-top:10px}
-#askChips button{font-size:12px;padding:6px 12px;min-height:32px}
-.aska .askbody{font-size:14px;line-height:1.5;color:var(--tx);background:var(--card2);
-  border:1px solid var(--line);border-radius:var(--r-md);padding:12px 13px}
-.aska .askbody b{font-weight:700}
-.aska .asksrc{font-size:11px;color:var(--faint);margin-top:6px;padding-left:2px}
+/* ---- floating AI chat assistant + Financial Independence (v3.1) ---- */
+#aiFab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:44;
+  width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;
+  background:var(--brand);color:var(--onbrand);box-shadow:0 6px 20px rgba(0,0,0,.35),0 0 0 1px color-mix(in srgb,var(--brand) 40%,transparent);
+  display:flex;align-items:center;justify-content:center;font-size:26px;transition:transform .16s,opacity .2s}
+#aiFab:active{transform:scale(.92)}
+#aiFab.hidden{opacity:0;pointer-events:none;transform:scale(.6)}
+#aiPanel{position:fixed;right:14px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:70;
+  width:min(400px,calc(100vw - 24px));height:min(72vh,580px);
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-xl);
+  box-shadow:0 18px 50px rgba(0,0,0,.5);display:flex;flex-direction:column;overflow:hidden;
+  opacity:0;pointer-events:none;transform:translateY(24px) scale(.96);transform-origin:bottom right;
+  transition:opacity .2s ease,transform .2s ease}
+#aiPanel.show{opacity:1;pointer-events:auto;transform:none}
+.ai-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.ai-title{font-weight:700;font-size:15px}
+#aiClose{background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
+#aiMsgs{flex:1 1 auto;overflow-y:auto;padding:14px 14px 4px;display:flex;flex-direction:column;gap:10px}
+.ai-msg{display:flex;flex-direction:column;max-width:85%}
+.ai-msg.user{align-self:flex-end;align-items:flex-end}
+.ai-msg.ai{align-self:flex-start;align-items:flex-start}
+.ai-bub{font-size:14px;line-height:1.5;padding:10px 13px;border-radius:16px}
+.ai-msg.ai .ai-bub{background:var(--card2);border:1px solid var(--line);color:var(--tx);border-bottom-left-radius:5px}
+.ai-msg.user .ai-bub{background:var(--brand);color:var(--onbrand);font-weight:600;border-bottom-right-radius:5px}
+.ai-bub b{font-weight:700}
+.ai-src{font-size:10.5px;color:var(--faint);margin-top:4px;padding:0 4px}
+#aiChips{display:flex;flex-wrap:wrap;gap:7px;padding:4px 14px 0;flex:0 0 auto}
+#aiChips button{background:var(--card2);border:1px solid var(--line);color:var(--mut);border-radius:999px;
+  padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer}
+#aiChips button:active{transform:var(--press)}
+.ai-inputrow{display:flex;gap:8px;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px));flex:0 0 auto;border-top:1px solid var(--line);margin-top:6px}
+#aiInput{flex:1;min-width:0;background:var(--card2);border:1px solid var(--line);color:var(--tx);
+  border-radius:999px;padding:11px 15px;font-size:14px;font-family:inherit;outline:none}
+#aiInput:focus{border-color:var(--brand)}
+#aiSend{flex:0 0 auto;width:42px;border:none;border-radius:50%;background:var(--brand);color:var(--onbrand);font-size:16px;cursor:pointer}
+#aiSend:active{transform:var(--press)}
 .askthinking{color:var(--mut)}
 .fi-track{height:8px;border-radius:999px;background:var(--card2);border:1px solid var(--line);overflow:hidden;margin-top:8px}
 .fi-track i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),#5ee7a5);border-radius:999px}

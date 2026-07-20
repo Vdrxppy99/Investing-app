@@ -324,7 +324,7 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
   });
 }
-function renderInsights(){ wireAsk(); renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderFI(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderCrashCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderFI(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderCrashCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
 
 /* ---- Crash Test: what past crashes would do to TODAY's portfolio (and that they all healed) ---- */
 const CRASH_SCENARIOS=[
@@ -508,35 +508,56 @@ function askLocal(qRaw){
   return {confident:false, html:''};
 }
 
-let askBusy=false;
+/* ---- floating chat assistant (bubble bottom-right → slide-up chat window) ---- */
+let aiBusy=false, aiOpen=false, aiSeq=0, aiMsgs=[];
 const ASK_CHIPS=['How am I doing?','Best fund?','When can I retire?','Am I diversified?','How risky am I?'];
-function renderAskChips(){
-  const el=$('askChips'); if(!el) return;
-  el.innerHTML=ASK_CHIPS.map(c=>`<button type="button" data-ask="${esc(c)}">${esc(c)}</button>`).join('');
-  el.querySelectorAll('button').forEach(b=> b.onclick=()=>{ $('askInput').value=b.dataset.ask; doAsk(); });
+function aiRender(){
+  const box=$('aiMsgs'); if(!box) return;
+  box.innerHTML=aiMsgs.map(m=>`<div class="ai-msg ${m.role}"><div class="ai-bub">${m.html}</div>${m.src?`<div class="ai-src">${m.src}</div>`:''}</div>`).join('');
+  box.scrollTop=box.scrollHeight;
 }
-function paintAsk(html, kind){
-  const box=$('askAnswer'); if(!box) return;
-  box.innerHTML=`<div class="aska"><div class="askbody">${html}</div>${kind?`<div class="asksrc">${kind}</div>`:''}</div>`;
+function aiPush(role, html, src){ const id=++aiSeq; aiMsgs.push({id,role,html,src}); aiRender(); return id; }
+function aiReplace(id, html, src){ const m=aiMsgs.find(x=>x.id===id); if(m){ m.html=html; m.src=src; aiRender(); } }
+function aiRenderChips(){
+  const el=$('aiChips'); if(!el) return;
+  el.innerHTML=aiMsgs.length>1?'':ASK_CHIPS.map(c=>`<button type="button">${esc(c)}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=> b.onclick=()=>{ $('aiInput').value=b.textContent; aiSend(); });
 }
-async function doAsk(){
-  const inp=$('askInput'); if(!inp||askBusy) return;
-  const qq=inp.value.trim(); if(!qq) return;
-  const local=askLocal(qq);
-  if(local.confident){ paintAsk(local.html, '🔒 answered on your phone'); return; }
-  // fall through to Cloudflare AI if the app wired it and reports are on (shares the push token)
+function aiToggle(open){
+  aiOpen = open!=null?open:!aiOpen;
+  $('aiPanel').classList.toggle('show', aiOpen);
+  $('aiFab').classList.toggle('hidden', aiOpen);
+  if(aiOpen){
+    if(!aiMsgs.length){ aiPush('ai', `Hi! I'm your portfolio assistant — I answer from your real numbers, privately on your phone. Ask me anything, or tap a suggestion:`); }
+    aiRenderChips();
+    setTimeout(()=>{ const i=$('aiInput'); if(i) i.focus(); }, 120);
+  }
+}
+async function aiSend(){
+  const inp=$('aiInput'); if(!inp||aiBusy) return;
+  const q=inp.value.trim(); if(!q) return;
+  inp.value=''; aiPush('user', esc(q)); aiRenderChips();
+  const local=askLocal(q);
+  if(local.confident){ aiPush('ai', local.html, '🔒 on your phone'); return; }
   if(typeof askAI!=='function' || !(lsGet('pt_push')||{}).token){
-    paintAsk(`I can answer things like your returns, best/worst fund, dividends, risk, diversification, fees, and when you could retire. For open-ended questions, turn on Daily reports (⚙︎) to unlock the AI assistant.`, '🔒 on your phone');
+    aiPush('ai', `I can answer your returns, best/worst fund, dividends, risk, diversification, fees, and when you could retire. For open-ended questions, turn on Daily reports (⚙︎) to unlock the full AI.`, '🔒 on your phone');
     return;
   }
-  askBusy=true; paintAsk('<span class="askthinking">Thinking…</span>','');
+  aiBusy=true; const tid=aiPush('ai','<span class="askthinking">Thinking…</span>');
   try{
-    const r=await askAI(qq, askContext());
-    paintAsk(esc(r.answer).replace(/\n/g,'<br>'), r.left!=null?`✨ AI · ${r.left} left today`:'✨ AI');
+    const r=await askAI(q, askContext());
+    aiReplace(tid, esc(r.answer).replace(/\n/g,'<br>'), r.left!=null?`✨ AI · ${r.left} left today`:'✨ AI');
   }catch(e){
-    paintAsk(e&&e.message==='limit'?`You've used today's free AI questions — they reset tomorrow. I can still answer the built-in ones (returns, risk, dividends, retirement…) any time.`:`Couldn't reach the AI just now — check your connection. The built-in answers still work offline.`,'');
+    aiReplace(tid, e&&e.message==='limit'?`You've used today's free AI questions — they reset tomorrow. The built-in answers still work any time.`:`Couldn't reach the AI just now — the built-in answers still work offline.`, '');
   }
-  askBusy=false;
+  aiBusy=false;
+}
+function wireAi(){
+  const fab=$('aiFab'); if(!fab || fab._wired) return; fab._wired=true;
+  fab.onclick=()=>{ if(typeof haptic==='function') haptic(); aiToggle(true); };
+  $('aiClose').onclick=()=>aiToggle(false);
+  $('aiSend').onclick=aiSend;
+  $('aiInput').addEventListener('keydown',e=>{ if(e.key==='Enter') aiSend(); });
 }
 /* compact, on-device summary sent to the user's own Cloudflare AI (they opted in) */
 function askContext(){
@@ -544,13 +565,6 @@ function askContext(){
   const funds=rows('all').map(x=>{ const f=fundReturn(x.sym)||{}; return `${x.sym.replace('-','.')}: ${fmt(x.qty*priceOf(x.sym))} (${f.pct!=null?fmtPct(f.pct):'n/a'} all-time, ${(x.qty*priceOf(x.sym)/Math.max(1,mine)*100).toFixed(0)}% of portfolio)`; }).join('; ');
   const g=state.goal||{};
   return `Total ${fmt(t.value)}; invested ${fmt(mine)}; today ${fmtSign(t.day)} (${fmtPct((t.value-t.day)>0?t.day/(t.value-t.day)*100:0)}). Holdings: ${funds}. All-time ${pr.find(x=>x.k==='All')?.p?.toFixed(1)||'?'}%, YTD ${pr.find(x=>x.k==='YTD')?.p?.toFixed(1)||'?'}%. Dividends ~${fmt(annualIncome())}/yr. ${r?`Volatility ${r.vol.toFixed(0)}%, beta ${r.beta.toFixed(2)}, worst drawdown ${r.mdd.toFixed(0)}%, Sharpe ${r.sharpe.toFixed(2)}.`:''} ${g.amt>0?`Goal ${fmt(g.amt)}.`:''}${g.fimo>0?` FI target ${fmt(g.fimo)}/mo.`:''} Long-term index investor who never sells; contributions not assumed in projections.`;
-}
-function wireAsk(){
-  const btn=$('askBtn'), inp=$('askInput'); if(!btn||!inp||btn._wired) return;
-  btn._wired=true;
-  btn.onclick=doAsk;
-  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') doAsk(); });
-  renderAskChips();
 }
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */
@@ -802,3 +816,7 @@ if($('projSeg')) $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=(
   renderProjection();
 });
 
+
+/* wire the floating assistant as soon as this file loads (DOM is already parsed when the
+   app scripts are injected post-unlock) — robust against injected-script HTTP caching */
+if(typeof wireAi==='function') wireAi();

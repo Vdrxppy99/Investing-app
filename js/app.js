@@ -276,6 +276,7 @@ $('miniBar').onclick=()=>{
 })();
 renderAll();
 animateTotal();
+if(typeof wireAi==='function') wireAi(); // floating chat assistant — available on every page
 setTimeout(()=>$('page-portfolio').classList.add('seen'), 600); // launch animation played — don't replay on tab returns
 (function(){ // quiet "you got the new version" note after an auto-update (version read from the footer — no extra bump site)
   const m=document.querySelector('.foot'), v=m&&(m.textContent.match(/v(\d+\.\d+)/)||[])[1];
