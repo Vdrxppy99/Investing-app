@@ -202,6 +202,7 @@ export default {
     if (path === '/test') {
       let b = null; try { b = await req.json(); } catch (_) { /* empty body = report test */ }
       if (b && b.kind === 'alerts') return j(await checkAlerts(env, true), 200, cors);
+      if (b && b.kind === 'open') return j(await sendReport(env, 'open', true), 200, cors);
       if (b && b.kind === 'demo') { // one sample of EVERY notification type, so the owner can eyeball them all
         const sub = await env.KV.get('sub', 'json');
         if (!sub || !sub.endpoint) return j({ skip: 'no device subscribed yet' }, 200, cors);

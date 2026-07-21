@@ -15,8 +15,9 @@ import { etNow, tradingDay, money, signed } from './shared.js';
 const MOVE_PCT = 2;                                    // single-holding day move that counts as "big"
 const PORT_MOVE = 450;                                 // whole-portfolio day $ swing that earns a heads-up (~1.6% at $28k — a genuinely big day, not a normal ~$280 wiggle)
 const SD_MULT = 2;                                     // band width = mean ± 2σ
-const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1, tgt: 1, pbig: 1 }; // days before the same alert may repeat
-const PRIORITY = { 'm$': 8, mg: 7, tgt: 7, pbig: 6, atl: 5, ath: 4, dv: 4, lo: 3, hi: 2, mv: 1 }; // milestones/targets top, then big portfolio day, lows, dividends/highs, bands, movers
+const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1, tgt: 1, pbig: 1, divsoon: 60 }; // days before the same alert may repeat
+const PRIORITY = { 'm$': 8, mg: 7, tgt: 7, pbig: 6, atl: 5, ath: 4, dv: 4, divsoon: 4, lo: 3, hi: 2, mv: 1 }; // milestones/targets top, then big portfolio day, lows, dividends, bands, movers
+const DIV_LEAD_DAYS = 4; // remind this many days before the estimated ex-dividend date
 const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', 'Accept': 'application/json' };
 const money0 = v => '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
 
@@ -155,22 +156,40 @@ export async function checkAlerts(env, force) {
     if (ms.dirty) { delete ms.dirty; await env.KV.put('mstone', JSON.stringify(ms)); }
   }
 
-  /* ---- dividend declarations: once a day, look for a NEW payout event on each fund.
-     First sighting of a fund just records its latest event (no back-alerts). */
+  /* ---- dividends: once a day, per fund — (a) declaration alert when a NEW payout appears, and
+     (b) an UPCOMING reminder ~DIV_LEAD_DAYS before the next ex-date. Yahoo gives no free future
+     ex-dates, so we ESTIMATE the next one from the fund's own steady quarterly cadence. */
   const dvs = await env.KV.get('divs', 'json') || { seen: {} };
   if (dvs.date !== et.date) {
+    if (!dvs.reminded) dvs.reminded = {}; // {sym: estimated-nextEx-ts we've already reminded for}
+    const nowSec = Date.now() / 1000;
     for (const h of snap.holdings) {
-      const evs = (await fetchChartResult(h.sym, 'range=3mo&interval=1d&events=div'))?.events?.dividends;
+      const evs = (await fetchChartResult(h.sym, 'range=1y&interval=1d&events=div'))?.events?.dividends;
       if (!evs) continue;
-      const latest = Object.values(evs).reduce((a, e) => (e && e.date > (a ? a.date : 0) ? e : a), null);
-      if (!latest || !(latest.amount > 0)) continue;
+      const list = Object.values(evs).filter(e => e && e.amount > 0).sort((a, b) => a.date - b.date);
+      if (!list.length) continue;
+      const latest = list[list.length - 1], name = h.sym.replace('-', '.');
       if (dvs.seen[h.sym] && latest.date > dvs.seen[h.sym] && ok(`${h.sym}:dv`)) {
-        const cut = h.qty * latest.amount, name = h.sym.replace('-', '.');
+        const cut = h.qty * latest.amount;
         found.push({ sym: h.sym, name, type: 'dv', p: PRIORITY.dv, impact: cut,
           title: `${name} is paying you a dividend`,
           body: `~${money(cut)} for your ${h.qty % 1 ? h.qty.toFixed(2) : h.qty} shares (${money(latest.amount)}/share) — cash lands in your account within days.` });
       }
       dvs.seen[h.sym] = latest.date;
+      // estimate the next ex-date from the median gap between recent ex-dates (quarterly ≈ 91d)
+      if (list.length >= 2) {
+        const gaps = []; for (let i = 1; i < list.length; i++) gaps.push(list[i].date - list[i - 1].date);
+        gaps.sort((a, b) => a - b); const medGap = gaps[Math.floor(gaps.length / 2)];
+        const nextEx = latest.date + medGap, days = (nextEx - nowSec) / 86400;
+        if (medGap > 20 * 86400 && days > 0 && days <= DIV_LEAD_DAYS && dvs.reminded[h.sym] !== nextEx) {
+          const cut = h.qty * latest.amount;
+          const exStr = new Date(nextEx * 1000).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
+          found.push({ sym: h.sym, name, type: 'divsoon', p: PRIORITY.divsoon, impact: cut,
+            title: `${name} dividend expected ~${exStr}`,
+            body: `Its next payout (~${money(latest.amount)}/share ≈ ${money(cut)} on today's shares) is due around ${exStr}. Own shares before that date to receive this one — a window to add if you were planning to.` });
+          dvs.reminded[h.sym] = nextEx;
+        }
+      }
     }
     dvs.date = et.date;
     await env.KV.put('divs', JSON.stringify(dvs)); // one write per day
@@ -179,7 +198,7 @@ export async function checkAlerts(env, force) {
   if (!found.length) return { skip: 'nothing notable', evaluated };
   found.sort((a, z) => z.p - a.p || z.impact - a.impact);
   const top = found[0];
-  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg', 'tgt', 'pbig'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
+  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg', 'tgt', 'pbig', 'divsoon'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
   const body = top.body + (extras.length ? ` · Also: ${extras.join(', ')}` : '');
   const res = await sendWebPush(env, sub, JSON.stringify({ title: top.title, body, tag: 'alert' }), 'alert');
   if (res.status === 404 || res.status === 410) { await env.KV.delete('sub'); return { error: 'subscription expired — re-enable in the app', status: res.status }; }
