@@ -497,10 +497,7 @@ function askLocal(qRaw){
   if(has('how much do i have','net worth','total value','worth','how much money','my money','balance')){
     return A(`You have <b>${fmt(t.value)}</b> total — ${fmt(mine)} invested across ${rows('all').length} funds${cash>0?` plus ${fmt(cash)} in cash`:''}.`);
   }
-  // buy/sell advice — deflect gently, give data
-  if(has('should i buy','should i sell','should i invest','what should i do','buy more','sell')){
-    return A(`I can't give buy/sell advice — but here's the lens that fits your strategy: you're a long-term index investor who never sells, and history rewards staying invested. Your portfolio is ${fmt(t.value)}, ${dayPct>=0?'up':'down'} today. If you have cash to add, the Target Mix card shows which fund is furthest below target — feeding that keeps you balanced without selling.`);
-  }
+  // buy/sell/what-should-I-do → let the AI reason through it with math + disclaimer (falls through)
   // greeting / help
   if(has('hello','hi ','hey','what can you','help','who are you','what do you')){
     return A(`I'm your portfolio assistant — I answer from your real numbers, all on your phone. Try: <i>“How am I doing this year?”</i>, <i>“What's my best fund?”</i>, <i>“When can I retire?”</i>, <i>“Am I diversified?”</i>, or <i>“How risky am I?”</i>`);
@@ -546,7 +543,8 @@ async function aiSend(){
   aiBusy=true; const tid=aiPush('ai','<span class="askthinking">Thinking…</span>');
   try{
     const r=await askAI(q, askContext());
-    aiReplace(tid, esc(r.answer).replace(/\n/g,'<br>'), r.left!=null?`✨ AI · ${r.left} left today`:'✨ AI');
+    const src=(r.lighter?'✨ AI · lighter model':'✨ AI')+(r.left!=null?` · ${r.left} left today`:'');
+    aiReplace(tid, esc(r.answer).replace(/\n/g,'<br>'), src);
   }catch(e){
     aiReplace(tid, e&&e.message==='limit'?`You've used today's free AI questions — they reset tomorrow. The built-in answers still work any time.`:`Couldn't reach the AI just now — the built-in answers still work offline.`, '');
   }
@@ -561,10 +559,16 @@ function wireAi(){
 }
 /* compact, on-device summary sent to the user's own Cloudflare AI (they opted in) */
 function askContext(){
-  const t=totals('all'), mine=t.value-cashFor('all'), pr=periodReturns(), r=riskStats();
+  const t=totals('all'), mine=t.value-cashFor('all'), pr=periodReturns(), r=riskStats(), real=realReturn();
   const funds=rows('all').map(x=>{ const f=fundReturn(x.sym)||{}; return `${x.sym.replace('-','.')}: ${fmt(x.qty*priceOf(x.sym))} (${f.pct!=null?fmtPct(f.pct):'n/a'} all-time, ${(x.qty*priceOf(x.sym)/Math.max(1,mine)*100).toFixed(0)}% of portfolio)`; }).join('; ');
-  const g=state.goal||{};
-  return `Total ${fmt(t.value)}; invested ${fmt(mine)}; today ${fmtSign(t.day)} (${fmtPct((t.value-t.day)>0?t.day/(t.value-t.day)*100:0)}). Holdings: ${funds}. All-time ${pr.find(x=>x.k==='All')?.p?.toFixed(1)||'?'}%, YTD ${pr.find(x=>x.k==='YTD')?.p?.toFixed(1)||'?'}%. Dividends ~${fmt(annualIncome())}/yr. ${r?`Volatility ${r.vol.toFixed(0)}%, beta ${r.beta.toFixed(2)}, worst drawdown ${r.mdd.toFixed(0)}%, Sharpe ${r.sharpe.toFixed(2)}.`:''} ${g.amt>0?`Goal ${fmt(g.amt)}.`:''}${g.fimo>0?` FI target ${fmt(g.fimo)}/mo.`:''} Long-term index investor who never sells; contributions not assumed in projections.`;
+  const pget=k=>{ const x=pr.find(p=>p.k===k); return x&&x.p!=null?fmtPct(x.p):'n/a'; };
+  const g=state.goal||{}, dayPct=(t.value-t.day)>0?t.day/(t.value-t.day)*100:0;
+  return `Total ${fmt(t.value)} (invested ${fmt(mine)}${cashFor('all')>0?`, cash ${fmt(cashFor('all'))}`:''}). Today ${fmtSign(t.day)} (${fmtPct(dayPct)}). `
+    +`Returns by period (deposit-adjusted market return, not counting new money): 1-week ${pget('1W')}, 1-month ${pget('1M')}, 6-month ${pget('6M')}, YTD ${pget('YTD')}, 1-year ${pget('1Y')}, all-time ${pget('All')}${real?`; all-time after inflation ${fmtPct(real.realTot)}`:''}. `
+    +`Holdings: ${funds}. Dividends ~${fmt(annualIncome())}/yr. `
+    +`${r?`Volatility ${r.vol.toFixed(0)}%/yr, beta ${r.beta.toFixed(2)} vs S&P, worst drawdown ${r.mdd.toFixed(0)}%, Sharpe ${r.sharpe.toFixed(2)}, safe 4%-rule income ${fmt(t.value*0.04/12)}/mo. `:''}`
+    +`${g.amt>0?`Goal ${fmt(g.amt)} (${(t.value/g.amt*100).toFixed(0)}% there). `:''}${g.fimo>0?`Financial-independence target ${fmt(g.fimo)}/mo. `:''}`
+    +`Owner is a long-term index-fund investor; projections never assume future deposits. Today's date ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}.`;
 }
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */

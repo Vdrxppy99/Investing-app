@@ -341,7 +341,7 @@ async function askAI(question, context){
   if(!r.ok) throw new Error('ai');
   const d=await r.json();
   if(!d || !d.answer) throw new Error('ai');
-  return {answer:d.answer, left:d.left};
+  return {answer:d.answer, left:d.left, lighter:d.lighter};
 }
 function pushTest(){
   return pushCall('/test').then(r=>r.json()).then(d=>{

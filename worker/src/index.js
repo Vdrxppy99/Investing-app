@@ -172,21 +172,32 @@ export default {
       const qn = (b && typeof b.question === 'string') ? b.question.trim().slice(0, 500) : '';
       if (!qn) return j({ error: 'no question' }, 400, cors);
       const today = etNow().date, u = await env.KV.get('ai', 'json') || {};
-      const n = u.date === today ? (u.n || 0) : 0, CAP = 25;
+      const n = u.date === today ? (u.n || 0) : 0, CAP = 40;
       if (n >= CAP) return j({ error: 'limit', left: 0 }, 429, cors);
-      const ctx = (b.context && typeof b.context === 'string') ? b.context.slice(0, 2000) : '';
-      const sys = 'You are a concise, friendly assistant inside a personal investing app. Answer ONLY from the portfolio snapshot given. The owner is a long-term index-fund investor who never sells and does not want to be told to buy or sell. Plain language, at most 4 sentences, include the relevant figures from the snapshot, and never invent numbers that are not in it. No tax or legal advice.';
-      let answer = '';
-      try {
-        const out = await env.AI.run('@cf/meta/llama-4-scout-17b-16e-instruct', { max_tokens: 300, messages: [
-          { role: 'system', content: sys },
-          { role: 'user', content: `Portfolio snapshot: ${ctx}\n\nQuestion: ${qn}` }
-        ] });
-        answer = ((out && (out.response || out.result)) || '').toString().trim();
-      } catch (_) { return j({ error: 'ai failed' }, 502, cors); }
-      if (!answer) return j({ error: 'ai empty' }, 502, cors);
+      const ctx = (b.context && typeof b.context === 'string') ? b.context.slice(0, 2500) : '';
+      const sys = "You are a sharp, genuinely helpful investing assistant inside the owner's personal portfolio app — a smart friend who knows their numbers cold. Answer the question DIRECTLY and COMPLETELY. Do real math with their figures: percentages, dollar amounts, and especially compare different time periods when relevant. "
+        + "The owner is a long-term index-fund investor. When they ask whether to buy, sell, add money, or what to do, actually work the question through: weigh the short-term move against the 6-month/1-year/all-time returns, bring in the ideas a long-term investor uses (dollar-cost averaging, buying while lower, time in the market beats timing the market, nobody catches the exact bottom), reason about THEIR situation, and give a clear, useful take — while making clear the final call is theirs. Never refuse or dodge the question. Never promise a guaranteed outcome. "
+        + "You can also answer general investing and personal-finance questions (how dividends work, what an expense ratio is, index funds, compounding, etc.) from your own knowledge, in plain simple language. "
+        + "Write 4-7 sentences, plain and warm. Use the real figures from the snapshot; never invent numbers not in it. Do not add your own disclaimer line — the app adds one automatically. No tax or legal advice.";
+      const messages = [ { role: 'system', content: sys }, { role: 'user', content: `Portfolio snapshot: ${ctx}\n\nQuestion: ${qn}` } ];
+      // Best model first; if it errors (usually the daily free neuron budget) auto-fall back to a lighter one
+      // so answers keep coming instead of hitting a wall. All models are on the free Workers AI allocation.
+      const MODELS = ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-4-scout-17b-16e-instruct'];
+      let answer = '', used = '';
+      for (const m of MODELS) {
+        try {
+          const out = await env.AI.run(m, { max_tokens: 450, messages });
+          answer = ((out && (out.response || out.result)) || '').toString().trim();
+          if (answer) { used = m; break; }
+        } catch (_) { /* budget/model issue — try the lighter model next */ }
+      }
+      if (!answer) return j({ error: 'ai failed' }, 502, cors);
+      // GUARANTEE the disclaimer on any advice-shaped question (never rely on the model to add it)
+      if (/\b(buy|sell|sold|selling|buying|invest|add|adding|contribut|should i|worth it|good time|hold|dump|cash out|move|rebalanc|put in|take out)\b/i.test(qn) && !/not financial advice/i.test(answer)) {
+        answer += "\n\n⚠️ Not financial advice — I'm not a licensed advisor, so do your own research and invest at your own risk.";
+      }
       await env.KV.put('ai', JSON.stringify({ date: today, n: n + 1 }));
-      return j({ answer, left: CAP - n - 1 }, 200, cors);
+      return j({ answer, left: CAP - n - 1, lighter: used !== MODELS[0] }, 200, cors);
     }
     if (path === '/test') {
       let b = null; try { b = await req.json(); } catch (_) { /* empty body = report test */ }
