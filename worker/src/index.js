@@ -126,7 +126,7 @@ const corsFor = req => {
 const j = (obj, status, cors) => new Response(JSON.stringify(obj), { status: status || 200, headers: { 'content-type': 'application/json', ...cors } });
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const cors = corsFor(req);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     const path = new URL(req.url).pathname;
@@ -202,6 +202,35 @@ export default {
     if (path === '/test') {
       let b = null; try { b = await req.json(); } catch (_) { /* empty body = report test */ }
       if (b && b.kind === 'alerts') return j(await checkAlerts(env, true), 200, cors);
+      if (b && b.kind === 'demo') { // one sample of EVERY notification type, so the owner can eyeball them all
+        const sub = await env.KV.get('sub', 'json');
+        if (!sub || !sub.endpoint) return j({ skip: 'no device subscribed yet' }, 200, cors);
+        const SAMPLES = [
+          { title: 'Market open — $28,340.00', body: '+$187.20 (+0.66%) at the bell · VTI +0.8% · VXUS +0.7%', tag: 'demo-open' },
+          { title: 'Market closed — +$243.10 today', body: '$28,395.90 (+0.86%) · VTI +1.0% · BRK.B +0.9%', tag: 'demo-close' },
+          { title: 'Your portfolio is up $487 today', body: 'Now at $28,807.12 (+1.7%) — led by VTI +$240 (+2.1%) and VXUS +$165 (+1.9%).', tag: 'demo-up' },
+          { title: 'Your portfolio is down $512 today', body: 'Now at $27,808.40 (−1.8%) — led by VTI −$255 (−2.2%) and VXUS −$170 (−1.9%).', tag: 'demo-down' },
+          { title: 'VXUS +2.4% today', body: '+$210.50 on your shares', tag: 'demo-mover' },
+          { title: 'VOO just set an all-time high', body: '$701.20 — its highest price ever. Your stake: $2,650.00 (+$38.10 today)', tag: 'demo-ath' },
+          { title: 'VXUS fell to an all-time low', body: '$79.10 — its lowest price on record. Your stake: $8,320.00 (−$95.00 today)', tag: 'demo-atl' },
+          { title: 'VTI is breaking out above its usual range', body: '$382.40, above its typical $353–$378 band — strong momentum. +$180.00 on your shares today', tag: 'demo-hi' },
+          { title: 'VYM slipped below its usual range', body: '$150.90, below its typical $154–$162 band — unusual weakness. −$35.00 on your shares today', tag: 'demo-lo' },
+          { title: 'VYM is paying you a dividend', body: '~$14.20 for your 3.18 shares ($0.85/share) — cash lands in your account within days.', tag: 'demo-div' },
+          { title: 'You just crossed $30,000', body: 'Your portfolio reached $30,012.45 today — $9,300 of that is growth your money made on its own.', tag: 'demo-milestone' },
+          { title: "You're 75% of the way to your goal", body: '$28,500 of your $38,000 target — steady progress.', tag: 'demo-goal' },
+          { title: 'VOO just hit your $700 alert', body: 'Trading at $701.20 — the level you asked to hear about. Your stake: $2,650.00 (+$38.10 today).', tag: 'demo-target' },
+          { title: 'Your June in review', body: '+$1,240.00 (+4.6%) for the month — you ended June at $27,900. Open the app for the full story.', tag: 'demo-monthly' }
+        ];
+        // fire in the background with a gap so iOS shows them separately instead of coalescing
+        ctx.waitUntil((async () => {
+          for (const s of SAMPLES) {
+            const res = await sendWebPush(env, sub, JSON.stringify({ title: s.title, body: s.body, tag: s.tag }), s.tag);
+            if (res.status === 404 || res.status === 410) { await env.KV.delete('sub'); break; }
+            await new Promise(r => setTimeout(r, 900));
+          }
+        })());
+        return j({ demo: true, sending: SAMPLES.length }, 200, cors);
+      }
       return j(await sendReport(env, 'close', true), 200, cors);
     }
     return j({ error: 'not found' }, 404, cors);

@@ -12,10 +12,11 @@ import { fetchQuote } from './quotes.js';
 import { sendWebPush } from './webpush.js';
 import { etNow, tradingDay, money, signed } from './shared.js';
 
-const MOVE_PCT = 2;                                    // day move that counts as "big"
+const MOVE_PCT = 2;                                    // single-holding day move that counts as "big"
+const PORT_MOVE = 450;                                 // whole-portfolio day $ swing that earns a heads-up (~1.6% at $28k — a genuinely big day, not a normal ~$280 wiggle)
 const SD_MULT = 2;                                     // band width = mean ± 2σ
-const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1, tgt: 1 }; // days before the same alert may repeat
-const PRIORITY = { 'm$': 7, mg: 6, tgt: 6, atl: 5, ath: 4, dv: 4, lo: 3, hi: 2, mv: 1 }; // milestones/your-own-targets top, then lows, dividends/highs, bands, movers
+const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1, tgt: 1, pbig: 1 }; // days before the same alert may repeat
+const PRIORITY = { 'm$': 8, mg: 7, tgt: 7, pbig: 6, atl: 5, ath: 4, dv: 4, lo: 3, hi: 2, mv: 1 }; // milestones/targets top, then big portfolio day, lows, dividends/highs, bands, movers
 const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', 'Accept': 'application/json' };
 const money0 = v => '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
 
@@ -77,16 +78,17 @@ export async function checkAlerts(env, force) {
   const sent = await env.KV.get('alerts', 'json') || {};   // {"VOO:ath":"2026-07-20", ...}
   const ok = key => force || !sent[key] || daysApart(et.date, sent[key]) >= COOLDOWN[key.split(':')[1]];
 
-  const found = [], evaluated = [];
-  let total = +snap.cash || 0, priced = 0;
+  const found = [], evaluated = [], contribs = [];
+  let total = +snap.cash || 0, priced = 0, portDay = 0;
   for (const h of snap.holdings) {
     const q = await fetchQuote(h.sym);
     if (!q || !(q.price > 0) || !(q.prev > 0)) continue;
-    total += h.qty * q.price; priced++;
+    total += h.qty * q.price; priced++; portDay += h.qty * (q.price - q.prev);
     const name = h.sym.replace('-', '.');
     const dayUsd = h.qty * (q.price - q.prev);
     const stake = h.qty * q.price;
     const pct = (q.price / q.prev - 1) * 100;
+    contribs.push({ name, usd: dayUsd, pct }); // for the "led by …" attribution on a big portfolio day
     const b = bands && bands.data[h.sym];
     evaluated.push({ sym: name, price: q.price, band: b ? [+b.lo.toFixed(2), +b.hi.toFixed(2)] : null, ath: b && b.ath, atl: b && b.atl });
     const add = (type, title, body) => { if (ok(`${h.sym}:${type}`)) found.push({ sym: h.sym, name, type, title, body, p: PRIORITY[type], impact: Math.abs(dayUsd) }); };
@@ -111,6 +113,18 @@ export async function checkAlerts(env, force) {
         body: `Trading at ${money(q.price)} — the level you asked to hear about. Your stake: ${money(stake)} (${signed(dayUsd)} today).` });
     }
     if (b && q.price > b.ath) { b.ath = q.price; bands.dirty = true; }  // ratchet so tomorrow compares against today
+  }
+
+  /* ---- big portfolio day: whole-portfolio swings ±$PORT_MOVE → one heads-up, attributed to
+     the funds that actually moved the needle (biggest $ contribution, like the Top Movers view) ---- */
+  if (priced === snap.holdings.length && Math.abs(portDay) >= PORT_MOVE && ok('PORT:pbig')) {
+    const prev = total - portDay, pct = prev > 0 ? portDay / prev * 100 : 0, up = portDay >= 0;
+    const s0 = v => (v >= 0 ? '+' : '−') + money0(v);
+    const drivers = contribs.filter(c => up ? c.usd > 0 : c.usd < 0).sort((a, b) => Math.abs(b.usd) - Math.abs(a.usd)).slice(0, 2);
+    const led = drivers.length ? ` — led by ${drivers.map(c => `${c.name} ${s0(c.usd)} (${(c.pct >= 0 ? '+' : '') + c.pct.toFixed(1)}%)`).join(' and ')}` : '';
+    found.push({ sym: 'PORT', name: 'PORT', type: 'pbig', p: PRIORITY.pbig, impact: Math.abs(portDay),
+      title: `Your portfolio is ${up ? 'up' : 'down'} ${money0(Math.abs(portDay))} today`,
+      body: `Now at ${money(total)} (${(pct >= 0 ? '+' : '') + pct.toFixed(1)}%)${led}.` });
   }
 
   /* ---- milestones: first time the portfolio crosses a $5k line, or a goal-progress line.
@@ -165,7 +179,7 @@ export async function checkAlerts(env, force) {
   if (!found.length) return { skip: 'nothing notable', evaluated };
   found.sort((a, z) => z.p - a.p || z.impact - a.impact);
   const top = found[0];
-  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg', 'tgt'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
+  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg', 'tgt', 'pbig'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
   const body = top.body + (extras.length ? ` · Also: ${extras.join(', ')}` : '');
   const res = await sendWebPush(env, sub, JSON.stringify({ title: top.title, body, tag: 'alert' }), 'alert');
   if (res.status === 404 || res.status === 410) { await env.KV.delete('sub'); return { error: 'subscription expired — re-enable in the app', status: res.status }; }
