@@ -778,12 +778,18 @@ function openEdit(){
     <div class="ebtns"><button class="btn sec" id="exportBtn">⬇ Export backup</button><button class="btn sec" id="importBtn">⬆ Import backup</button><button class="btn sec" id="csvBtn">⬇ CSV</button><button class="btn warn" id="resetSeed">Erase all holdings</button></div>
     <div class="ebtns"><button class="btn sec" id="shareBtn">📤 Share performance card</button><button class="btn sec" id="speakBtn">🗣️ Speak my briefing</button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">The share card shows percentages only — never your dollar amounts. Tip: a Siri Shortcut that opens the app with <b>?brief=1</b> makes it speak on command.</div>
+    ${window.DEMO_MODE ? `
+    <div style="font-size:12.5px;font-weight:700;margin-top:18px">Example portfolio</div>
+    <div class="ebtns"><button class="btn pri" id="exitDemoBtn">← Exit the demo</button></div>
+    <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">You're exploring a fictional example portfolio. Nothing here is saved and it can't see, read, or touch any real account. Exit to return to the lock screen.</div>
+    ` : `
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Security</div>
     <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button><button class="btn sec" id="cloudTgl"></button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it. Cloud backup keeps an encrypted copy on your own server — unreadable without your passcode, so a lost phone loses nothing.</div>
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Daily reports</div>
     <div class="ebtns"><button class="btn sec" id="pushTgl"></button><button class="btn sec" id="pushTest" style="display:none">Send test now</button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Lock-screen notification at US market open (~15:35) and close (~22:15) with your day's dollars and biggest movers — even while the app is closed. Notifications are end-to-end encrypted.</div>
+    `}
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">`;
   showOverlay('editModal');
   $('editX').onclick=$('cancelEdit').onclick=()=>hideOverlay('editModal');
@@ -803,6 +809,7 @@ function openEdit(){
   $('shareBtn').onclick=sharePerfCard;
   $('speakBtn').onclick=speakBriefing;
   $('importBtn').onclick=()=>$('importFile').click();
+  if(window.DEMO_MODE){ $('exitDemoBtn').onclick=window.exitDemo; } else { // security + reports touch the real vault/Worker — real mode only
   $('lockNow').onclick=()=>vaultLock();
   const ft=$('faceTgl');
   const paintFt=()=>{ ft.textContent = vaultFaceEnabled() ? 'Disable Face ID' : 'Enable Face ID'; };
@@ -858,6 +865,7 @@ function openEdit(){
     if(!(lsGet('pt_push')||{}).on){ toast('Turn on Daily reports first, then tap Send test.', true); return; }
     $('pushTest').disabled=true; pushTest().finally(()=>{ $('pushTest').disabled=false; });
   };
+  } // end real-mode-only security/reports wiring
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
   $('editSheet').querySelectorAll('.del').forEach(b=> b.onclick=()=>{ readEditInputs(); state.holdings.splice(+b.dataset.i,1); openEdit(); });
   $('addRow').onclick=()=>{ readEditInputs(); state.holdings.push({acc:'brok',sym:'',qty:0,cost:0}); openEdit(); };

@@ -274,6 +274,7 @@ async function swReady(ms){
   throw new Error('the app is still finishing its update — fully close it, reopen, wait ~15 seconds, then tap again');
 }
 async function pushEnable(){
+  if(window.DEMO_MODE){ toast('Notifications aren’t part of the example portfolio.', true); return false; }
   if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
     alert('This browser can’t do notifications. Open My Portfolio from your Home Screen icon (needs iOS 16.4+).'); return false;
   }

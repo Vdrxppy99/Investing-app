@@ -9,10 +9,14 @@ const mem = {};
 let quotesRev=0, qDirty=false; // bumped by setQuote only when a price actually changed
 window.storageFull=false;
 function lsGet(k){
+  // DEMO MODE: a pure in-memory sandbox — never read the device, the real vault, or localStorage
+  if(window.DEMO_MODE){ const v=window.DEMO_STORE?window.DEMO_STORE[k]:undefined; return v===undefined?null:v; }
   if(PRIVATE_KEYS.has(k)){ const v=window.VAULT_DATA?window.VAULT_DATA[k]:undefined; return v===undefined?null:v; }
   try{ const v=localStorage.getItem(k); return v?JSON.parse(v):mem[k]||null; }catch(e){ return mem[k]||null; }
 }
 function lsSet(k,v){
+  // DEMO MODE: writes stay in memory and vanish on reload — nothing touches disk, vault, or Worker
+  if(window.DEMO_MODE){ if(window.DEMO_STORE) window.DEMO_STORE[k]=v; return; }
   if(PRIVATE_KEYS.has(k)){ if(window.VAULT_DATA){ window.VAULT_DATA[k]=v; if(window.vaultPersist) vaultPersist(); } return; }
   mem[k]=v;
   try{ localStorage.setItem(k,JSON.stringify(v)); window.storageFull=false; }

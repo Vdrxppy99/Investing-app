@@ -16,8 +16,12 @@ const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 /* ⚠ MUST stay identical to PRIVATE_KEYS in js/core.js (this file loads alone, pre-unlock,
    so it cannot share core's copy). Adding a key? Change BOTH lists + exportBackup(). */
 const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push','pt_bk','pt_alerts'];
-const APP_SCRIPTS=['js/boot.js','js/seed.js','js/core.js','js/portfolio.js','js/api.js',
+const APP_SCRIPTS=['js/boot.js','js/seed.js','js/demo.js','js/core.js','js/portfolio.js','js/api.js',
                    'js/explore.js','js/insights.js','js/sheets.js','js/app.js'];
+/* PUBLIC demo passcode — not secret, lives in source. It opens a fictional example portfolio
+   (js/demo.js) and can NEVER read or touch the real encrypted vault. Real passcodes are ≥6
+   chars, so this can never collide with a real one. */
+const DEMO_PASS='demo';
 let MK=null; // master key — memory only, gone when the page closes
 window.VAULT_DATA=null;
 const $id=i=>document.getElementById(i);
@@ -94,6 +98,7 @@ async function unlockWithPass(pass){
 
 /* ---------- Face ID (WebAuthn passkey + PRF extension) ---------- */
 async function enrollFace(){
+  if(window.DEMO_MODE) throw new Error('demo');
   const prfSalt=crypto.getRandomValues(new Uint8Array(32));
   const cred=await navigator.credentials.create({publicKey:{
     rp:{id:location.hostname,name:'My Portfolio'},
@@ -136,7 +141,6 @@ async function unlockWithFace(){
 window.vaultLock=()=>location.reload(); // MK lives only in memory — reload = locked
 window.vaultFaceEnabled=()=>!!LS.getItem('pt_v_prf');
 window.vaultEnableFace=enrollFace;
-window.vaultDisableFace=()=>LS.removeItem('pt_v_prf');
 window.vaultFaceAvailable=async()=>{
   try{
     if(!window.PublicKeyCredential) return false;
@@ -146,6 +150,7 @@ window.vaultFaceAvailable=async()=>{
   }catch(e){ return false; }
 };
 window.vaultChangePass=async(oldp,newp)=>{
+  if(window.DEMO_MODE) throw new Error('demo'); // never let the example portfolio touch the real vault
   const o=JSON.parse(LS.getItem('pt_v_pass'));
   const kek=await kekFromPass(oldp,ub64(o.salt));
   await unwrapMK(kek,o); // verify the old passcode
@@ -171,6 +176,7 @@ async function cloudKeyOf(km,salt){
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:CLOUD_ITER,hash:'SHA-256'},km,{name:'AES-GCM',length:256},true,['encrypt','decrypt']);
 }
 window.vaultCloudKeys=async(pass)=>{
+  if(window.DEMO_MODE) throw new Error('demo');
   const o=JSON.parse(LS.getItem('pt_v_pass'));
   await unwrapMK(await kekFromPass(pass,ub64(o.salt)), o); // throws if the passcode is wrong
   const km=await cloudKm(pass);
@@ -199,9 +205,22 @@ async function cloudRestore(pass){
   return d.holdings.length;
 }
 window.vaultWipe=()=>{
+  if(window.DEMO_MODE){ location.reload(); return; } // demo can't erase the real device
   ['pt_vault_data','pt_v_pass','pt_v_prf',...PRIVATE_KEYS].forEach(k=>LS.removeItem(k));
   location.reload();
 };
+window.vaultDisableFace=()=>{ if(window.DEMO_MODE) return; LS.removeItem('pt_v_prf'); };
+
+/* ---------- demo / example mode ---------- */
+// Enter the fictional example portfolio. Sets a flag the app's storage layer honours (core.js
+// lsGet/lsSet route to an in-memory DEMO_STORE), never derives a master key, and never reads
+// the real ciphertext. seed.js→demo.js build DEMO_STORE during startApp() before core.js inits.
+function enterDemo(){
+  window.DEMO_MODE=true;
+  document.body.classList.add('demo');
+  startApp();
+}
+window.exitDemo=()=>location.reload(); // DEMO_MODE isn't persisted → reload returns to the lock screen
 
 /* ---------- lock screen UI ---------- */
 function err(m){ $id('lockErr').textContent=m||''; }
@@ -229,6 +248,7 @@ function boot(){
     $id('lockSub').textContent='This page needs HTTPS to unlock your encrypted data.';
     return;
   }
+  const dl=$id('demoLink'); if(dl) dl.onclick=e=>{ e.preventDefault(); enterDemo(); }; // "View the example portfolio"
   const hasVault=!!LS.getItem('pt_v_pass');
   if(!hasVault){
     $id('lockSetup').style.display='';
@@ -246,6 +266,7 @@ function boot(){
     };
     $id('setupBtn').onclick=async()=>{
       const a=$id('setPass1').value, b=$id('setPass2').value;
+      if(a===DEMO_PASS){ enterDemo(); return; } // demo passcode works on a fresh device too — no vault created
       if(a.length<6){ err('Use at least 6 characters.'); return; }
       if(a!==b){ err('Passcodes don’t match.'); return; }
       err(''); $id('setupBtn').textContent='Encrypting…'; $id('setupBtn').disabled=true;
@@ -256,6 +277,7 @@ function boot(){
     $id('lockEnter').style.display='';
     $id('lockSub').textContent='Enter your passcode';
     const tryUnlock=async()=>{
+      if($id('unlockPass').value===DEMO_PASS){ enterDemo(); return; } // demo passcode → example portfolio, real vault untouched
       err(''); $id('unlockBtn').textContent='Unlocking…';
       try{ await unlockWithPass($id('unlockPass').value); startApp(); }
       catch(e){ err('Wrong passcode.'); $id('unlockBtn').textContent='Unlock'; $id('unlockPass').value=''; $id('unlockPass').focus(); }
