@@ -255,6 +255,16 @@ function pushSyncSoon(){
   clearTimeout(pushSyncT);
   pushSyncT=setTimeout(()=>{ pushSyncLast=Date.now(); pushCall('/snapshot', pushSnapshot()).catch(()=>{}); }, 8000);
 }
+/* Resolve the ACTIVE service-worker registration without hanging. Right after a version
+   update the SW is still installing/activating, so navigator.serviceWorker.ready can be
+   slow — wait patiently, then fall back to whatever registration is already active. */
+async function swReady(ms){
+  const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r=>setTimeout(()=>r(null), ms||12000))]);
+  if(reg && reg.active) return reg;
+  const got = await navigator.serviceWorker.getRegistration();
+  if(got && got.active) return got;
+  throw new Error('the app is still finishing its update — fully close it, reopen, wait ~10 seconds, then tap again');
+}
 async function pushEnable(){
   if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
     alert('This browser can’t do notifications. Open My Portfolio from your Home Screen icon (needs iOS 16.4+).'); return false;
@@ -273,7 +283,7 @@ async function pushEnable(){
   }
   if(perm!=='granted'){ toast('Tap “Turn on reports” again and choose Allow.', true); return false; }
   try{
-    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_,rej)=>setTimeout(()=>rej(new Error('service worker not ready — fully close and reopen the app')),4000))]);
+    const reg = await swReady(12000);
     let sub = await reg.pushManager.getSubscription();
     if(!sub) sub = await reg.pushManager.subscribe({userVisibleOnly:true,
       applicationServerKey:Uint8Array.from(atob(PUSH_VAPID.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0))});
@@ -287,7 +297,7 @@ async function pushEnable(){
   }catch(e){ alert('Couldn’t finish turning on reports.\n\nReason: '+((e&&e.message)||e)+'\n\n(Screenshot this and send it to me.)'); return false; }
 }
 async function pushDisable(){
-  try{ const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}
+  try{ const reg=await swReady(4000); const sub=await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}
   try{ await pushCall('/unsubscribe'); }catch(e){}
   const p=lsGet('pt_push')||{}; p.on=false; lsSet('pt_push', p); // off is set even if the network calls failed
   toast('Daily reports off.');
@@ -302,7 +312,7 @@ async function pushReconcile(){
   if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){ p.on=false; lsSet('pt_push',p); return; }
   try{
     if(Notification.permission!=='granted'){ p.on=false; lsSet('pt_push',p); return; } // permission lost on reinstall → honest off
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await swReady(9000);
     let sub=await reg.pushManager.getSubscription();
     if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,
       applicationServerKey:Uint8Array.from(atob(PUSH_VAPID.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0))});
@@ -325,7 +335,7 @@ async function pushVerify(){
     // no OS permission → reports are definitely off (the common reinstall case); correct instantly, no SW wait
     if(Notification.permission!=='granted'){ if(p.on){ p.on=false; lsSet('pt_push',p); paintPushIfOpen(); } return; }
     // permission granted → confirm a live subscription exists, but never hang on serviceWorker.ready
-    const reg=await Promise.race([navigator.serviceWorker.ready, new Promise((_,rej)=>setTimeout(()=>rej(new Error('sw-timeout')),2500))]);
+    const reg=await swReady(6000);
     const sub=await reg.pushManager.getSubscription();
     const reallyOn=!!(sub && p.token);
     if(!!p.on !== reallyOn){ p.on=reallyOn; lsSet('pt_push', p); paintPushIfOpen(); }
