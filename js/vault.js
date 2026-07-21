@@ -17,7 +17,7 @@ const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
    so it cannot share core's copy). Adding a key? Change BOTH lists + exportBackup(). */
 const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push','pt_bk','pt_alerts'];
 const APP_SCRIPTS=['js/boot.js','js/seed.js','js/core.js','js/portfolio.js','js/api.js',
-                   'js/explore.js','js/insights.js','js/sheets.js','js/news.js','js/app.js'];
+                   'js/explore.js','js/insights.js','js/sheets.js','js/app.js'];
 let MK=null; // master key — memory only, gone when the page closes
 window.VAULT_DATA=null;
 const $id=i=>document.getElementById(i);

@@ -701,7 +701,7 @@ function openDetail(sym){
       return `<div style="font-size:13px;font-weight:700;margin-top:16px">Price alert</div>
         <div class="krow"><span class="k">${al?`Push me at ${fmtPx(al.at)} (${al.dir==='up'?'on the way up':'on the way down'})`:'Get a push when it hits a price you pick'}</span>
         <span><button class="btn sec" id="alertBtn" style="padding:6px 12px;font-size:12px">${al?'Remove':'🔔 Set'}</button></span></div>`;
-    })()}<div id="sheetNews" data-sym="${esc(sym)}"></div>`;
+    })()}`;
   showOverlay('detail');
   $('detailX').onclick = closeDetail;
   $('detailX').focus({preventScroll:true});
@@ -719,7 +719,6 @@ function openDetail(sym){
     if(typeof pushSyncNow==='function') pushSyncNow();
     openDetail(sym);
   };
-  loadSheetNews(sym);
   if(detailChart){ detailChart.destroy(); detailChart=null; }
   const h=state.history[sym];
   const ih=state.intraday[sym];

@@ -257,27 +257,34 @@ function pushSyncSoon(){
 }
 async function pushEnable(){
   if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
-    toast('This browser can’t do push — use the installed app.', true); return false;
+    alert('This browser can’t do notifications. Open My Portfolio from your Home Screen icon (needs iOS 16.4+).'); return false;
   }
-  // iOS only grants web push to Home-Screen apps — a Safari tab would fail with a confusing error
+  // iOS only grants web push to Home-Screen apps — a Safari tab silently does nothing
   const standalone = navigator.standalone===true || matchMedia('(display-mode: standalone)').matches;
   if(!standalone && /iPhone|iPad/.test(navigator.userAgent)){
-    toast('Open the app from your Home Screen icon to turn on reports.', true); return false;
+    alert('Open My Portfolio from your Home Screen icon — not Safari — then turn on reports. (iOS only allows notifications for the installed app.)'); return false;
   }
-  const perm = await Notification.requestPermission(); // first await — must stay inside the tap gesture
-  if(perm!=='granted'){ toast('Notifications are blocked — allow them in iOS Settings → Notifications → My Portfolio.', true); return false; }
+  // check the current state first; iOS only shows a prompt from 'default' — from 'denied' it silently returns denied
+  let perm = Notification.permission;
+  if(perm==='default'){ try{ perm = await Notification.requestPermission(); }catch(e){} }
+  if(perm==='denied'){
+    alert('iOS is blocking notifications for this app, so it can’t ask again.\n\nFix it here:\niPhone Settings → Notifications → My Portfolio → turn ON “Allow Notifications”.\n(If it’s not listed there, look under Settings → Apps → My Portfolio → Notifications.)\n\nThen come back and tap “Turn on reports” again.');
+    return false;
+  }
+  if(perm!=='granted'){ toast('Tap “Turn on reports” again and choose Allow.', true); return false; }
   try{
-    const reg = await navigator.serviceWorker.ready;
+    const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_,rej)=>setTimeout(()=>rej(new Error('service worker not ready — fully close and reopen the app')),4000))]);
     let sub = await reg.pushManager.getSubscription();
     if(!sub) sub = await reg.pushManager.subscribe({userVisibleOnly:true,
       applicationServerKey:Uint8Array.from(atob(PUSH_VAPID.replace(/-/g,'+').replace(/_/g,'/')), c=>c.charCodeAt(0))});
     const p = ensurePushToken(); // token first — pushCall reads it
     const r = await pushCall('/subscribe', {sub:sub.toJSON(), snapshot:pushSnapshot()});
-    if(!r.ok) throw new Error('server '+r.status);
+    if(!r.ok) throw new Error('server said '+r.status+(r.status===403?' (token mismatch — tap “Turn off reports” once, then on again)':''));
     p.on=true; lsSet('pt_push', p); pushSyncLast=Date.now();
-    toast('Daily reports on — market open & close, right on your lock screen.');
+    toast('Daily reports on — sending you a test now…');
+    setTimeout(()=>{ pushTest(); }, 1200); // auto-fire a test so you immediately see it working
     return true;
-  }catch(e){ toast('Couldn’t reach the report server — check your connection and try again.', true); return false; }
+  }catch(e){ alert('Couldn’t finish turning on reports.\n\nReason: '+((e&&e.message)||e)+'\n\n(Screenshot this and send it to me.)'); return false; }
 }
 async function pushDisable(){
   try{ const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}

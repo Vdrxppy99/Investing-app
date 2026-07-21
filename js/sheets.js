@@ -1,26 +1,6 @@
 'use strict';
 /* ============ TAP-THROUGH SHEETS ============ */
 const stockCache={};
-/* per-symbol news inside any holding/stock sheet */
-const sheetNewsCache={};
-async function loadSheetNews(sym){
-  const box=$('sheetNews'); if(!box || box.dataset.sym!==sym) return;
-  const cached=sheetNewsCache[sym];
-  if(cached && Date.now()-cached.ts<20*60000){ paintSheetNews(sym, cached.list); return; }
-  box.innerHTML='<div class="mload" style="padding:14px 0 4px">Loading news…</div>';
-  const got=await fetchNewsQ(sym, sym); // junk/PR filtering happens inside
-  sheetNewsCache[sym]={list:got.slice(0,4), ts:Date.now()};
-  paintSheetNews(sym, sheetNewsCache[sym].list);
-}
-function paintSheetNews(sym, list){
-  const box=$('sheetNews'); if(!box || box.dataset.sym!==sym) return; // sheet closed or another symbol opened
-  box.innerHTML = list.length
-    ? `<div style="font-size:13px;font-weight:700;margin-top:18px">Latest news</div>`+list.map(i=>
-        `<a class="snrow" href="${esc(i.link)}" target="_blank" rel="noopener">
-          <div class="sntitle">${esc(i.title)}</div>
-          <div class="nmeta">${esc(i.pub)} · ${agoStr(i.t)}</div></a>`).join('')
-    : '';
-}
 const EXPLAIN = {
   'Total profit':['Total profit','Your total gain since you started — current value minus everything you\'ve deposited. This includes both price gains and dividends you\'ve received.'],
   'Deposited':['Total deposited','Every dollar you\'ve added across both accounts, taken from Vanguard\'s performance page. It\'s the baseline your total profit is measured against.'],
@@ -87,12 +67,10 @@ async function openStockSheet(sym, name){
     </div><div style="display:flex;gap:8px;align-items:flex-start"><button class="xbtn" id="watchBtn" style="font-size:17px"></button><button class="xbtn" id="detailX">✕</button></div></div>
     <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px">Loading chart…</div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
-    <div class="stats" id="ssStats"></div>
-    <div id="sheetNews" data-sym="${esc(sym)}"></div>`;
+    <div class="stats" id="ssStats"></div>`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
-  if(!sym.startsWith('^')) loadSheetNews(sym);
   const inWatch=()=>(state.watch||[]).some(w=>w.sym===sym);
   const paintWatch=()=>{ const b=$('watchBtn'); if(!b) return;
     b.textContent=inWatch()?'★':'☆';
