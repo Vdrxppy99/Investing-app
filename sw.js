@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v3.1.6'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v3.1.7'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
@@ -13,10 +13,16 @@ const CORE = ['./', './index.html', './manifest.webmanifest',
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  // cache:'reload' bypasses the HTTP cache so a new SW version always ships
-  // exactly what the server has — never a heuristically-"fresh" stale file
+  // cache:'reload' bypasses the HTTP cache so a new SW version always ships exactly what the
+  // server has. Each fetch has an 8s abort so a slow/blocked CDN can NEVER stall activation —
+  // a hung install used to leave the worker stuck "installing" forever, breaking push.
   e.waitUntil(caches.open(V).then(c =>
-    Promise.all(CORE.map(u => fetch(u, {cache:'reload'}).then(r => { if(r.ok) return c.put(u, r); }).catch(() => {})))
+    Promise.all(CORE.map(u => {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 8000);
+      return fetch(u, {cache:'reload', signal:ctl.signal})
+        .then(r => { clearTimeout(t); if(r.ok) return c.put(u, r); })
+        .catch(() => { clearTimeout(t); }); // best-effort: a missed file just isn't pre-cached
+    }))
   ));
 });
 self.addEventListener('activate', e => {

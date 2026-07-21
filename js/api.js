@@ -255,15 +255,23 @@ function pushSyncSoon(){
   clearTimeout(pushSyncT);
   pushSyncT=setTimeout(()=>{ pushSyncLast=Date.now(); pushCall('/snapshot', pushSnapshot()).catch(()=>{}); }, 8000);
 }
-/* Resolve the ACTIVE service-worker registration without hanging. Right after a version
-   update the SW is still installing/activating, so navigator.serviceWorker.ready can be
-   slow — wait patiently, then fall back to whatever registration is already active. */
+/* Get a service-worker registration with an ACTIVE worker — the one thing pushManager needs.
+   Don't rely on navigator.serviceWorker.ready (waits for page CONTROL, flaky in iOS PWAs and
+   never resolves if control never happens). Instead: register (idempotent), then poll the
+   registration's own state until .active appears, driving activation forward ourselves. */
 async function swReady(ms){
-  const reg = await Promise.race([navigator.serviceWorker.ready, new Promise(r=>setTimeout(()=>r(null), ms||12000))]);
-  if(reg && reg.active) return reg;
-  const got = await navigator.serviceWorker.getRegistration();
-  if(got && got.active) return got;
-  throw new Error('the app is still finishing its update — fully close it, reopen, wait ~10 seconds, then tap again');
+  let reg = await navigator.serviceWorker.getRegistration();
+  if(!reg){ try{ reg = await navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}); }catch(e){ throw new Error('couldn’t start the app’s background engine — reopen the app and try again'); } }
+  if(reg.active) return reg;
+  const w = reg.installing || reg.waiting; if(w && typeof w.postMessage==='function'){ /* nudge */ }
+  await new Promise(res=>{
+    let done=false; const finish=()=>{ if(done) return; done=true; clearInterval(iv); clearTimeout(to); res(); };
+    const iv=setInterval(()=>{ if(reg.active) finish(); }, 250);
+    const to=setTimeout(finish, ms||15000);
+    if(w) w.addEventListener('statechange', ()=>{ if(reg.active) finish(); });
+  });
+  if(reg.active) return reg;
+  throw new Error('the app is still finishing its update — fully close it, reopen, wait ~15 seconds, then tap again');
 }
 async function pushEnable(){
   if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
