@@ -343,13 +343,21 @@ function installRelock(){
 }
 
 function boot(){
+  // The example portfolio needs no crypto at all — it never derives a key and
+  // never reads the real ciphertext — so it must be wired BEFORE the secure
+  // context check. Previously this whole function returned early on an insecure
+  // origin, which left every button on the lock screen inert with no
+  // explanation: opening the app over plain HTTP on a phone (a LAN address, so
+  // not a secure context, unlike 127.0.0.1) produced a screen where nothing
+  // responded to a tap.
+  $id('demoLink').onclick = e => { e.preventDefault(); enterDemo(); };
+
   if(!window.crypto||!crypto.subtle){
-    $id('lockSub').textContent='This page needs HTTPS to unlock your encrypted data.';
+    showStep(null, 'Unlocking needs a secure connection');
+    err('Your encrypted data can only be unlocked over HTTPS. The example portfolio below works anywhere.');
     return;
   }
   installRelock();
-
-  $id('demoLink').onclick = e => { e.preventDefault(); enterDemo(); };
 
   const hasVault = !!LS.getItem('pt_v_pass');
 
