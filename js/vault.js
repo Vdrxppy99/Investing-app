@@ -355,6 +355,10 @@ function boot(){
   if(!window.crypto||!crypto.subtle){
     showStep(null, 'Unlocking needs a secure connection');
     err('Your encrypted data can only be unlocked over HTTPS. The example portfolio below works anywhere.');
+    // Restore genuinely cannot run without crypto.subtle — but a control that
+    // does nothing at all is the bug that got reported, so it explains itself.
+    $id('cloudRestoreLink').onclick = () =>
+      err('Restoring needs HTTPS too, because the backup is decrypted on this device. Open the app from its normal address.');
     return;
   }
   installRelock();
