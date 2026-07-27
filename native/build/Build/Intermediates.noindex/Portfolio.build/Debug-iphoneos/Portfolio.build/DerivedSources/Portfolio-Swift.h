@@ -346,6 +346,8 @@ extern "C" {
 #if __has_warning("-Watimport-in-framework-header")
 #pragma clang diagnostic ignored "-Watimport-in-framework-header"
 #endif
+@import ObjectiveC;
+@import WebKit;
 #endif
 
 #endif // defined(__OBJC__)
@@ -367,6 +369,30 @@ extern "C" {
 #endif
 
 #if defined(__OBJC__)
+
+@class UIRefreshControl;
+@class WKWebView;
+@class WKNavigation;
+@class WKNavigationAction;
+SWIFT_CLASS("_TtCV9Portfolio9WebScreen11Coordinator")
+@interface Coordinator : NSObject <WKNavigationDelegate>
+- (void)reload:(UIRefreshControl * _Nonnull)sender;
+- (void)webView:(WKWebView * _Nonnull)webView didFinishNavigation:(WKNavigation * _Null_unspecified)navigation;
+- (void)webView:(WKWebView * _Nonnull)webView didFailNavigation:(WKNavigation * _Null_unspecified)navigation withError:(NSError * _Nonnull)error;
+- (void)webView:(WKWebView * _Nonnull)webView didFailProvisionalNavigation:(WKNavigation * _Null_unspecified)navigation withError:(NSError * _Nonnull)error;
+/// Keep the app itself on the dashboard; anything external opens in Safari
+/// rather than trapping the user in a webview with no chrome to escape it.
+- (void)webView:(WKWebView * _Nonnull)webView decidePolicyForNavigationAction:(WKNavigationAction * _Nonnull)navigationAction decisionHandler:(void (^ _Nonnull)(WKNavigationActionPolicy))decisionHandler;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+@class NSString;
+@class WKFrameInfo;
+@interface Coordinator (SWIFT_EXTENSION(Portfolio)) <WKUIDelegate>
+- (void)webView:(WKWebView * _Nonnull)webView runJavaScriptAlertPanelWithMessage:(NSString * _Nonnull)message initiatedByFrame:(WKFrameInfo * _Nonnull)frame completionHandler:(void (^ _Nonnull)(void))completionHandler;
+- (void)webView:(WKWebView * _Nonnull)webView runJavaScriptConfirmPanelWithMessage:(NSString * _Nonnull)message initiatedByFrame:(WKFrameInfo * _Nonnull)frame completionHandler:(void (^ _Nonnull)(BOOL))completionHandler;
+- (void)webView:(WKWebView * _Nonnull)webView runJavaScriptTextInputPanelWithPrompt:(NSString * _Nonnull)prompt defaultText:(NSString * _Nullable)defaultText initiatedByFrame:(WKFrameInfo * _Nonnull)frame completionHandler:(void (^ _Nonnull)(NSString * _Nullable))completionHandler;
+@end
 
 #endif // defined(__OBJC__)
 #if __has_attribute(external_source_symbol)

@@ -14,6 +14,8 @@ struct WebScreen: UIViewRepresentable {
 
         let web = WKWebView(frame: .zero, configuration: config)
         web.navigationDelegate = context.coordinator
+        // Without this, alert/confirm/prompt are silent no-ops — see Dialogs.swift.
+        web.uiDelegate = context.coordinator
         web.isOpaque = false
         web.backgroundColor = .clear
         web.scrollView.backgroundColor = .clear

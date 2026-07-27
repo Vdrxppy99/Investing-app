@@ -6,6 +6,48 @@
 	<integer>12</integer>
 	<key>logs</key>
 	<dict>
+		<key>ABCB4F38-BAD8-4C65-9F64-F8369EB265E0</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>ABCB4F38-BAD8-4C65-9F64-F8369EB265E0.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>W</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>1</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Portfolio project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Portfolio</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
+			<key>timeStartedRecording</key>
+			<real>806876447.15145802</real>
+			<key>timeStoppedRecording</key>
+			<real>806876451.33716702</real>
+			<key>title</key>
+			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
+			<key>uniqueIdentifier</key>
+			<string>ABCB4F38-BAD8-4C65-9F64-F8369EB265E0</string>
+		</dict>
 		<key>F56844BC-4433-45C3-8BDA-413D5C2202B9</key>
 		<dict>
 			<key>className</key>
