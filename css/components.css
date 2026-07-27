@@ -144,7 +144,7 @@
     align-items: center;
     gap: var(--s-3);
     width: 100%;
-    min-height: 64px;
+    min-height: 56px;
     padding: var(--s-3) 0;
     border-bottom: var(--hairline) solid var(--line);
     text-align: left;
@@ -180,7 +180,7 @@
   .card {
     background: var(--surface);
     border-radius: var(--r-card);
-    padding: var(--s-5);
+    padding: var(--s-4);
     box-shadow: var(--shadow-1);
   }
   .card__head {
@@ -188,7 +188,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--s-3);
-    margin-bottom: var(--s-4);
+    margin-bottom: var(--s-3);
   }
   .card__title {
     font-size: var(--t-heading);
@@ -930,7 +930,7 @@
     justify-content: space-between;
     gap: var(--s-3);
     min-height: var(--tap);
-    padding: var(--s-4) var(--s-5);
+    padding: var(--s-3) var(--s-4);
     cursor: pointer;
     list-style: none;
     transition: background-color var(--dur-micro) var(--ease-out);
@@ -950,7 +950,7 @@
     transition: transform var(--dur-enter) var(--ease-out);
   }
   .group2[open] > .group2__sum svg { transform: rotate(180deg); }
-  .group2__body { display: grid; gap: var(--s-4); padding: 0 var(--s-5) var(--s-5); }
+  .group2__body { display: grid; gap: var(--s-3); padding: 0 var(--s-4) var(--s-4); }
   /* Nested cards inside a group sit on surface-2, so they read as contained
      rather than as another peer card floating on the page. */
   .group2__body .card { background: var(--surface-2); box-shadow: none; padding: var(--s-4); }
@@ -1005,7 +1005,7 @@
     align-items: center;
     gap: var(--s-3);
     width: 100%;
-    min-height: 64px;
+    min-height: 56px;
     padding: var(--s-3) 0;
     border-bottom: var(--hairline) solid var(--line);
     text-align: left;
@@ -1118,4 +1118,40 @@
   .gtable { width: 100%; border-collapse: collapse; font-size: var(--t-label); }
   .gtable td, .gtable th { padding: var(--s-2) var(--s-3); border-top: var(--hairline) solid var(--line); }
   .gtable th { color: var(--text-faint); text-align: left; font-weight: var(--w-semibold); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTE — collapsed explanatory prose.
+
+   Owner feedback: "there a lot of plain text … like 60 percent of the app is
+   text information about something. yeah collapse it, but not most of the app."
+   That was the right correction and the inverse of what the first pass did: the
+   Insights groups now open by default and the PROSE is what folds away.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .note { margin-top: var(--s-2); }
+  .note > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    min-height: var(--s-6);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-faint);
+    cursor: pointer;
+    list-style: none;
+  }
+  .note > summary::-webkit-details-marker { display: none; }
+  /* A caret drawn in text rather than an icon, so a collapsed note costs one
+     line and reads as an aside instead of another control competing for the eye. */
+  .note > summary::before { content: "＋"; font-weight: var(--w-bold); }
+  .note[open] > summary::before { content: "－"; }
+  .note > p {
+    margin-top: var(--s-2);
+    font-size: var(--t-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-muted);
+    max-width: 56ch;
+  }
 }

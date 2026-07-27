@@ -29,8 +29,8 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--s-3);
-    min-height: var(--s-9);
-    padding-block: var(--s-3);
+    min-height: var(--tap);
+    padding-block: var(--s-2);
   }
   .appbar__actions { display: flex; align-items: center; gap: var(--s-1); flex-shrink: 0; }
   /* app.js writes a greeting plus the date into this h1. Beside five icon
@@ -68,9 +68,12 @@
   .page__scroll { overscroll-behavior: contain; }
 
   /* ── Stacks and grids ────────────────────────────────────────────────────── */
-  .stack { display: grid; gap: var(--s-5); }
-  .stack--tight { gap: var(--s-3); }
-  .stack--loose { gap: var(--s-7); }
+  /* Tightened one step after the owner reported too much swiping on the phone.
+     Vertical rhythm is the single biggest lever on scroll length, and 20px between
+     every card on a 390px screen was buying air rather than clarity. */
+  .stack { display: grid; gap: var(--s-3); }
+  .stack--tight { gap: var(--s-2); }
+  .stack--loose { gap: var(--s-5); }
 
   .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
   .grid-3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
@@ -103,7 +106,7 @@
   /* ── Hero — deliberately has NO card around it ───────────────────────────
      A number at --t-hero does not need a box, and boxing it made it peer with
      the day-change box beside it. Four stacked divs become one composed unit. */
-  .hero { padding-block: var(--s-4) var(--s-6); }
+  .hero { padding-block: var(--s-2) var(--s-4); }
   .hero__total { display: block; }
   .hero__delta {
     display: flex;

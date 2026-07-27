@@ -64,7 +64,7 @@
         <input class="input" id="setPass2" type="password" autocomplete="new-password">
       </label>
       <button class="btn btn--primary btn--lg btn--full" id="setupBtn">Create passcode</button>
-      <p class="t-caption faint">Your holdings are encrypted on this device. Nothing is sent anywhere. If you forget this passcode only a backup can recover the data.</p>
+      <details class="note"><summary>What this means</summary><p>Your holdings are encrypted on this device. Nothing is sent anywhere. If you forget this passcode only a backup can recover the data.</p></details>
     </div>
 
     <!-- Enrolment, promoted: full-width primary with an explanation, and "Not
@@ -238,7 +238,7 @@
     </aside>
   </div>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v3.2.0</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v4.0.0</span></p>
 </div>
 
 <!-- ═══════════════════ EXPLORE ═══════════════════ -->
@@ -317,31 +317,31 @@
         <div class="card" id="ddCard">
           <h3 class="card__title">Drawdown · 1Y</h3><div id="ddStat"></div>
           <div class="chart chart--short"><canvas id="ddChart"></canvas></div>
-          <p class="t-caption faint">How far the portfolio sat below its previous peak.</p>
+          <details class="note"><summary>What this means</summary><p>How far the portfolio sat below its previous peak.</p></details>
         </div>
         <div class="card" id="hmCard">
           <h3 class="card__title">Monthly returns</h3><div id="hmBody"></div>
-          <p class="t-caption faint">Deposit-adjusted, so it measures the market and not your contributions.</p>
+          <details class="note"><summary>What this means</summary><p>Deposit-adjusted, so it measures the market and not your contributions.</p></details>
         </div>
       </div>
     </details>
 
-    <details class="group2">
+    <details class="group2" open>
       <summary class="group2__sum"><span class="group2__label">Risk</span><svg aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
       <div class="group2__body">
         <div class="card" id="riskCard"><h3 class="card__title">Risk</h3></div>
         <div class="card" id="peCard"><h3 class="card__title">Portfolio P/E</h3></div>
         <div class="card press" id="crashCard"><h3 class="card__title">Crash test</h3><div id="crashBody"></div>
-          <p class="t-caption faint">If history's worst markets replayed tomorrow, and how long each took to heal.</p>
+          <details class="note"><summary>What this means</summary><p>If history's worst markets replayed tomorrow, and how long each took to heal.</p></details>
         </div>
       </div>
     </details>
 
-    <details class="group2">
+    <details class="group2" open>
       <summary class="group2__sum"><span class="group2__label">Income &amp; tax</span><svg aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
       <div class="group2__body">
         <section class="card"><div class="tablewrap"><table class="table" id="gainsTable"></table></div>
-          <p class="t-caption faint">Dividends are cash your funds paid you, reinvested. Unrealised is paper profit on what you still hold.</p>
+          <details class="note"><summary>What this means</summary><p>Dividends are cash your funds paid you, reinvested. Unrealised is paper profit on what you still hold.</p></details>
         </section>
         <div class="card" id="taxCard"><h3 class="card__title">Tax lots</h3></div>
         <div class="card"><h3 class="card__title">Contributions</h3><div id="contribSub"></div><div id="contribRO"></div>
@@ -350,7 +350,7 @@
       </div>
     </details>
 
-    <details class="group2">
+    <details class="group2" open>
       <summary class="group2__sum"><span class="group2__label">Future</span><svg aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
       <div class="group2__body">
         <div class="card" id="projCard">
@@ -367,13 +367,13 @@
           <p class="t-caption faint" id="projMC"></p>
         </div>
         <div class="card press" id="fiCard"><h3 class="card__title">Financial independence</h3><div id="fiBody"></div>
-          <p class="t-caption faint">The 4% rule: a portfolio can pay out about 4% a year for life. This is what yours could cover, and when.</p>
+          <details class="note"><summary>What this means</summary><p>The 4% rule: a portfolio can pay out about 4% a year for life. This is what yours could cover, and when.</p></details>
         </div>
         <div class="card" id="coachCard"><h3 class="card__title">Next moves</h3><div class="grid-2" id="coachGrid"></div></div>
       </div>
     </details>
 
-    <details class="group2">
+    <details class="group2" open>
       <summary class="group2__sum"><span class="group2__label">Under the hood</span><svg aria-hidden="true"><use href="#i-chevron-down"/></svg></summary>
       <div class="group2__body">
         <div class="t-caption muted" id="lookSub"></div>
