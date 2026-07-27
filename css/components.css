@@ -631,3 +631,78 @@
   .group__fig dt { color: var(--text-muted); font-weight: var(--w-medium); }
   .group__fig dd { font-weight: var(--w-bold); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOCK SCREEN — the first thing anyone sees, so it gets its own section.
+   Previously the heaviest concentration of inline styles and emoji in the app.
+   DESIGN.md §8, §14.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .lock {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: var(--canvas);
+    padding: var(--s-5);
+    padding-top: calc(var(--s-5) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
+    z-index: 100;
+  }
+  /* Dissolve into the app rather than snapping. Pure presentation — the crypto
+     path is untouched by this. */
+  body:not(.locked) .lock { display: none; }
+  body.unlocking .lock { opacity: 0; transition: opacity var(--dur-enter) var(--ease-out); }
+
+  .lock__box {
+    width: 100%;
+    max-width: 360px;
+    display: grid;
+    gap: var(--s-4);
+    text-align: center;
+  }
+  .lock__logo {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--r-card);
+    margin: 0 auto;
+  }
+  .lock__title {
+    font-size: var(--t-title);
+    line-height: var(--lh-title);
+    letter-spacing: var(--tr-title);
+    font-weight: var(--w-bold);
+  }
+  .lock__sub { font-size: var(--t-caption); color: var(--text-muted); }
+
+  /* Each step is a state of the same box, never a separate screen. */
+  .lock__step { display: grid; gap: var(--s-3); }
+  .lock__step[hidden] { display: none; }
+
+  /* The tertiary entrances (restore, example) sit visually below the fold of
+     attention — present, findable, not competing with the one primary control. */
+  .lock__alt {
+    display: grid;
+    gap: var(--s-1);
+    padding-top: var(--s-4);
+    border-top: var(--hairline) solid var(--line);
+  }
+  .lock__alt .btn { justify-content: center; }
+
+  /* Designed error state, not a raw string dumped into a div. */
+  .lock__err {
+    display: none;
+    align-items: flex-start;
+    gap: var(--s-2);
+    padding: var(--s-3);
+    background: var(--secondary-tint);
+    border-left: var(--s-1) solid var(--secondary);
+    border-radius: var(--r-input);
+    font-size: var(--t-caption);
+    text-align: left;
+    color: var(--text);
+  }
+  .lock__err[data-shown="true"] { display: flex; }
+  .lock__err svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--secondary); }
+}

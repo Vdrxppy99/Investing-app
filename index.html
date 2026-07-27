@@ -22,38 +22,82 @@
 <link rel="stylesheet" href="css/layout.css">
 </head>
 <body class="locked">
-<div id="lockScreen">
-  <div class="lockbox">
-    <img src="icon-192.png" alt="" class="locklogo">
-    <div class="locktitle">My Portfolio</div>
-    <div class="locksub" id="lockSub">Unlocking…</div>
-    <div id="lockSetup" style="display:none">
-      <div id="restoreFirst" style="border:1px solid var(--brand);border-radius:14px;padding:14px;margin-bottom:16px;background:rgba(38,208,124,.06)">
-        <div style="font-weight:700;font-size:14px;margin-bottom:3px">Reinstalling or on a new phone?</div>
-        <div class="locknote" style="margin:0 0 10px">Don't make a new passcode — bring your saved data back instead.</div>
-        <button class="btn pri" id="cloudRestoreLink" style="width:100%">☁️ Restore my data from backup</button>
-      </div>
-      <div class="locknote" style="text-align:center;margin-bottom:10px">— or start fresh —</div>
-      <input id="setPass1" type="password" placeholder="Create passcode (min 6 characters)" autocomplete="new-password" aria-label="Create passcode">
-      <input id="setPass2" type="password" placeholder="Repeat passcode" autocomplete="new-password" aria-label="Repeat passcode">
-      <button class="btn sec" id="setupBtn">Create passcode</button>
-      <div class="locknote">Your holdings are encrypted with this passcode on this device — nothing is sent anywhere. If you forget it, only a backup can bring the data back.</div>
+<!-- Lock screen. Face ID is the front door; the passcode is a fallback reached
+     by a quiet link. Zero inline styles, zero emoji. DESIGN.md §14. -->
+<div class="lock" id="lockScreen" role="dialog" aria-modal="true" aria-label="Unlock My Portfolio">
+  <div class="lock__box">
+    <img src="icon-192.png" alt="" class="lock__logo">
+    <h1 class="lock__title">My Portfolio</h1>
+    <p class="lock__sub" id="lockSub">Unlocking</p>
+
+    <!-- Face ID front door. Shown only when the automatic attempt was rejected
+         for want of a user gesture — otherwise the system sheet appears first
+         and this is never seen. -->
+    <div class="lock__step" id="lockFace" hidden>
+      <button class="btn btn--primary btn--lg btn--full" id="faceBtn">
+        <svg aria-hidden="true"><use href="#i-scan-face"/></svg><span>Unlock with Face ID</span>
+      </button>
+      <button class="btn btn--ghost" id="usePassLink">Use passcode</button>
     </div>
-    <div id="lockEnter" style="display:none">
-      <input id="unlockPass" type="password" placeholder="Passcode" autocomplete="current-password" aria-label="Passcode">
-      <button class="btn pri" id="unlockBtn">Unlock</button>
-      <button class="btn sec" id="faceBtn" style="display:none">Unlock with Face ID</button>
-      <a href="#" id="forgotLink" class="locknote" style="display:block;text-align:center;margin-top:12px">Forgot passcode?</a>
+
+    <!-- Passcode fallback. Only the default view when no passkey is enrolled. -->
+    <div class="lock__step" id="lockEnter" hidden>
+      <label class="field">
+        <span class="field__label">Passcode</span>
+        <input class="input" id="unlockPass" type="password" autocomplete="current-password">
+      </label>
+      <button class="btn btn--primary btn--lg btn--full" id="unlockBtn">Unlock</button>
+      <button class="btn btn--ghost" id="forgotLink">Forgot passcode?</button>
     </div>
-    <div id="lockFaceStep" style="display:none">
-      <div class="locknote" style="margin-bottom:12px">Passcode set ✓ &nbsp;Add Face ID so future opens are one glance?</div>
-      <button class="btn pri" id="faceEnrollBtn">Enable Face ID</button>
-      <button class="btn sec" id="faceSkipBtn">Not now</button>
+
+    <!-- First run. -->
+    <div class="lock__step" id="lockSetup" hidden>
+      <label class="field">
+        <span class="field__label">Create a passcode</span>
+        <input class="input" id="setPass1" type="password" autocomplete="new-password">
+      </label>
+      <label class="field">
+        <span class="field__label">Repeat it</span>
+        <input class="input" id="setPass2" type="password" autocomplete="new-password">
+      </label>
+      <button class="btn btn--primary btn--lg btn--full" id="setupBtn">Create passcode</button>
+      <p class="t-caption faint">Your holdings are encrypted on this device. Nothing is sent anywhere. If you forget this passcode only a backup can recover the data.</p>
     </div>
-    <div id="lockErr" class="lockerr"></div>
-    <a href="#" id="demoLink" class="demolink">👀 View the example portfolio — no login</a>
+
+    <!-- Enrolment, promoted: full-width primary with an explanation, and "Not
+         now" demoted to a text link rather than an equal-weight peer button. -->
+    <div class="lock__step" id="lockFaceStep" hidden>
+      <button class="btn btn--primary btn--lg btn--full" id="faceEnrollBtn">
+        <svg aria-hidden="true"><use href="#i-scan-face"/></svg><span>Enable Face ID</span>
+      </button>
+      <p class="t-caption muted">Open with a glance instead of typing. Your passcode keeps working as the recovery key.</p>
+      <button class="btn btn--ghost" id="faceSkipBtn">Not now</button>
+    </div>
+
+    <!-- Replaces prompt(), which WKWebView silently no-ops. -->
+    <div class="lock__step" id="lockRestore" hidden>
+      <label class="field">
+        <span class="field__label">Passcode from your old device</span>
+        <input class="input" id="restorePass" type="password" autocomplete="current-password">
+      </label>
+      <button class="btn btn--primary btn--lg btn--full" id="restoreGo">Restore</button>
+      <button class="btn btn--ghost" id="restoreCancel">Cancel</button>
+    </div>
+
+    <div class="lock__err" id="lockErr" role="alert">
+      <svg aria-hidden="true"><use href="#i-alert"/></svg><span id="lockErrText"></span>
+    </div>
+
+    <!-- Host for the erase confirmation modal, which replaces confirm(). -->
+    <div id="lockModalHost"></div>
+
+    <div class="lock__alt">
+      <button class="btn btn--ghost btn--sm" id="cloudRestoreLink">Restore from backup</button>
+      <button class="btn btn--ghost btn--sm" id="demoLink">See an example portfolio</button>
+    </div>
   </div>
 </div>
+
 <button id="demoBadge" aria-label="Exit the example portfolio">DEMO · example data · tap to exit</button>
 <div id="miniBar"><span id="mbVal"></span><span id="mbDay"></span></div>
 <div id="ptr"><span class="ptr-spin"></span></div>
@@ -245,6 +289,10 @@
 <div id="editModal" class="overlay hidden"><div class="sheet" id="editSheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" role="status"></div>
 
+<!-- Loaded before vault.js: the lock screen references the icon sprite and
+     renders through the ui builders, so both must exist before it paints. -->
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/vault.js"></script>
 </body>
 </html>
