@@ -239,3 +239,45 @@
     .split { grid-template-columns: minmax(0, 1fr) var(--side-col-wide); }
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HORIZONTAL CONTAINMENT
+
+   Owner: "i dont mind it being long, all i care is it fits horizontally."
+   Measured before this block at 390px: Portfolio scrolled to 645px and Explore
+   to 2098px. Cause was the .rail bleed — a flex row with negative inline margins
+   whose children do not shrink, so its content width propagated outward through
+   every ancestor instead of scrolling inside itself.
+
+   Two rules do the work: min-width:0 lets a flex/grid child be narrower than its
+   content (without it, `min-width:auto` refuses), and overflow-x:clip on the page
+   stops anything that still escapes from moving the document.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer layout {
+  /* Nothing may ever scroll the document sideways. */
+  html, body { max-width: 100%; overflow-x: clip; }
+
+  .wrap, .page, .split, .split__main, .split__side { min-width: 0; max-width: 100%; }
+  .page { overflow-x: clip; }
+
+  /* Grid and flex children default to min-width:auto, which is what let the wide
+     content push outward rather than being clipped or scrolled. */
+  .stack > *, .grid-2 > *, .grid-3 > *, .group2__body > * { min-width: 0; }
+
+  /* A rail scrolls INSIDE itself. It must not size its parent. */
+  .rail { min-width: 0; max-width: 100%; }
+  /* Inside a padded card the negative bleed would poke through the card edge, so
+     rails nested in a card sit flush instead. */
+  .card > .rail, .group2__body > .rail { margin-inline: 0; padding-inline: 0; }
+
+  .card { min-width: 0; max-width: 100%; overflow: hidden; }
+
+  /* Chart.js writes explicit canvas dimensions; without this it can set a width
+     wider than the container and drag the card with it. */
+  .chart { min-width: 0; max-width: 100%; }
+  .chart canvas { max-width: 100% !important; }
+
+  /* Long unbroken values (tickers, currency strings) must wrap rather than push. */
+  .hero__total, .row__value, .stat__value { overflow-wrap: anywhere; }
+}
