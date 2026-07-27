@@ -1,0 +1,633 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTS — every component in DESIGN.md §6, in the order documented there.
+   Emitted by the builders in js/ui.js. Nothing anywhere composes markup by hand.
+
+   If you find yourself writing a rule here that overrides an earlier rule in
+   this file, stop — that is the old failure mode returning. Fix the component.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ── 6.1 Button — 5 variants x 3 sizes ────────────────────────────────────
+     States: default · :active (§5) · :focus-visible · disabled · loading.
+     Loading preserves width so the surrounding row never reflows. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    height: var(--tap);
+    padding: 0 var(--s-4);
+    border-radius: var(--r-button);
+    font-size: var(--t-label);
+    line-height: var(--lh-label);
+    font-weight: var(--w-semibold);
+    white-space: nowrap;
+    transition: transform var(--dur-micro) var(--ease-out),
+                background-color var(--dur-micro) var(--ease-out);
+  }
+  .btn:active { transform: scale(var(--press-scale)); transition: none; }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+  .btn svg { width: 20px; height: 20px; }
+
+  .btn--sm { height: 36px; padding: 0 var(--s-3); }
+  .btn--lg { height: 52px; padding: 0 var(--s-5); font-size: var(--t-body); }
+  .btn--full { width: 100%; }
+
+  /* Primary is the only control with a physical edge — that is what makes the
+     CTA feel different from everything else rather than just look different. */
+  .btn--primary {
+    background: var(--primary-fill);
+    color: var(--on-primary);
+    border-bottom: var(--edge) solid var(--primary-edge);
+  }
+  .btn--primary:active {
+    border-bottom-width: 0;
+    transform: translateY(var(--edge)) scale(var(--press-scale));
+  }
+
+  .btn--secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: var(--hairline) solid var(--line);
+  }
+  .btn--secondary:active { background: var(--surface-3); }
+
+  .btn--ghost { background: none; color: var(--primary); }
+  .btn--ghost:active { background: var(--primary-tint); }
+
+  /* Deliberately not a filled red button — too loud for an app about someone's
+     savings. Destructive intent is carried by the word and the confirm step. */
+  .btn--danger { background: var(--surface-2); color: var(--loss); }
+  .btn--danger:active { background: var(--surface-3); }
+
+  .btn__spin {
+    width: 18px;
+    height: 18px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: var(--r-pill);
+    animation: spin var(--dur-spin) linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 6.2 Icon button ─────────────────────────────────────────────────────
+     44x44 regardless of the 24px glyph box. Always carries aria-label. */
+  .iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--tap);
+    height: var(--tap);
+    border-radius: var(--r-button);
+    color: var(--text-muted);
+    transition: transform var(--dur-micro) var(--ease-out),
+                background-color var(--dur-micro) var(--ease-out),
+                color var(--dur-micro) var(--ease-out);
+  }
+  .iconbtn:active {
+    transform: scale(var(--press-scale));
+    background: var(--surface-2);
+    color: var(--text);
+    transition: none;
+  }
+  .iconbtn svg { width: 24px; height: 24px; }
+
+  /* ── 6.3 Segmented control ───────────────────────────────────────────────
+     Also the fix for Explore's three stacked screener cards. */
+  .seg {
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-1);
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+  }
+  .seg__item {
+    flex: 1;
+    height: 32px;
+    padding: 0 var(--s-3);
+    border-radius: var(--r-pill);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-muted);
+    transition: background-color var(--dur-enter) var(--ease-out),
+                color var(--dur-enter) var(--ease-out);
+  }
+  .seg__item[aria-selected="true"] {
+    background: var(--primary-tint);
+    color: var(--primary);
+    font-weight: var(--w-semibold);
+  }
+
+  /* ── 6.4 Chip / pill ─────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 28px;
+    padding: 0 var(--s-3);
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+  }
+  .chip--gain { background: var(--gain-tint); color: var(--gain); }
+  .chip--loss { background: var(--loss-tint); color: var(--loss); }
+  .chip--attn { background: var(--secondary-tint); color: var(--secondary); }
+  .chip--primary { background: var(--primary-tint); color: var(--primary); }
+
+  /* ── 6.5 List row — the workhorse ────────────────────────────────────────
+     Divided by a bottom hairline rather than being a bordered card each. That
+     is the fix for "every box has the same weight, so nothing is prioritised". */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    min-height: 64px;
+    padding: var(--s-3) 0;
+    border-bottom: var(--hairline) solid var(--line);
+    text-align: left;
+  }
+  .row:last-child { border-bottom: none; }
+  .row--press { transition: background-color var(--dur-micro) var(--ease-out); }
+  .row--press:active { background: var(--surface-2); }
+  .row__main { flex: 1; min-width: 0; }
+  .row__title {
+    font-size: var(--t-body);
+    font-weight: var(--w-semibold);
+    color: var(--text);
+  }
+  .row__sub {
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row__trail { text-align: right; flex-shrink: 0; }
+  .row__value {
+    font-size: var(--t-label);
+    font-weight: var(--w-bold);
+    color: var(--text);
+  }
+  .row__chev { color: var(--text-faint); flex-shrink: 0; }
+  .row__chev svg { width: 20px; height: 20px; }
+
+  /* ── 6.6 Card ────────────────────────────────────────────────────────────
+     No border in dark mode: the surface lightness IS the elevation. Adding a
+     border as well is what made every box in the old app read identically. */
+  .card {
+    background: var(--surface);
+    border-radius: var(--r-card);
+    padding: var(--s-5);
+    box-shadow: var(--shadow-1);
+  }
+  .card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin-bottom: var(--s-4);
+  }
+  .card__title {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    letter-spacing: var(--tr-heading);
+    font-weight: var(--w-bold);
+  }
+
+  /* ── 6.7 Stat tile ───────────────────────────────────────────────────────── */
+  .stat {
+    background: var(--surface-2);
+    border-radius: var(--r-button);
+    padding: var(--s-4);
+  }
+  .stat__label {
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    margin-bottom: var(--s-1);
+  }
+  .stat__value {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--w-bold);
+  }
+  .stat__delta { font-size: var(--t-caption); margin-top: var(--s-1); }
+
+  /* ── 6.8 Input ───────────────────────────────────────────────────────────
+     16px floor is enforced in base.css. Border uses --border-control, which
+     exists specifically because a control boundary needs 3:1. */
+  .field { display: block; }
+  .field__label {
+    display: block;
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-muted);
+    margin-bottom: var(--s-2);
+  }
+  .input {
+    width: 100%;
+    height: var(--tap);
+    padding: 0 var(--s-3);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--border-control);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font-weight: var(--w-semibold);
+  }
+  .input:focus-visible {
+    border-color: var(--primary);
+    outline: var(--ring) solid var(--primary);
+    outline-offset: 0;
+  }
+  .input[aria-invalid="true"] { border-color: var(--loss); }
+  .input:disabled { opacity: 0.5; }
+  .field__error {
+    font-size: var(--t-caption);
+    color: var(--loss);
+    margin-top: var(--s-1);
+  }
+  .input--num { text-align: right; }
+
+  /* ── 6.9 Search field — the hero of Explore, so it sticks ────────────────── */
+  .search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    height: var(--tap);
+    padding: 0 var(--s-3);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--border-control);
+    border-radius: var(--r-input);
+  }
+  .search:focus-within { border-color: var(--primary); }
+  .search__icon { color: var(--text-muted); flex-shrink: 0; }
+  .search__icon svg { width: 20px; height: 20px; }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-weight: var(--w-semibold);
+  }
+  .search input::placeholder { color: var(--text-faint); font-weight: var(--w-medium); }
+  /* Only present when there is something to clear — never a dead control. */
+  .search__clear {
+    display: none;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-pill);
+  }
+  .search--filled .search__clear { display: flex; }
+  .search__clear svg { width: 18px; height: 18px; }
+
+  /* ── 6.10 Sheet ──────────────────────────────────────────────────────────
+     Level 3. A real scrim, not a backdrop-blur crutch — blur was standing in
+     for hierarchy in the old app. Becomes a centred modal at >=1024px (layout). */
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-sheet) var(--ease-sheet);
+    z-index: 40;
+  }
+  .scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 88dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-2);
+    border-top: var(--hairline) solid var(--line-strong);
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    box-shadow: var(--shadow-3), var(--highlight);
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translateY(100%);
+    transition: transform var(--dur-sheet) var(--ease-sheet);
+    z-index: 50;
+  }
+  .sheet[data-open="true"] { transform: translateY(0); }
+  /* Set by the drag handler; must not be eased or the finger feels laggy. */
+  .sheet[data-dragging="true"] { transition: none; }
+
+  .sheet__grip {
+    display: flex;
+    justify-content: center;
+    padding: var(--s-3) 0 var(--s-2);
+    flex-shrink: 0;
+    cursor: grab;
+    touch-action: none;
+  }
+  .sheet__grip::after {
+    content: "";
+    width: 36px;
+    height: 4px;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+  }
+  .sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: 0 var(--s-5) var(--s-3);
+    flex-shrink: 0;
+  }
+  .sheet__body {
+    padding: 0 var(--s-5) var(--s-5);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── 6.11 Modal — destructive confirmations, replacing every confirm() ───── */
+  .modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: calc(100% - var(--s-8));
+    max-width: 520px;
+    background: var(--surface-2);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-3), var(--highlight);
+    padding: var(--s-5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-enter) var(--ease-out),
+                transform var(--dur-enter) var(--ease-out);
+    z-index: 50;
+  }
+  .modal[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .modal__actions {
+    display: flex;
+    gap: var(--s-2);
+    margin-top: var(--s-5);
+  }
+  .modal__actions .btn { flex: 1; }
+
+  /* ── 6.12 Toast ──────────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    left: var(--s-5);
+    right: var(--s-5);
+    bottom: calc(var(--s-9) + env(safe-area-inset-bottom) + var(--s-5));
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--line-strong);
+    border-radius: var(--r-button);
+    box-shadow: var(--shadow-3), var(--highlight);
+    font-size: var(--t-label);
+    font-weight: var(--w-semibold);
+    transform: translateY(var(--s-3));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-enter) var(--ease-out),
+                transform var(--dur-enter) var(--ease-out);
+    z-index: 60;
+  }
+  .toast[data-open="true"] { opacity: 1; transform: translateY(0); }
+  .toast--warn { color: var(--secondary); }
+  .toast--error { color: var(--loss); }
+
+  /* ── 6.13 Tab bar — opaque level 3, NOT backdrop-blurred ─────────────────── */
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    background: var(--surface-2);
+    border-top: var(--hairline) solid var(--line);
+    box-shadow: var(--highlight);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 30;
+  }
+  .tabbar__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-1);
+    min-height: var(--tap);
+    padding: var(--s-2) 0;
+    color: var(--text-faint);
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    transition: color var(--dur-micro) var(--ease-out);
+  }
+  .tabbar__item svg { width: 24px; height: 24px; }
+  .tabbar__item[aria-current="page"] { color: var(--primary); }
+
+  /* ── 6.14 Progress bar ───────────────────────────────────────────────────── */
+  .bar {
+    height: var(--s-2);
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+  }
+  .bar__fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: var(--r-pill);
+    transition: width var(--dur-data) var(--ease-out);
+  }
+  /* Off-track uses the attention colour, never --loss: a goal behind schedule
+     is not a loss, and --loss is reserved for numbers. */
+  .bar__fill--attn { background: var(--secondary); }
+
+  /* ── 6.15 Ring — the goal ring ───────────────────────────────────────────── */
+  .ring { position: relative; display: grid; place-items: center; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring__track { stroke: var(--surface-2); }
+  .ring__fill {
+    stroke: var(--primary);
+    transition: stroke-dashoffset var(--dur-data) var(--ease-out);
+  }
+  .ring__fill--attn { stroke: var(--secondary); }
+  .ring__label {
+    position: absolute;
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--w-bold);
+  }
+
+  /* ── 6.16 Skeleton — every first paint, never a bare spinner ─────────────── */
+  .skel {
+    background: var(--skeleton);
+    border-radius: var(--r-input);
+    position: relative;
+    overflow: hidden;
+  }
+  .skel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+    transform: translateX(-100%);
+    animation: sheen var(--dur-shimmer) ease-in-out infinite;
+  }
+  @keyframes sheen { to { transform: translateX(100%); } }
+  .skel--line { height: var(--s-3); }
+  .skel--title { height: var(--s-5); }
+  .skel--tile { height: 72px; border-radius: var(--r-button); }
+  .skel--badge { width: 40px; height: 40px; border-radius: var(--r-button); }
+  .skel--chart { height: 200px; border-radius: var(--r-button); }
+
+  /* ── 6.17 Empty state · 6.18 Error state ────────────────────────────────── */
+  .empty {
+    display: grid;
+    justify-items: center;
+    gap: var(--s-3);
+    padding: var(--s-8) var(--s-5);
+    text-align: center;
+  }
+  .empty__icon { color: var(--text-faint); }
+  .empty__icon svg { width: 32px; height: 32px; }
+  .empty--error .empty__icon { color: var(--secondary); }
+  .empty__title {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--w-bold);
+  }
+  .empty__note {
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    max-width: 28ch;
+  }
+
+  /* ── 6.19 Banner ─────────────────────────────────────────────────────────── */
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    background: var(--secondary-tint);
+    border-left: var(--s-1) solid var(--secondary);
+    border-radius: var(--r-button);
+    font-size: var(--t-caption);
+    color: var(--text);
+  }
+  .banner__text { flex: 1; }
+
+  /* ── 6.20 Badge / logo tile ──────────────────────────────────────────────── */
+  .blogo {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: var(--surface-2);
+    border-radius: var(--r-button);
+    font-size: var(--t-label);
+    font-weight: var(--w-bold);
+    color: var(--text-muted);
+    overflow: hidden;
+  }
+  .blogo img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* ── 6.21 Chart container ────────────────────────────────────────────────
+     Fixed aspect so the page never shifts when data lands. */
+  .chart { position: relative; width: 100%; aspect-ratio: 16 / 10; }
+  .chart canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+  .chart__readout {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    min-height: var(--lh-heading);
+    margin-bottom: var(--s-3);
+  }
+  .spark { width: 56px; height: 20px; flex-shrink: 0; }
+
+  /* ── 6.22 Table — genuinely tabular data only ───────────────────────────── */
+  .tablewrap { overflow-x: auto; overscroll-behavior-x: contain; }
+  .table { width: 100%; border-collapse: collapse; }
+  .table th {
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    text-align: left;
+    padding: var(--s-2) var(--s-3);
+    white-space: nowrap;
+  }
+  .table td {
+    font-size: var(--t-label);
+    padding: var(--s-3);
+    border-top: var(--hairline) solid var(--line);
+    white-space: nowrap;
+  }
+  .table th:not(:first-child),
+  .table td:not(:first-child) { text-align: right; }
+
+  /* ── Disclosure row — how a demoted module is reached on mobile ─────────── */
+  .disclose {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    min-height: var(--tap);
+    padding: var(--s-3) 0;
+    border-bottom: var(--hairline) solid var(--line);
+    text-align: left;
+    transition: background-color var(--dur-micro) var(--ease-out);
+  }
+  .disclose:active { background: var(--surface-2); }
+  .disclose__title { flex: 1; font-size: var(--t-body); font-weight: var(--w-semibold); }
+  .disclose__meta { font-size: var(--t-caption); color: var(--text-muted); }
+  .disclose svg { width: 20px; height: 20px; color: var(--text-faint); }
+
+  /* ── Insight group card — the Insights restructure (DESIGN.md §8) ───────── */
+  .group { text-align: left; width: 100%; }
+  .group__label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    margin-bottom: var(--s-3);
+  }
+  .group__figures { display: grid; gap: var(--s-2); }
+  .group__fig {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    font-size: var(--t-label);
+  }
+  .group__fig dt { color: var(--text-muted); font-weight: var(--w-medium); }
+  .group__fig dd { font-weight: var(--w-bold); }
+}

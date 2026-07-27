@@ -1,0 +1,220 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT — the app shell, breakpoints, grids, the nav rail. DESIGN.md §7.
+
+   The old app's entire layout strategy was `.wrap{max-width:600px}`, which on a
+   laptop left a phone-width column stranded in the middle of an empty page. The
+   breakpoints below are the difference between "web page" and "app".
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer layout {
+  /* ── Shell ───────────────────────────────────────────────────────────────── */
+  .shell {
+    min-height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .wrap {
+    padding-inline: var(--s-5);
+    padding-inline: max(var(--s-5), env(safe-area-inset-left)) max(var(--s-5), env(safe-area-inset-right));
+    /* Clear the fixed tab bar plus the home indicator. */
+    padding-bottom: calc(var(--s-9) + var(--s-8) + env(safe-area-inset-bottom));
+  }
+
+  .appbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    min-height: var(--s-9);
+    padding-block: var(--s-3);
+  }
+  .appbar__actions { display: flex; align-items: center; gap: var(--s-1); }
+
+  /* ── Page transition — ONE transition on the container as a whole ─────────
+     The old app staggered every child with nth-child delays. Staggering
+     everything draws attention to the fact that nothing is prioritised, and it
+     makes each tab switch feel slower than it is. */
+  .page { display: none; }
+  .page[data-active="true"] {
+    display: block;
+    animation: page-in var(--dur-enter) var(--ease-out) both;
+  }
+  @keyframes page-in {
+    from { opacity: 0; transform: translateY(var(--s-2)); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* Per-tab scroll containers, so position is preserved when returning. */
+  .page__scroll { overscroll-behavior: contain; }
+
+  /* ── Stacks and grids ────────────────────────────────────────────────────── */
+  .stack { display: grid; gap: var(--s-5); }
+  .stack--tight { gap: var(--s-3); }
+  .stack--loose { gap: var(--s-7); }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
+  .grid-3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
+
+  /* Horizontal rail — indices, sectors. Snaps so it never rests half-way. */
+  .rail {
+    display: flex;
+    gap: var(--s-3);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    /* Bleed to the screen edge so the rail reads as continuing off-screen. */
+    margin-inline: calc(var(--s-5) * -1);
+    padding-inline: var(--s-5);
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar { display: none; }
+  .rail > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+  .section__label {
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    margin-bottom: var(--s-3);
+  }
+
+  /* ── Hero — deliberately has NO card around it ───────────────────────────
+     A number at --t-hero does not need a box, and boxing it made it peer with
+     the day-change box beside it. Four stacked divs become one composed unit. */
+  .hero { padding-block: var(--s-4) var(--s-6); }
+  .hero__total { display: block; }
+  .hero__delta {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    margin-top: var(--s-2);
+    font-size: var(--t-body);
+    font-weight: var(--w-semibold);
+  }
+  .hero__sub {
+    margin-top: var(--s-2);
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+  }
+
+  /* The desktop rail is built at all sizes but hidden until it is needed. */
+  .rail-nav { display: none; }
+
+  /* ═══ 601–1023px — single column, capped, still a bottom tab bar ══════════ */
+  @media (min-width: 601px) {
+    .wrap {
+      max-width: var(--reading-max);
+      margin-inline: auto;
+      padding-inline: var(--s-7);
+    }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* ═══ >=1024px — the app shell. This is where it stops looking like a phone
+         screenshot pasted onto white. ═══════════════════════════════════════ */
+  @media (min-width: 1024px) {
+    .shell {
+      display: grid;
+      grid-template-columns: var(--rail) minmax(0, 1fr);
+    }
+
+    .tabbar { display: none; }
+
+    .rail-nav {
+      display: flex;
+      flex-direction: column;
+      gap: var(--s-1);
+      position: sticky;
+      top: 0;
+      height: 100dvh;
+      padding: var(--s-5) var(--s-3);
+      background: var(--surface);
+      border-right: var(--hairline) solid var(--line);
+    }
+    .rail-nav__brand {
+      display: flex;
+      align-items: center;
+      gap: var(--s-2);
+      padding: var(--s-2) var(--s-3) var(--s-5);
+      font-size: var(--t-heading);
+      font-weight: var(--w-bold);
+      letter-spacing: var(--tr-heading);
+    }
+    .rail-nav__item {
+      display: flex;
+      align-items: center;
+      gap: var(--s-3);
+      min-height: var(--tap);
+      padding: 0 var(--s-3);
+      border-radius: var(--r-button);
+      color: var(--text-muted);
+      font-size: var(--t-body);
+      font-weight: var(--w-semibold);
+      text-align: left;
+      transition: background-color var(--dur-micro) var(--ease-out),
+                  color var(--dur-micro) var(--ease-out);
+    }
+    .rail-nav__item svg { width: 22px; height: 22px; }
+    .rail-nav__item:active { background: var(--surface-2); }
+    .rail-nav__item[aria-current="page"] {
+      background: var(--primary-tint);
+      color: var(--primary);
+    }
+    .rail-nav__spacer { flex: 1; }
+
+    .wrap {
+      max-width: var(--content-max);
+      margin-inline: auto;
+      padding-inline: var(--s-7);
+      padding-bottom: var(--s-8);
+    }
+
+    /* Portfolio splits: chart + holdings main, demoted modules to the side. */
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) var(--side-col);
+      gap: var(--s-7);
+      align-items: start;
+    }
+    .split__side { display: grid; gap: var(--s-5); position: sticky; top: var(--s-5); }
+
+    /* On mobile these modules are disclosure rows; here they are real cards. */
+    .disclose { display: none; }
+    .side-only { display: block; }
+
+    .grid-2 { gap: var(--s-4); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
+
+    /* Sheets become centred modals rather than bottom sheets. */
+    .sheet {
+      left: 50%;
+      right: auto;
+      bottom: auto;
+      top: 50%;
+      width: calc(100% - var(--s-8));
+      max-width: 520px;
+      max-height: 80dvh;
+      border-radius: var(--r-card);
+      border: var(--hairline) solid var(--line-strong);
+      transform: translate(-50%, -50%) scale(0.96);
+      opacity: 0;
+    }
+    .sheet[data-open="true"] { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    .sheet__grip { display: none; }
+
+    .toast { left: auto; right: var(--s-7); bottom: var(--s-7); max-width: 380px; }
+  }
+
+  /* On mobile the side column does not exist; its modules live behind
+     disclosure rows instead. */
+  @media (max-width: 1023px) {
+    .side-only { display: none; }
+  }
+
+  @media (min-width: 1440px) {
+    .wrap { max-width: var(--content-max-wide); }
+    .split { grid-template-columns: minmax(0, 1fr) var(--side-col-wide); }
+  }
+}

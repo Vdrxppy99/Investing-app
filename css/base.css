@@ -1,0 +1,207 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE — reset, typography defaults, focus, scroll, safe areas, motion policy.
+   Everything here applies app-wide. Component styling lives in components.css.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    /* Never let iOS silently inflate type in landscape. */
+    -webkit-text-size-adjust: 100%;
+    /* Pinch-zoom stays available (accessibility), but double-tap zoom does not —
+       double-tap zoom is what makes a wrapped web app feel like a web page. */
+    touch-action: manipulation;
+  }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+    font-weight: var(--w-medium);
+    -webkit-font-smoothing: antialiased;
+
+    /* NON-NEGOTIABLE, and a base rule rather than sprinkled per-selector:
+       digits that change width as prices tick is the loudest amateur tell a
+       finance app can have. DESIGN.md §3. */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+
+    /* Chrome is not selectable; real content re-enables it below. Stops the
+       long-press text selection that immediately reads as "this is a webpage". */
+    -webkit-user-select: none;
+    user-select: none;
+
+    /* No rubber-band on the document. Internal scrollers use `contain`. */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Numbers and names are the reason to use the app — they must be copyable. */
+  [data-selectable],
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* ── Type utilities — the ONLY way to set a size ─────────────────────────── */
+  .t-hero {
+    font-size: var(--t-hero);
+    line-height: 1;
+    letter-spacing: var(--tr-hero);
+    font-weight: var(--w-black);
+  }
+  .t-display {
+    font-size: var(--t-display);
+    line-height: var(--lh-display);
+    letter-spacing: var(--tr-display);
+    font-weight: var(--w-black);
+  }
+  .t-title {
+    font-size: var(--t-title);
+    line-height: var(--lh-title);
+    letter-spacing: var(--tr-title);
+    font-weight: var(--w-bold);
+  }
+  .t-heading {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    letter-spacing: var(--tr-heading);
+    font-weight: var(--w-bold);
+  }
+  .t-body {
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+    font-weight: var(--w-medium);
+  }
+  .t-label {
+    font-size: var(--t-label);
+    line-height: var(--lh-label);
+    font-weight: var(--w-semibold);
+  }
+  .t-caption {
+    font-size: var(--t-caption);
+    line-height: var(--lh-caption);
+    font-weight: var(--w-medium);
+  }
+  /* Eyebrow labels only. Never body copy — uppercase tracking hurts to read. */
+  .t-micro {
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    font-weight: var(--w-bold);
+    text-transform: uppercase;
+  }
+
+  .muted { color: var(--text-muted); }
+  .faint { color: var(--text-faint); }
+  .gain { color: var(--gain); }
+  .loss { color: var(--loss); }
+  .attn { color: var(--secondary); }
+
+  h1, h2, h3, h4 { font-size: inherit; font-weight: inherit; }
+
+  /* ── Controls inherit the type system rather than the UA's ───────────────── */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+  }
+
+  button {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  /* iOS zooms the viewport when a focused input is under 16px. This is a floor,
+     not a default — three inputs in the old app violated it. DESIGN.md §6.8. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+
+  svg {
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  img { max-width: 100%; display: block; }
+
+  /* ── Focus — visible on every control, always replaced, never just removed ─ */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: var(--ring) solid var(--primary);
+    outline-offset: var(--ring);
+    border-radius: var(--r-input);
+  }
+
+  /* ── The signature interaction (DESIGN.md §5) ─────────────────────────────
+     Applied to every interactive surface. The down stroke has NO transition so
+     it lands within one frame; only the release is eased. A transition on the
+     press is precisely what makes web UI feel laggy. */
+  .press {
+    transition: transform var(--dur-micro) var(--ease-out),
+                background-color var(--dur-micro) var(--ease-out);
+  }
+  .press:active {
+    transform: scale(var(--press-scale));
+    transition: none;
+  }
+
+  /* ── Screen-reader-only, for labels that must exist but not display ──────── */
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  [hidden] { display: none !important; }
+
+  /* ── Motion policy ───────────────────────────────────────────────────────
+     Reduced motion removes MOVEMENT, not FEEDBACK: the press still changes
+     colour, it just stops scaling. Silently dropping the affordance would be
+     worse for the people this setting exists for. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .press:active { transform: none; }
+  }
+}
