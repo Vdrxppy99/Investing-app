@@ -65,6 +65,7 @@
        the no-literals rule is absolute. */
     --dur-shimmer: 1400ms;
     --dur-spin: 700ms;
+    --dur-stagger: 160ms;   /* typing-dot offset; a loop phase, not a transition */
 
     /* ── Fixed dimensions that recur structurally ────────────────────────── */
     --tap: 44px;            /* minimum tap target — a11y floor */
@@ -197,5 +198,37 @@
 
     --skeleton: rgba(16, 21, 29, 0.06);
     --skeleton-sheen: rgba(16, 21, 29, 0.03);
+  }
+
+  /* ═══ COMPATIBILITY ALIASES ═══════════════════════════════════════════════
+     The engine JS reads these six names from computed style when configuring
+     charts. Aliasing is deliberate rather than editing every reference, and it
+     is where defect #2 actually gets fixed: --brand used to BE --green (byte
+     identical), so charts, chrome and gains were all one colour. --brand now
+     resolves to the interaction blue while --green resolves to the P&L green, so
+     the same JS suddenly draws the correct semantics.
+
+     --*-rgb are raw triplets because Chart.js gradients need rgba() with a
+     computed alpha, and a hex token cannot supply that.
+     ═══════════════════════════════════════════════════════════════════════════ */
+  :root, :root[data-theme="dark"] {
+    --brand: var(--primary);
+    --green: var(--gain);
+    --red: var(--loss);
+    --mut: var(--text-muted);
+    --faint: var(--text-faint);
+    --green-rgb: 47, 190, 122;
+    --red-rgb: 242, 107, 117;
+    --brand-rgb: 76, 130, 247;
+    --card: var(--surface);
+    --card2: var(--surface-2);
+    --tx: var(--text);
+    --grid: var(--line);
+    --warn: var(--secondary);
+  }
+  :root[data-theme="light"] {
+    --green-rgb: 10, 127, 88;
+    --red-rgb: 208, 45, 64;
+    --brand-rgb: 31, 95, 224;
   }
 }

@@ -12,6 +12,10 @@
     min-height: 100dvh;
     padding-top: env(safe-area-inset-top);
   }
+  /* The demo badge is fixed at the top centre, where it collided with the appbar
+     icon buttons. Give the shell room rather than moving the badge — it belongs
+     at the top, and only demo mode pays the cost. */
+  body.demo .shell { padding-top: calc(env(safe-area-inset-top) + var(--s-8)); }
 
   .wrap {
     padding-inline: var(--s-5);
@@ -28,14 +32,30 @@
     min-height: var(--s-9);
     padding-block: var(--s-3);
   }
-  .appbar__actions { display: flex; align-items: center; gap: var(--s-1); }
+  .appbar__actions { display: flex; align-items: center; gap: var(--s-1); flex-shrink: 0; }
+  /* app.js writes a greeting plus the date into this h1. Beside five icon
+     buttons on a 390px screen that wrapped to four lines, so it steps down a
+     type level and truncates rather than pushing the hero off-screen. */
+  .appbar h1 {
+    min-width: 0;
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    letter-spacing: var(--tr-heading);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .appbar h1 .bdate { color: var(--text-muted); font-weight: var(--w-medium); }
 
   /* ── Page transition — ONE transition on the container as a whole ─────────
      The old app staggered every child with nth-child delays. Staggering
      everything draws attention to the fact that nothing is prioritised, and it
      makes each tab switch feel slower than it is. */
+  /* The existing JS toggles .hidden on pages. Honouring that class rather than
+     introducing a second mechanism it does not know about — the alternative was
+     editing every call site, which is logic the preservation contract protects. */
   .page { display: none; }
-  .page[data-active="true"] {
+  .page:not(.hidden) {
     display: block;
     animation: page-in var(--dur-enter) var(--ease-out) both;
   }
@@ -180,9 +200,12 @@
     }
     .split__side { display: grid; gap: var(--s-5); position: sticky; top: var(--s-5); }
 
-    /* On mobile these modules are disclosure rows; here they are real cards. */
+    /* The side-column modules stop being disclosures here and read as plain
+       cards: forced open, summary chrome stripped. */
     .disclose { display: none; }
-    .side-only { display: block; }
+    .sidecard > .group2__sum { pointer-events: none; }
+    .sidecard > .group2__sum svg { display: none; }
+    .sidecard > .group2__body { display: grid !important; }
 
     .grid-2 { gap: var(--s-4); }
     .grid-3 { grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
@@ -207,11 +230,6 @@
     .toast { left: auto; right: var(--s-7); bottom: var(--s-7); max-width: 380px; }
   }
 
-  /* On mobile the side column does not exist; its modules live behind
-     disclosure rows instead. */
-  @media (max-width: 1023px) {
-    .side-only { display: none; }
-  }
 
   @media (min-width: 1440px) {
     .wrap { max-width: var(--content-max-wide); }
