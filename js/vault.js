@@ -268,6 +268,13 @@ async function showFaceStepOrStart(){
    Face ID → (cancelled/failed) → "Use passcode" → passcode field → (forgotten)
    → restore from backup, or erase. The passcode is never the front door unless
    no passkey is enrolled on this device. */
+// Set as soon as the user picks a route (restore / passcode). The automatic Face
+// ID attempt is fire-and-forget, so without this its failure handler lands after
+// the user has already tapped something and replaces their screen — which is
+// exactly why "Restore from backup" appeared to do nothing while the example
+// worked (the example boots the app immediately, leaving nothing to override).
+let userChose = false;
+
 function showPasscode(msg){
   showStep('lockEnter','Enter your passcode');
   if(msg) err(msg);
@@ -290,22 +297,23 @@ async function attemptFace(fromGesture){
     // sub-300ms NotAllowedError is treated as "needs a tap", not "user said no".
     const gestureBlocked = e && e.name === 'NotAllowedError' && !fromGesture && elapsed < 300;
     if(gestureBlocked){
-      showStep('lockFace','Unlock to continue');
+      if(!userChose) showStep('lockFace','Unlock to continue');
       return false;
     }
     if(e && e.name === 'NotAllowedError'){
       // A real cancellation, or biometrics locked out after failed attempts.
+      if(userChose) return false;
       showStep('lockFace','Unlock to continue');
       err('Face ID was cancelled. Use your passcode if it keeps failing.');
       return false;
     }
     if(e && e.message === 'prf-unsupported'){
-      showPasscode('This browser can’t do Face ID unlock. Your passcode still works.');
+      if(!userChose) showPasscode('This browser can’t do Face ID unlock. Your passcode still works.');
       return false;
     }
     // pt_v_prf present but the credential no longer resolves — deleted from
     // iCloud Keychain, or enrolled against a different origin.
-    showPasscode('Face ID isn’t available on this device any more. Use your passcode.');
+    if(!userChose) showPasscode('Face ID isn’t available on this device any more. Use your passcode.');
     return false;
   }
 }
@@ -366,9 +374,9 @@ function boot(){
   const hasVault = !!LS.getItem('pt_v_pass');
 
   /* ---- restore, replacing prompt() (a silent no-op inside WKWebView) ---- */
-  const openRestore = () => { err(''); showStep('lockRestore','Restore from a backup'); };
+  const openRestore = () => { userChose = true; err(''); showStep('lockRestore','Restore from a backup'); };
   $id('cloudRestoreLink').onclick = openRestore;
-  $id('restoreCancel').onclick = () => { err(''); hasVault ? startFront() : showSetup(); };
+  $id('restoreCancel').onclick = () => { userChose = false; err(''); hasVault ? startFront() : showSetup(); };
   $id('restoreGo').onclick = async () => {
     const p = $id('restorePass').value;
     if(!p) { err('Enter the passcode from your old device.'); return; }
@@ -418,7 +426,7 @@ function boot(){
   }
 
   $id('faceBtn').onclick = () => attemptFace(true);
-  $id('usePassLink').onclick = () => { err(''); showPasscode(); };
+  $id('usePassLink').onclick = () => { userChose = true; err(''); showPasscode(); };
 
   const tryUnlock = async () => {
     if($id('unlockPass').value===DEMO_PASS){ enterDemo(); return; }
