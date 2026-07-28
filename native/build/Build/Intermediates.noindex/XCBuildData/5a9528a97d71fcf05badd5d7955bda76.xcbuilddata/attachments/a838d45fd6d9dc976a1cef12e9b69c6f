@@ -2,9 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>LastAccessedDate</key>
-	<date>2026-07-28T19:41:15Z</date>
-	<key>WorkspacePath</key>
-	<string>/Users/isaacamsalu/Claude/Projects/Investing-app/native/Portfolio.xcodeproj</string>
+	<key>application-identifier</key>
+	<string>G45659WU8K.de.portfolio.app</string>
 </dict>
 </plist>

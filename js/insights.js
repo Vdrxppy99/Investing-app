@@ -563,7 +563,7 @@ async function aiSend(){
   const local=askLocal(q);
   if(local.confident){ aiPush('ai', local.html, '🔒 on your phone'); return; }
   if(typeof askAI!=='function' || !(lsGet('pt_push')||{}).token){
-    aiPush('ai', `I can answer your returns, best/worst fund, dividends, risk, diversification, fees, and when you could retire. For open-ended questions, turn on Daily reports (⚙︎) to unlock the full AI.`, '🔒 on your phone');
+    aiPush('ai', `I can answer your returns, best/worst fund, dividends, risk, diversification, fees, and when you could retire. For open-ended questions, turn on Daily reports (Settings) to unlock the full AI.`, '🔒 on your phone');
     return;
   }
   aiBusy=true; const tid=aiPush('ai','<span class="askthinking">Thinking…</span>');
@@ -704,7 +704,7 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const t=totals('all'), rs=rows('all');
   const cash=cashFor('all'), cashPct=cash/Math.max(1,t.value);
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.12):0.07;
-  if(cashPct>0.05) items.push({ic:'💵', title:'Deploy idle cash', detail:`${fmt(cash)} · ${(cashPct*100).toFixed(0)}% uninvested`, sev:'warn', t:'Put idle cash to work',
+  if(cashPct>0.05) items.push({ic:'dollar', title:'Deploy idle cash', detail:`${fmt(cash)} · ${(cashPct*100).toFixed(0)}% uninvested`, sev:'warn', t:'Put idle cash to work',
     b:`${fmt(cash)} (${(cashPct*100).toFixed(0)}% of the portfolio) is uninvested. At your ~${(r*100).toFixed(0)}%/yr pace that's ≈${fmt(cash*r)} of growth per year sitting out.`});
   // drift vs the target mix set on the Allocation card
   if(state.targets && Object.keys(state.targets).length){
@@ -715,18 +715,18 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
         const c=(rs.find(x=>x.sym===sym)||{qty:0}).qty*priceOf(sym)/inv*100;
         const d=c-tgt; if(worst===null||d<worst.d) worst={sym,d};
       }
-      if(worst && worst.d<-3) items.push({ic:'🎛️', title:'Feed the laggard', detail:`${worst.sym.replace('-','.')} is ${Math.abs(worst.d).toFixed(0)}% under target`, sev:'warn', t:'Rebalance with new money',
+      if(worst && worst.d<-3) items.push({ic:'layers', title:'Feed the laggard', detail:`${worst.sym.replace('-','.')} is ${Math.abs(worst.d).toFixed(0)}% under target`, sev:'warn', t:'Rebalance with new money',
         b:`${worst.sym.replace('-','.')} sits ${Math.abs(worst.d).toFixed(1)}% below the target mix you set. Pointing the next deposit at it restores your chosen balance — no selling, no taxes.`});
     }
   }
   // single-company weight (index funds are already diversified — shared set in seed.js)
   const singles=rs.filter(x=>!DIVERSIFIED_FUNDS.has(x.sym)).map(x=>({sym:x.sym, w:x.qty*priceOf(x.sym)/Math.max(1,t.value)})).sort((a,b)=>b.w-a.w);
-  if(singles.length && singles[0].w>0.15) items.push({ic:'⚖️', title:'Trim a big bet', detail:`${singles[0].sym.replace('-','.')} is ${(singles[0].w*100).toFixed(0)}% of everything`, sev:'warn', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
+  if(singles.length && singles[0].w>0.15) items.push({ic:'layers', title:'Trim a big bet', detail:`${singles[0].sym.replace('-','.')} is ${(singles[0].w*100).toFixed(0)}% of everything`, sev:'warn', t:`${singles[0].sym.replace('-','.')} is a big single bet`,
     b:`${(singles[0].w*100).toFixed(0)}% of everything rides on one company. Steering new contributions to your index funds dilutes that gradually — no selling, no taxes.`});
   // all-equity note
   if(!rs.some(x=>['BND','BNDX','AGG','BSV'].includes(x.sym))){
     const rk=riskStats();
-    items.push({ic:'🛡️', title:'Know your risk', detail:`100% stocks · worst dip ${rk?rk.mdd.toFixed(0):'–'}%`, sev:'info', t:'100% stocks — know the ride',
+    items.push({ic:'shield', title:'Know your risk', detail:`100% stocks · worst dip ${rk?rk.mdd.toFixed(0):'–'}%`, sev:'info', t:'100% stocks — know the ride',
       b:`Maximum long-run growth, but your worst drop so far was ${rk?rk.mdd.toFixed(0):'-'}%. Fine for a long horizon; if a big goal is under ~5 years away, a slice of bonds (BND) softens the swings.`});
   }
   // tax lots turning long-term soon
@@ -736,7 +736,7 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   if(turning.length){
     const x=turning[0], d=new Date(x.at).toLocaleDateString([],{month:'short',day:'numeric'});
     const dl=Math.max(1,Math.ceil((x.at-now)/86400e3));
-    items.push({ic:'🧾', title:'Tax timing', detail:`${x.sym.replace('-','.')} turns long-term in ${dl}d`, sev:'warn', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
+    items.push({ic:'calendar', title:'Tax timing', detail:`${x.sym.replace('-','.')} turns long-term in ${dl}d`, sev:'warn', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
       b:`A lot with ${fmtSign(x.g)} of gain turns long-term on ${d} — before that, the gain would be taxed at the higher short-term rate.`});
   }
   // contribution cadence
@@ -744,14 +744,14 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const lastBuy=buys.map(l=>l.date).sort().pop();
   if(lastBuy){
     const days=Math.floor((now-new Date(lastBuy+'T12:00:00').getTime())/86400e3);
-    if(days>40) items.push({ic:'🔁', title:'Keep investing', detail:`${days} days since your last buy`, sev:'warn', t:'Keep the contribution streak',
+    if(days>40) items.push({ic:'refresh', title:'Keep investing', detail:`${days} days since your last buy`, sev:'warn', t:'Keep the contribution streak',
       b:`Last buy was ${days} days ago. Your pace so far has been ~${fmt(pmt)}/mo. The projection below shows what today's money does on its own — every new buy lifts the whole fan.`});
   }
-  if(!state.goal||!(state.goal.amt>0)) items.push({ic:'🎯', title:'Set a goal', detail:'No target set yet', sev:'info', t:'Set a goal',
+  if(!state.goal||!(state.goal.amt>0)) items.push({ic:'target', title:'Set a goal', detail:'No target set yet', sev:'info', t:'Set a goal',
     b:'Give the money a number. A target unlocks the progress ring and a projected finish date on the Portfolio tab.'});
   // vs a savings account — what taking the market ride has actually been worth
   const sav=savingsAlt();
-  if(sav && Math.abs(sav.ahead)>100) items.push({ic:'🏦', title:'Beating the bank', detail:`${fmtSign(sav.ahead)} vs a savings account`, sev:'info', t:'Your money vs a savings account',
+  if(sav && Math.abs(sav.ahead)>100) items.push({ic:'wallet', title:'Beating the bank', detail:`${fmtSign(sav.ahead)} vs a savings account`, sev:'info', t:'Your money vs a savings account',
     b:`If every deposit had gone into a 3%/yr savings account instead, you'd have <b>${fmt(sav.alt)}</b> today. You have <b>${fmt(sav.val)}</b> — <b class="${cls(sav.ahead)}">${fmtSign(sav.ahead)}</b> ${sav.ahead>=0?'ahead':'behind'} for taking the market ride. Over decades this gap is where wealth actually comes from.`});
   return items.slice(0,4);
 }
@@ -770,10 +770,10 @@ function renderCoach(){
   const items=coachItems();
   grid.innerHTML = items.length ? items.map(x=>
     `<div class="icard cmove sev-${x.sev||'info'}">
-      <div class="cmhead"><span class="cicon">${x.ic}</span><span class="chev">›</span></div>
+      <div class="cmhead"><span class="cicon"><svg aria-hidden="true"><use href="#i-${x.ic}"/></svg></span><span class="chev"><svg aria-hidden="true"><use href="#i-chevron-right"/></svg></span></div>
       <div class="ctitle">${x.title}</div>
       <div class="cdetail">${x.detail}</div></div>`).join('')
-    : '<div class="icard wide"><div class="sub-n" style="text-align:center;padding:10px 0">✓ Nothing needs your attention — the portfolio is running clean.</div></div>';
+    : '<div class="icard wide coach-empty">Nothing needs your attention. The portfolio is running clean.</div>';
   grid.querySelectorAll('.cmove').forEach((el,i)=> el.onclick=()=>openInfoSheet(items[i].t, `<p>${items[i].b}</p>`));
 }
 let projYears=10;

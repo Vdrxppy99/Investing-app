@@ -30,11 +30,11 @@ const COLORS = {'VTI':CAT[0],'VXUS':CAT[1],'VXF':CAT[2],'VOO':CAT[3],'BRK-B':CAT
 const DIVERSIFIED_FUNDS = new Set(['VOO','VTI','VXF','VXUS','VYM','VT','BND','VNQ','SCHD','QQQ','AVUV','GLDM','VGT','BRK-B']);
 /* Personal data no longer ships in this public file — it lives encrypted in the
    vault on your device (js/vault.js). Fresh devices start empty: restore via
-   ⚙︎ → Import backup. */
+   Settings → Import backup. */
 const SEED_HOLDINGS = [];
 const SEED_LOTS = [];
 const SEED_CASH = { main:0, brok:0 };
-const SEED_DEPOSITS = 0; // net deposits across accounts — edit via ⚙︎ to match Vanguard's performance page exactly
+const SEED_DEPOSITS = 0; // net deposits across accounts — edit via Settings to match Vanguard's performance page exactly
 const SEED_CONFIRMED = '';
 const STALE_DAYS = 30; // remind to refresh holdings after this many days
 const SEED_TS = new Date('2026-07-01T16:15:00-04:00').getTime();

@@ -2,7 +2,7 @@
    ICONS — one set, Lucide (ISC), inlined as a <symbol> sprite.
    Referenced everywhere as: <svg class="..."><use href="#i-name"/></svg>
 
-   Replaces 13 different emoji that were doing interface duty (☁️ 👀 💬 ➤ ✕ ⚙︎
+   Replaces 13 different emoji that were doing interface duty (☁️ 👀 💬 ➤ ✕ Settings
    ☆ ★ 🔔 🔒 💵 🎯 🏦) plus a set of hand-rolled SVG path strings built inside JS
    template literals. Those were two visibly different icon languages sitting
    next to each other.

@@ -137,7 +137,7 @@ async function unlockWithFace(){
   window.VAULT_DATA=await loadVaultData();
 }
 
-/* ---------- security API used by the app (⚙︎ sheet) ---------- */
+/* ---------- security API used by the app (Settings sheet) ---------- */
 window.vaultLock=()=>location.reload(); // MK lives only in memory — reload = locked
 window.vaultFaceEnabled=()=>!!LS.getItem('pt_v_prf');
 window.vaultEnableFace=enrollFace;

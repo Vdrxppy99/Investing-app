@@ -1672,3 +1672,72 @@
   }
   .page h2:not(.card__title):not(.group2__label) + .estnote { margin-top: 0; }
 }
+
+@layer components {
+  /* The demo badge is fixed at the top centre, and Explore's search bar is
+     sticky at top:0 — so the badge sat on top of the search field. The shell
+     already gets top padding in demo mode; the sticky element needs the same
+     offset or it slides underneath. */
+  body.demo .searchsticky { top: calc(env(safe-area-inset-top) + var(--s-8)); }
+
+  /* Ideas rows: the "why this" sentence was wrapping to four lines and dragging
+     the price far from the name it belongs to. Two lines, clamped — the full
+     text is in the detail sheet, and the point of this list is to scan. */
+  #ideaList .nrow, #ideaList .mrow { align-items: flex-start; }
+  #ideaList .iwhy, #ideaList .nmeta, #ideaList .msub {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+  }
+  /* Price and delta stay pinned to the top of the row so they line up with the
+     ticker rather than floating beside the middle of a paragraph. */
+  #ideaList .hright, #ideaList .mright { align-self: flex-start; text-align: right; }
+}
+
+@layer components {
+  /* ── Coach / "Next moves" tiles ───────────────────────────────────────────
+     Was: emoji as the icon, a heading-sized title wrapping to two lines, and a
+     body line wrapping to three — four tiles filling a whole screen. Now a real
+     icon, a compact title and a caption, so the grid scans in one glance. */
+  #coachGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
+  .cmove {
+    display: grid;
+    gap: var(--s-1);
+    align-content: start;
+    padding: var(--s-3);
+    background: var(--surface-2);
+    border-radius: var(--r-button);
+    min-width: 0;
+    transition: background-color var(--dur-micro) var(--ease-out);
+  }
+  .cmove:active { background: var(--surface-3); }
+  .cmhead { display: flex; align-items: center; justify-content: space-between; }
+  .cicon svg { width: 20px; height: 20px; color: var(--primary); }
+  .cmhead .chev svg { width: 16px; height: 16px; color: var(--text-faint); }
+  /* Severity is carried by the icon colour — one hue, no extra palette. */
+  .cmove.sev-warn .cicon svg { color: var(--secondary); }
+  .ctitle {
+    font-size: var(--t-label);
+    line-height: var(--lh-label);
+    font-weight: var(--w-bold);
+    color: var(--text);
+  }
+  .cdetail {
+    font-size: var(--t-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .coach-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    padding: var(--s-4);
+  }
+}

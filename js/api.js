@@ -338,7 +338,7 @@ async function pushReconcile(){
     if(r.ok){ pushSyncLast=Date.now(); paintPushIfOpen(); }
   }catch(e){ /* subscribe blocked (e.g. not installed) — leave as-is; user can re-toggle */ }
 }
-function paintPushIfOpen(){ // self-contained (openEdit's paintPush is a closure) — keeps the ⚙︎ toggle honest
+function paintPushIfOpen(){ // self-contained (openEdit's paintPush is a closure) — keeps the Settings toggle honest
   const el=document.getElementById('pushTgl'); if(!el) return;
   const on=!!(lsGet('pt_push')||{}).on;
   el.textContent = on ? 'Turn off reports' : '🔔 Turn on reports';

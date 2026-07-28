@@ -9,7 +9,7 @@ const EXPLAIN = {
   'Invested':['Invested','Your cost basis: the total you paid for the shares you still hold in this account.']
 };
 function openInfoSheet(title, html){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div><div class="infobody">${html}</div>`;
+  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="infobody">${html}</div>`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
@@ -70,7 +70,7 @@ function askValue(opts){
 
 function explainStat(key){ const e=EXPLAIN[key]; if(e) openInfoSheet(e[0], `<p>${e[1]}</p>`); }
 function openListSheet(title, bodyHtml, note){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>
+  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
     ${bodyHtml}${note?`<div class="inc-note">${note}</div>`:''}`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
@@ -86,7 +86,7 @@ async function openStockSheet(sym, name){
       <div class="hsym" style="font-size:18px">${esc(sym.replace('-','.'))}</div>
       <div style="color:var(--mut);font-size:13px;margin-top:2px">${esc(name||'')}</div>
       <div id="ssPrice" style="font-size:26px;font-weight:700;margin-top:8px">${q?fmtP(q.price):'…'}</div>
-    </div><div style="display:flex;gap:8px;align-items:flex-start"><button class="xbtn" id="watchBtn" style="font-size:17px"></button><button class="xbtn" id="detailX">✕</button></div></div>
+    </div><div style="display:flex;gap:8px;align-items:flex-start"><button class="xbtn" id="watchBtn" style="font-size:17px"></button><button class="xbtn" id="detailX"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div></div>
     <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px">Loading chart…</div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats" id="ssStats"></div>`;

@@ -6,7 +6,7 @@
 	<integer>12</integer>
 	<key>logs</key>
 	<dict>
-		<key>2F3499CD-CED0-4EE6-855D-3D9AF6479550</key>
+		<key>A9D7A135-CF41-4980-881E-F67258F86C3E</key>
 		<dict>
 			<key>className</key>
 			<string>IDECommandLineBuildLog</string>
@@ -15,49 +15,7 @@
 			<key>domainType</key>
 			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
 			<key>fileName</key>
-			<string>2F3499CD-CED0-4EE6-855D-3D9AF6479550.xcactivitylog</string>
-			<key>hasPrimaryLog</key>
-			<true/>
-			<key>primaryObservable</key>
-			<dict>
-				<key>highLevelStatus</key>
-				<string>W</string>
-				<key>totalNumberOfAnalyzerIssues</key>
-				<integer>0</integer>
-				<key>totalNumberOfErrors</key>
-				<integer>0</integer>
-				<key>totalNumberOfTestFailures</key>
-				<integer>0</integer>
-				<key>totalNumberOfWarnings</key>
-				<integer>2</integer>
-			</dict>
-			<key>schemeIdentifier-containerName</key>
-			<string>Portfolio project</string>
-			<key>schemeIdentifier-schemeName</key>
-			<string>Portfolio</string>
-			<key>schemeIdentifier-sharedScheme</key>
-			<integer>1</integer>
-			<key>signature</key>
-			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
-			<key>timeStartedRecording</key>
-			<real>806932860.41587496</real>
-			<key>timeStoppedRecording</key>
-			<real>806932871.85721099</real>
-			<key>title</key>
-			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
-			<key>uniqueIdentifier</key>
-			<string>2F3499CD-CED0-4EE6-855D-3D9AF6479550</string>
-		</dict>
-		<key>7C91A885-047F-43C0-9A50-D32AE8956F14</key>
-		<dict>
-			<key>className</key>
-			<string>IDECommandLineBuildLog</string>
-			<key>documentTypeString</key>
-			<string>&lt;nil&gt;</string>
-			<key>domainType</key>
-			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
-			<key>fileName</key>
-			<string>7C91A885-047F-43C0-9A50-D32AE8956F14.xcactivitylog</string>
+			<string>A9D7A135-CF41-4980-881E-F67258F86C3E.xcactivitylog</string>
 			<key>hasPrimaryLog</key>
 			<true/>
 			<key>primaryObservable</key>
@@ -82,13 +40,55 @@
 			<key>signature</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>timeStartedRecording</key>
-			<real>806933274.30744803</real>
+			<real>806960475.17171705</real>
 			<key>timeStoppedRecording</key>
-			<real>806933276.66658199</real>
+			<real>806960479.62222302</real>
 			<key>title</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>uniqueIdentifier</key>
-			<string>7C91A885-047F-43C0-9A50-D32AE8956F14</string>
+			<string>A9D7A135-CF41-4980-881E-F67258F86C3E</string>
+		</dict>
+		<key>AD1DD91E-93F1-422F-A754-9F7F55567C41</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>AD1DD91E-93F1-422F-A754-9F7F55567C41.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>S</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>0</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>Portfolio project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>Portfolio</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
+			<key>timeStartedRecording</key>
+			<real>806960008.98123395</real>
+			<key>timeStoppedRecording</key>
+			<real>806960011.53025496</real>
+			<key>title</key>
+			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
+			<key>uniqueIdentifier</key>
+			<string>AD1DD91E-93F1-422F-A754-9F7F55567C41</string>
 		</dict>
 	</dict>
 </dict>

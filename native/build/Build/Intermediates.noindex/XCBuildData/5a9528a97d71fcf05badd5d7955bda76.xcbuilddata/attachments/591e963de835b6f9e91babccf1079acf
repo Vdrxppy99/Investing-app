@@ -1,0 +1,59 @@
+{
+  "" : {
+    "diagnostics" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Portfolio-primary.dia",
+    "emit-module-dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Portfolio-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Portfolio-primary-emit-module.dia",
+    "pch" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Portfolio-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Portfolio-primary.swiftdeps"
+  },
+  "/Users/isaacamsalu/Claude/Projects/Investing-app/native/Portfolio/Biometrics.swift" : {
+    "const-values" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics.swiftconstvalues",
+    "dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics.d",
+    "diagnostics" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics.dia",
+    "index-unit-output-path" : "/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics.o",
+    "llvm-bc" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics.bc",
+    "object" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics.o",
+    "swift-dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics.swiftdeps",
+    "swiftmodule" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Biometrics~partial.swiftmodule"
+  },
+  "/Users/isaacamsalu/Claude/Projects/Investing-app/native/Portfolio/Dialogs.swift" : {
+    "const-values" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs.swiftconstvalues",
+    "dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs.d",
+    "diagnostics" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs.dia",
+    "index-unit-output-path" : "/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs.o",
+    "llvm-bc" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs.bc",
+    "object" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs.o",
+    "swift-dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs.swiftdeps",
+    "swiftmodule" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/Dialogs~partial.swiftmodule"
+  },
+  "/Users/isaacamsalu/Claude/Projects/Investing-app/native/Portfolio/PortfolioApp.swift" : {
+    "const-values" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp.swiftconstvalues",
+    "dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp.d",
+    "diagnostics" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp.dia",
+    "index-unit-output-path" : "/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp.o",
+    "llvm-bc" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp.bc",
+    "object" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp.o",
+    "swift-dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp.swiftdeps",
+    "swiftmodule" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/PortfolioApp~partial.swiftmodule"
+  },
+  "/Users/isaacamsalu/Claude/Projects/Investing-app/native/Portfolio/WebScreen.swift" : {
+    "const-values" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen.swiftconstvalues",
+    "dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen.d",
+    "diagnostics" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen.dia",
+    "index-unit-output-path" : "/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen.o",
+    "llvm-bc" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen.bc",
+    "object" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen.o",
+    "swift-dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen.swiftdeps",
+    "swiftmodule" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/WebScreen~partial.swiftmodule"
+  },
+  "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/isaacamsalu/Claude/Projects/Investing-app/native/build/Build/Intermediates.noindex/Portfolio.build/Debug-iphonesimulator/Portfolio.build/Objects-normal/x86_64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

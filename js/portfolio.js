@@ -68,8 +68,8 @@ function renderList(){
         <div class="hval">${fmt(val)}</div>
         <div class="hpl ${cls(pl)}">${fmtSign(pl)} · ${fmtPct(plp)}</div>
       </div><div class="wbar"><i style="width:${(val/wtot*100).toFixed(1)}%"></i></div></div>`;
-  }).join('') || `<div class="empty"><div class="ei">📄</div><div class="et">No holdings yet</div>
-    <div class="eb">Add your first position with ⚙︎ above, or restore everything from a backup file.</div>
+  }).join('') || `<div class="empty"><div class="ei"><svg aria-hidden="true"><use href="#i-layers"/></svg></div><div class="et">No holdings yet</div>
+    <div class="eb">Add your first position with Settings above, or restore everything from a backup file.</div>
     <button class="btn pri" id="emptyAdd" style="margin-top:12px">Open settings</button></div>`;
   const ea=$('emptyAdd'); if(ea) ea.onclick=openEdit;
   $('holdList').querySelectorAll('.hrow').forEach(el=> el.onclick = ()=>openDetail(el.dataset.sym));
@@ -135,7 +135,7 @@ function renderTargetMix(rs, tot){
   }).join('');
   const tip = (worst && worst.d<-1)
     ? `<div class="tgtnext">Next deposit → <b>${esc(worst.sym.replace('-','.'))}</b> (${Math.abs(worst.d).toFixed(1)}% under target). Buying the laggard rebalances without selling — no taxes.</div>`
-    : `<div class="tgtnext">✓ Everything is within reach of its target.</div>`;
+    : `<div class="tgtnext">Everything is within reach of its target.</div>`;
   const plan=`<div class="tgtplan"><input id="tgtDep" type="number" inputmode="decimal" placeholder="Adding money? e.g. 500" aria-label="Deposit amount to plan">
     <button class="btn pri" id="tgtDepGo" style="min-height:38px;padding:8px 14px">Plan it</button></div><div id="tgtDepOut"></div>`;
   box.innerHTML=`<div class="tgthead">Target mix · bar = now, notch = target <a href="#" id="tgtEditLnk">edit</a></div>${rowsH}${tip}${plan}`;
@@ -309,7 +309,7 @@ function renderStale(){
   el.innerHTML = `<span class="ic">⚠︎</span>
     <span class="tx">Holdings last confirmed <b>${when}</b> (${days} days ago). Buy anything since? Send your latest Vanguard statement to refresh, or log it here.</span>
     <button class="act" id="staleAct">Update</button>
-    <button class="x" id="staleX" title="Dismiss" aria-label="Dismiss reminder">✕</button>`;
+    <button class="x" id="staleX" title="Dismiss" aria-label="Dismiss reminder"><svg aria-hidden="true"><use href="#i-x"/></svg></button>`;
   el.classList.remove('hidden');
   $('staleAct').onclick = openEdit;
   $('staleX').onclick = ()=>{ staleDismissed=true; el.classList.add('hidden'); };
@@ -332,7 +332,7 @@ function setStatus(){
   const st=$('status');
   if(window.vaultSaveError || window.storageFull){ // data at risk beats everything else on this line
     st.className='status err';
-    $('statusTx').textContent='⚠ Couldn’t save your changes on this device — export a backup now (⚙︎).';
+    $('statusTx').textContent='⚠ Couldn’t save your changes on this device — export a backup now (Settings).';
     return;
   }
   const newest = Math.max(...uniqSyms().map(s=>state.quotes[s]?state.quotes[s].ts:0), SEED_TS);
@@ -701,7 +701,7 @@ function openDetail(sym){
       <div class="hsym" style="font-size:18px">${esc(sym.replace('-','.'))}</div>
       <div style="color:var(--mut);font-size:13px;margin-top:2px">${esc(NAMES[sym]||'')}</div>
       <div style="font-size:26px;font-weight:700;margin-top:8px">${fmtPx(p)} <span style="font-size:14px" class="${cls(dp)}">${fmtPct(dp)} today</span></div>
-    </div><button class="xbtn" id="detailX">✕</button></div>
+    </div><button class="xbtn" id="detailX"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px"></div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats">
@@ -776,9 +776,9 @@ function openEdit(){
     <td><input data-i="${i}" data-f="sym" value="${esc(h.sym)}"></td>
     <td><input data-i="${i}" data-f="qty" type="number" step="any" value="${h.qty}"></td>
     <td><input data-i="${i}" data-f="cost" type="number" step="any" value="${h.cost}"></td>
-    <td><button class="del" data-i="${i}">✕</button></td></tr>`).join('');
+    <td><button class="del" data-i="${i}"><svg aria-hidden="true"><use href="#i-x"/></svg></button></td></tr>`).join('');
   $('editSheet').innerHTML = `
-    <div class="sheet-head"><div class="hsym" style="font-size:17px">Edit holdings</div><button class="xbtn" id="editX">✕</button></div>
+    <div class="sheet-head"><div class="hsym" style="font-size:17px">Edit holdings</div><button class="xbtn" id="editX"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="buybox">
       <div class="buytitle">Record a purchase</div>
       <div class="buyrow">
@@ -813,7 +813,7 @@ function openEdit(){
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">You're exploring a fictional example portfolio. Nothing here is saved and it can't see, read, or touch any real account. Exit to return to the lock screen.</div>
     ` : `
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Security</div>
-    <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button><button class="btn sec" id="cloudTgl"></button></div>
+    <div class="ebtns"><button class="btn sec" id="lockNow"><svg aria-hidden="true"><use href="#i-lock"/></svg> Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button><button class="btn sec" id="cloudTgl"></button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it. Cloud backup keeps an encrypted copy on your own server — unreadable without your passcode, so a lost phone loses nothing.</div>
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Daily reports</div>
     <div class="ebtns"><button class="btn sec" id="pushTgl"></button><button class="btn sec" id="pushTest" style="display:none">Send test now</button></div>
