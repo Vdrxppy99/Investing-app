@@ -1384,3 +1384,173 @@
   .ai-title { font-size: var(--t-heading); font-weight: var(--w-bold); }
   .ai-inputrow { display: flex; gap: var(--s-2); align-items: center; }
 }
+
+@layer components {
+  /* ── The surviving class contract, part 2 ─────────────────────────────────
+     Found by redesign/class-check.mjs: 47 classes the engine emits had no
+     definition, so they rendered with no size — which is why whole sections of
+     Insights looked empty. These are the ones whose structure is confirmed from
+     the markup that emits them. */
+
+  /* Buttons: the engine writes <button class="btn pri|sec|warn">. */
+  .btn.pri { background: var(--primary-fill); color: var(--on-primary); border-bottom: var(--edge) solid var(--primary-edge); }
+  .btn.pri:active { border-bottom-width: 0; transform: translateY(var(--edge)) scale(var(--press-scale)); }
+  .btn.sec { background: var(--surface-2); color: var(--text); border: var(--hairline) solid var(--line); }
+  .btn.warn { background: var(--surface-2); color: var(--loss); }
+  .ebtns { display: flex; gap: var(--s-2); }
+  .ebtns .btn { flex: 1; }
+
+  /* Sheet chrome emitted by sheets.js. */
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding-bottom: var(--s-3);
+  }
+  .xbtn {
+    display: inline-grid;
+    place-items: center;
+    width: var(--tap);
+    height: var(--tap);
+    margin: calc(var(--s-2) * -1);
+    border-radius: var(--r-pill);
+    color: var(--text-muted);
+    font-size: var(--t-heading);
+  }
+  .infobody, .cdetail { display: grid; gap: var(--s-3); font-size: var(--t-body); }
+  .cmhead, .ctitle { font-size: var(--t-heading); font-weight: var(--w-bold); }
+  .cicon { flex-shrink: 0; color: var(--text-muted); }
+
+  /* Empty state emitted by renderList(): .ei icon, .et title, .eb body. */
+  .ei { font-size: var(--t-title); color: var(--text-faint); }
+  .et { font-size: var(--t-heading); font-weight: var(--w-bold); margin-top: var(--s-2); }
+  .eb { font-size: var(--t-caption); color: var(--text-muted); margin-top: var(--s-1); max-width: 34ch; }
+
+  /* Allocation legend rows, market rows, and the assorted value/label spans. */
+  .alg, .alp { font-size: var(--t-caption); }
+  .alg { color: var(--text-muted); }
+  .alp { font-weight: var(--w-bold); }
+  .mark { flex: 1; min-width: 0; }
+  .mpx { font-size: var(--t-label); font-weight: var(--w-bold); }
+  .mchg { font-size: var(--t-caption); font-weight: var(--w-semibold); }
+  .big-n { font-size: var(--t-title); line-height: var(--lh-title); font-weight: var(--w-black); }
+  .statsub, .inc-total, .iwhy, .tgtsum, .tgtnext { font-size: var(--t-caption); color: var(--text-muted); }
+  .inc-total { font-weight: var(--w-bold); color: var(--text); }
+  .risk-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 var(--s-2);
+                border-radius: var(--r-pill); background: var(--surface-3); font-size: var(--t-caption); font-weight: var(--w-semibold); }
+  .tx { color: var(--text); }
+  .warn { color: var(--secondary); }
+  .dot { width: var(--s-2); height: var(--s-2); border-radius: var(--r-pill); background: currentColor; }
+  .wide { grid-column: 1 / -1; }
+
+  /* Range / target bars. */
+  .rangebar, .rb-track { position: relative; height: var(--s-2); background: var(--surface-2); border-radius: var(--r-pill); }
+  .rb-lbls { display: flex; justify-content: space-between; font-size: var(--t-caption); color: var(--text-faint); margin-top: var(--s-1); }
+  .tgtplan, .tgs { display: grid; gap: var(--s-2); }
+  .tgtlink { color: var(--primary); font-size: var(--t-caption); font-weight: var(--w-semibold); }
+
+  .buybox, .buydiv { display: grid; gap: var(--s-3); }
+  .chart-box { position: relative; }
+  .accbreak { font-size: var(--t-caption); color: var(--text-muted); }
+
+  /* Skeletons the engine emits under its own names. */
+  .skel-lines, .skel-row, .skel-tile, .skel-badge {
+    background: var(--skeleton); border-radius: var(--r-input); position: relative; overflow: hidden;
+  }
+  .skel-lines { height: var(--s-3); }
+  .skel-row { height: 56px; }
+  .skel-tile { height: 72px; }
+  .skel-badge { width: 40px; height: 40px; }
+}
+
+@layer components {
+  /* ── Assistant, polished ──────────────────────────────────────────────────
+     Reads as a product surface rather than a floating div: a titled header with
+     a status dot, bubbles with real tails, chips that scroll, and an input row
+     that clears the home indicator. */
+  .aipanel {
+    inset: auto var(--s-4) calc(var(--s-9) + env(safe-area-inset-bottom) + var(--s-3)) var(--s-4);
+    max-height: 72dvh;
+    border-radius: var(--r-card);
+    overflow: hidden;
+  }
+  .aipanel__head, .ai-head {
+    padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
+    background: var(--surface);
+    border-bottom: var(--hairline) solid var(--line);
+  }
+  .ai-title::before {
+    content: "";
+    display: inline-block;
+    width: var(--s-2);
+    height: var(--s-2);
+    margin-right: var(--s-2);
+    border-radius: var(--r-pill);
+    background: var(--gain);
+    vertical-align: middle;
+  }
+  .aipanel__msgs { padding: var(--s-4); gap: var(--s-3); background: var(--canvas); }
+
+  .ai-bub {
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-1);
+  }
+  /* A single squared corner on the speaker's side is the tail — enough to say
+     who is talking without drawing an actual pointer. */
+  .ai-msg.ai .ai-bub { border-bottom-left-radius: var(--s-1); }
+  .ai-msg.me .ai-bub { border-bottom-right-radius: var(--s-1); color: var(--text); }
+  .ai-bub p { margin: 0 0 var(--s-2); }
+  .ai-bub p:last-child { margin-bottom: 0; }
+  .ai-bub b, .ai-bub strong { font-weight: var(--w-bold); }
+  .ai-src { padding-top: var(--s-2); border-top: var(--hairline) solid var(--line); }
+
+  /* Suggestion chips read as tappable, and scroll rather than wrap into a wall. */
+  .aipanel__chips { padding: var(--s-2) var(--s-4) var(--s-3); background: var(--canvas); }
+  .aipanel__chips .chip {
+    background: var(--surface);
+    border: var(--hairline) solid var(--line);
+    color: var(--primary);
+    height: 32px;
+    cursor: pointer;
+  }
+  .aipanel__chips .chip:active { background: var(--surface-2); }
+
+  .aipanel__inputrow, .ai-inputrow {
+    padding: var(--s-3);
+    background: var(--surface);
+    border-top: var(--hairline) solid var(--line);
+    padding-bottom: max(var(--s-3), env(safe-area-inset-bottom));
+  }
+  .aipanel__inputrow .input, .ai-inputrow input {
+    flex: 1;
+    height: 40px;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--border-control);
+    padding: 0 var(--s-4);
+  }
+  #aiSend {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-pill);
+    background: var(--primary-fill);
+    color: var(--on-primary);
+  }
+  #aiSend svg { width: 18px; height: 18px; }
+
+  /* "Thinking" as three settling dots rather than a word. */
+  .askthinking { display: inline-flex; gap: var(--s-1); align-items: center; padding: var(--s-2) 0; }
+  .askthinking::before, .askthinking::after,
+  .askthinking > span {
+    content: "";
+    width: var(--s-1);
+    height: var(--s-1);
+    border-radius: var(--r-pill);
+    background: var(--text-faint);
+    animation: typing var(--dur-shimmer) ease-in-out infinite;
+  }
+  .askthinking::after { animation-delay: var(--dur-stagger); }
+}
