@@ -13,6 +13,9 @@ cd "$(dirname "$0")"
 MODE="${1:-simulator}"
 command -v xcodegen >/dev/null || { echo "✗ brew install xcodegen"; exit 1; }
 
+# One app, two platforms: the shell must report the same version as the web build.
+../scripts/sync-version.sh 2>/dev/null || "$(cd .. && pwd)/scripts/sync-version.sh"
+
 echo "→ generating Xcode project…"
 xcodegen generate --quiet
 

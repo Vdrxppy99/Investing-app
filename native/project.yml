@@ -7,7 +7,12 @@ options:
 
 settings:
   base:
-    MARKETING_VERSION: "1.0"
+    # HARD RULE: the native shell and the web app are ONE app on two platforms and
+    # must always report the same version. The shell loads the live GitHub Pages
+    # build, so the content is already identical by construction — this keeps the
+    # number the user sees in Settings honest too. scripts/sync-version.sh reads it
+    # from index.html so the two cannot drift.
+    MARKETING_VERSION: "4.3.1"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic
