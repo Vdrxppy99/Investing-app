@@ -1579,3 +1579,96 @@
   .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
   .toast.bad { color: var(--loss); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LABEL / VALUE ROWS — the polish pass
+
+   Every one of these is emitted as <div class="row"><span>label</span>
+   <span>value</span></div>. They were flex rows WITHOUT space-between, so the
+   label sat glued to its value and the whole section read as loose prose lying
+   on the page rather than a table of figures. That is what "just plain text
+   lying there" was, in Sectors, Next moves, the Future sections and everywhere
+   else the engine renders a pair.
+
+   The rule real brokerage apps follow, and the one applied here: the LABEL is
+   muted and left, the VALUE is bold, right-aligned and tabular. The eye then
+   scans one column of numbers instead of reading sentences.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .krow, .inc-row, .snrow, .tgtrow, .drow, .hbrow > .t, .hmet > .t, .group__fig {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    min-width: 0;
+  }
+
+  /* Label side: muted, allowed to truncate — a long fund name must never push
+     the number off the edge. */
+  .krow > span:first-child,
+  .inc-row > span:first-child,
+  .snrow > span:first-child,
+  .hbrow > .t > span:first-child,
+  .krow .k, .tgs {
+    color: var(--text-muted);
+    font-weight: var(--w-medium);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Value side: bold, right, tabular, never shrinks. */
+  .krow > span:last-child,
+  .inc-row > span:last-child,
+  .snrow > span:last-child,
+  .hbrow > .t > .p {
+    color: var(--text);
+    font-weight: var(--w-bold);
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .inc-row b { font-weight: var(--w-bold); }
+
+  /* Rows inside a card need dividing, or a stack of them is an undifferentiated
+     block of text. */
+  .krow, .inc-row, .snrow {
+    padding: var(--s-2) 0;
+    border-bottom: var(--hairline) solid var(--line);
+  }
+  .krow:last-child, .inc-row:last-child, .snrow:last-child { border-bottom: none; }
+
+  /* Sector and magnitude bars: label row above, bar below. */
+  .hbrow { display: grid; gap: var(--s-1); padding: var(--s-1) 0; }
+  .hbrow > .t { font-size: var(--t-caption); }
+
+  /* Target-mix rows carry a colour dot, so they stay a single flex line. */
+  .tgtrow { display: flex; align-items: center; }
+  .tgtrow .dot { flex-shrink: 0; }
+  .tgs { flex: 1; }
+
+  /* Coach / "Next moves" tiles — a heading and a sentence, not two loose lines. */
+  #coachGrid .icard, .icard.wide { display: grid; gap: var(--s-1); align-content: start; }
+  #coachGrid .icard .it { color: var(--text-faint); }
+  #coachGrid .icard b { font-size: var(--t-label); font-weight: var(--w-bold); }
+
+  /* Any bare paragraph the engine drops into a card reads as supporting copy,
+     never as the headline. */
+  .icard > div:not([class]), .card > div:not([class]):not([id]) {
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    line-height: var(--lh-caption);
+  }
+
+  /* Section eyebrows the engine writes as bare <h2> inside a page. */
+  .page h2:not(.card__title):not(.group2__label) {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    letter-spacing: var(--tr-heading);
+    font-weight: var(--w-bold);
+    margin: var(--s-5) 0 var(--s-2);
+  }
+  .page h2:not(.card__title):not(.group2__label) + .estnote { margin-top: 0; }
+}
