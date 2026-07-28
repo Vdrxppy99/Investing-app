@@ -455,6 +455,26 @@ function maybeShowRecap(){
       current = p;
       // After the page-in animation commits, not before, or the restore is lost.
       requestAnimationFrame(() => window.scrollTo(0, pos[p] || 0));
+
+      // Late data. Risk, P/E and the crash test need 1-year price history, which
+      // arrives asynchronously after boot. renderAll() re-renders the visible page
+      // when a refresh lands, but the history load does not itself trigger one — so
+      // the FIRST visit to Insights could paint empty containers and stay that way
+      // until you switched tabs and came back. Face ID made it reliable rather than
+      // rare, because getting in fast enough beats the history request.
+      //
+      // Two catch-up renders rather than one: the second covers a slow network.
+      // renderInsights/renderMarkets are idempotent, so re-running them is safe.
+      if (p !== 'portfolio') {
+        clearTimeout(window.__catchUp1); clearTimeout(window.__catchUp2);
+        const again = () => {
+          if (current !== p) return;                    // user moved on; leave it alone
+          if (p === 'insights' && typeof renderInsights === 'function') renderInsights();
+          if (p === 'explore' && typeof renderMarkets === 'function') renderMarkets();
+        };
+        window.__catchUp1 = setTimeout(again, 1200);
+        window.__catchUp2 = setTimeout(again, 4000);
+      }
     };
   }
 
