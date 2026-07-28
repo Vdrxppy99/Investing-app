@@ -508,14 +508,30 @@ function maybeShowRecap(){
      moment you switched tabs and came back. Kick the same self-correcting retry
      once at boot. */
   (function initialPaint(){
-    let tries = 0;
-    const tick = () => {
-      tries++;
-      let failed = 0;
-      try { if (typeof renderAll === 'function') failed = renderAll() || 0; } catch (_) {}
-      if (failed > 0 && tries < 8) setTimeout(tick, 400 * tries);
-    };
-    setTimeout(tick, 500);
+    // UNCONDITIONAL, deliberately. Two earlier attempts gated this on sections
+    // throwing, and both failed for the same reason: the sections do NOT throw.
+    // They render successfully against data that has not arrived yet, report zero
+    // failures, and the retry stops — leaving the screen blank exactly as before.
+    //
+    // refreshAll() does call renderAll() when it finishes, but that is at the END
+    // of phase 2, behind every history download. On a cold start after a Face ID
+    // unlock that can be many seconds of empty screen.
+    //
+    // renderAll() is idempotent and cheap, so re-running it on a fixed schedule
+    // for the first ~12 seconds costs nothing and cannot miss. This is a backstop,
+    // not a diagnosis — see redesign/STATUS.md.
+    const at = [400, 1000, 2000, 3500, 6000, 9000, 12000];
+    at.forEach(ms => setTimeout(() => {
+      try { if (typeof renderAll === 'function') renderAll(); } catch (_) {}
+    }, ms));
+
+    // And repaint the moment the tab is shown again, which is what made switching
+    // tabs "fix" it in the first place.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        try { if (typeof renderAll === 'function') renderAll(); } catch (_) {}
+      }
+    });
   })();
 
   /* theme-color must track the theme or the iOS status bar clashes with the app. */
