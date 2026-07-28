@@ -370,12 +370,15 @@ extern "C" {
 
 #if defined(__OBJC__)
 
+@class WKUserContentController;
+@class WKScriptMessage;
 @class UIRefreshControl;
 @class WKWebView;
 @class WKNavigation;
 @class WKNavigationAction;
 SWIFT_CLASS("_TtCV9Portfolio9WebScreen11Coordinator")
-@interface Coordinator : NSObject <WKNavigationDelegate>
+@interface Coordinator : NSObject <WKNavigationDelegate, WKScriptMessageHandler>
+- (void)userContentController:(WKUserContentController * _Nonnull)c didReceiveScriptMessage:(WKScriptMessage * _Nonnull)message;
 - (void)reload:(UIRefreshControl * _Nonnull)sender;
 - (void)webView:(WKWebView * _Nonnull)webView didFinishNavigation:(WKNavigation * _Null_unspecified)navigation;
 - (void)webView:(WKWebView * _Nonnull)webView didFailNavigation:(WKNavigation * _Null_unspecified)navigation withError:(NSError * _Nonnull)error;

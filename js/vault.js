@@ -222,6 +222,59 @@ function enterDemo(){
 }
 window.exitDemo=()=>location.reload(); // DEMO_MODE isn't persisted → reload returns to the lock screen
 
+
+/* ---------- native Face ID (the iOS shell) ----------
+   WKWebView does not expose WebAuthn, so the passkey path cannot run inside the
+   app at all — which is why every launch there fell back to typing the passcode.
+   The native shell provides window.BasisNative instead: the passcode lives in a
+   Secure Enclave-backed Keychain item whose access control requires biometry, so
+   READING it is the Face ID prompt. See native/Portfolio/Biometrics.swift.
+
+   The vault's cryptography is untouched. This retrieves the passcode and hands it
+   to the same unlockWithPass() the keyboard does, through the same PBKDF2 path. */
+const NATIVE = () => (typeof window !== 'undefined' && window.BasisNative && window.BasisNative.available) ? window.BasisNative : null;
+
+async function nativeCanEnrol(){
+  const n = NATIVE(); if(!n) return false;
+  try { return await n.bioAvailable(); } catch(_) { return false; }
+}
+
+async function nativeUnlock(){
+  const n = NATIVE(); if(!n) return false;
+  let enrolled = false;
+  try { enrolled = await n.bioEnrolled(); } catch(_) { return false; }
+  if(!enrolled) return false;
+  try{
+    const pass = await n.bioLoad();       // this IS the Face ID prompt
+    if(!pass) return false;
+    await unlockWithPass(pass);
+    startApp();
+    return true;
+  }catch(e){
+    const why = (e && e.message) || '';
+    if(why === 'cancelled') return false;            // user dismissed; passcode below
+    if(why === 'invalidated'){
+      // .biometryCurrentSet invalidates the item when a face is added or removed,
+      // so it has to be re-enrolled with the passcode. Clear the stale one.
+      try { await n.bioClear(); } catch(_) {}
+      err('Face ID changed on this device. Enter your passcode once to re-enable it.');
+    }
+    return false;
+  }
+}
+
+/* Offer enrolment after a successful passcode unlock, once, politely. */
+async function nativeOfferEnrol(pass){
+  const n = NATIVE(); if(!n || !pass) return;
+  try{
+    if(await n.bioEnrolled()) return;
+    if(!await n.bioAvailable()) return;
+    if(LS.getItem('pt_bio_declined')) return;
+    await n.bioSave(pass);
+  }catch(_){ /* enrolment is a convenience; never block unlocking on it */ }
+}
+window.basisBioClear = async () => { const n = NATIVE(); if(n) { try { await n.bioClear(); } catch(_) {} } };
+
 /* ---------- lock screen UI ----------
    Phase 3 of the redesign rewired WHICH DOOR OPENS FIRST. The locks are
    untouched: kekFromPass, kekFromPrf, wrapMK, unwrapMK, saveVaultNow,
@@ -414,6 +467,14 @@ function boot(){
 
   /* ---- the front door ---- */
   async function startFront(){
+    // Native shell first: inside the app this is the ONLY biometric route that
+    // exists, because WKWebView has no WebAuthn.
+    if(NATIVE()){
+      showStep(null, 'Unlocking');
+      if(await nativeUnlock()) return;
+      if(!userChose) showPasscode();
+      return;
+    }
     const canFace = window.vaultFaceEnabled() && await window.vaultFaceAvailable();
     if(!canFace){
       // No passkey on this device: the passcode legitimately IS the front door.
@@ -431,7 +492,12 @@ function boot(){
   const tryUnlock = async () => {
     if($id('unlockPass').value===DEMO_PASS){ enterDemo(); return; }
     err(''); const btn=$id('unlockBtn'); btn.textContent='Unlocking'; btn.disabled=true;
-    try{ await unlockWithPass($id('unlockPass').value); startApp(); }
+    try{
+      const typed = $id('unlockPass').value;
+      await unlockWithPass(typed);
+      await nativeOfferEnrol(typed);   // no-op outside the native shell
+      startApp();
+    }
     catch(e){
       err('Wrong passcode.');
       btn.textContent='Unlock'; btn.disabled=false;

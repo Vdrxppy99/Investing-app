@@ -34,6 +34,9 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIStatusBarStyle: UIStatusBarStyleLightContent
+        NSFaceIDUsageDescription: >-
+          Basis uses Face ID to unlock your encrypted portfolio, so you do not have
+          to type your passcode every time you open it.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.portfolio.app

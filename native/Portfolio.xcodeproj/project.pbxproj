@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0825F32CBE2067DAB460ED9A /* Biometrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74499DB955DC56B6520D3119 /* Biometrics.swift */; };
 		56633744217BD6E95255926E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 328468FABD12331FACB44BD5 /* Assets.xcassets */; };
 		71CD5A98E9F86F86C9CBED1A /* WebScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F68354B85D83539E68A0CB3 /* WebScreen.swift */; };
 		B6C313C78C5B96F51535D53C /* Dialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2E5ADFC9B7DA3E6EFEC0F76 /* Dialogs.swift */; };
@@ -16,6 +17,7 @@
 /* Begin PBXFileReference section */
 		0A21D628FE02E7ABAC286618 /* PortfolioApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioApp.swift; sourceTree = "<group>"; };
 		328468FABD12331FACB44BD5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		74499DB955DC56B6520D3119 /* Biometrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Biometrics.swift; sourceTree = "<group>"; };
 		7C00859D0C3AFDD6F1349129 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8F68354B85D83539E68A0CB3 /* WebScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebScreen.swift; sourceTree = "<group>"; };
 		C2E5ADFC9B7DA3E6EFEC0F76 /* Dialogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dialogs.swift; sourceTree = "<group>"; };
@@ -27,6 +29,7 @@
 			isa = PBXGroup;
 			children = (
 				328468FABD12331FACB44BD5 /* Assets.xcassets */,
+				74499DB955DC56B6520D3119 /* Biometrics.swift */,
 				C2E5ADFC9B7DA3E6EFEC0F76 /* Dialogs.swift */,
 				7C00859D0C3AFDD6F1349129 /* Info.plist */,
 				0A21D628FE02E7ABAC286618 /* PortfolioApp.swift */,
@@ -121,6 +124,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0825F32CBE2067DAB460ED9A /* Biometrics.swift in Sources */,
 				B6C313C78C5B96F51535D53C /* Dialogs.swift in Sources */,
 				E6478D2C786CE02974D02289 /* PortfolioApp.swift in Sources */,
 				71CD5A98E9F86F86C9CBED1A /* WebScreen.swift in Sources */,

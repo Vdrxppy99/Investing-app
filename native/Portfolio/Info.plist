@@ -20,6 +20,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Basis uses Face ID to unlock your encrypted portfolio, so you do not have to type your passcode every time you open it.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
