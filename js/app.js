@@ -466,14 +466,23 @@ function maybeShowRecap(){
       // Two catch-up renders rather than one: the second covers a slow network.
       // renderInsights/renderMarkets are idempotent, so re-running them is safe.
       if (p !== 'portfolio') {
-        clearTimeout(window.__catchUp1); clearTimeout(window.__catchUp2);
+        clearTimeout(window.__catchUp);
+        // Self-correcting rather than two fixed timers. renderInsights() now
+        // reports which sections could not render, so this keeps retrying only
+        // while something is still failing, and stops the moment everything is
+        // there. Fixed delays were a guess at how long the data takes; this
+        // measures it instead.
+        let tries = 0;
         const again = () => {
           if (current !== p) return;                    // user moved on; leave it alone
-          if (p === 'insights' && typeof renderInsights === 'function') renderInsights();
+          tries++;
+          let failed = 0;
+          if (p === 'insights' && typeof renderInsights === 'function') failed = renderInsights() || 0;
           if (p === 'explore' && typeof renderMarkets === 'function') renderMarkets();
+          // Back off, and give up after ~12s rather than polling forever.
+          if (failed > 0 && tries < 8) window.__catchUp = setTimeout(again, 400 * tries);
         };
-        window.__catchUp1 = setTimeout(again, 1200);
-        window.__catchUp2 = setTimeout(again, 4000);
+        window.__catchUp = setTimeout(again, 600);
       }
     };
   }

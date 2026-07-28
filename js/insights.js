@@ -324,7 +324,28 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
   });
 }
-function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderFI(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderCrashCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+/* Each section renders independently.
+   Previously this was one straight sequence of 18 calls, so the FIRST one to
+   throw silently killed every section after it — which looks exactly like "the
+   bottom half of Insights is empty". Isolating them means a section that cannot
+   render yet (missing history, a quote that has not landed) costs only itself.
+
+   It also reports which sections came up empty, so the caller can retry just
+   those instead of blindly re-rendering everything. */
+function renderInsights(){
+  const sections = [renderHealth, renderPerf, renderDrawdown, renderCoach, renderProjection,
+    renderFI, renderGainsTable, renderLook, ensureLookQuotes, renderLocDonut, renderPECard,
+    renderRiskCard, renderCrashCard, renderTaxCard, renderSectorDonut, renderHeatmap,
+    renderWorthChart, renderContribChart];
+  const failed = [];
+  for(const fn of sections){
+    try { fn(); } catch(e){ failed.push((fn.name||'section') + ': ' + (e && e.message)); }
+  }
+  if(failed.length) console.warn('[insights] sections deferred:', failed);
+  window.__insightsFailed = failed;
+  setTimeout(ensureChartsSized,150);
+  return failed.length;
+}
 
 /* ---- Crash Test: what past crashes would do to TODAY's portfolio (and that they all healed) ---- */
 const CRASH_SCENARIOS=[
