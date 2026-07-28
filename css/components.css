@@ -1354,3 +1354,33 @@
   .htip { display: flex; gap: var(--s-2); align-items: flex-start; }
   .htip .ti { color: var(--primary); font-weight: var(--w-bold); flex-shrink: 0; }
 }
+
+@layer components {
+  /* ── Assistant: the emitted class contract ────────────────────────────────
+     insights.js opens the panel with classList.toggle('show'), and builds
+     messages as .ai-msg > .ai-bub (+ .ai-src). The rebuilt panel listened for
+     data-open and used .bub, so the assistant could not open at all — and would
+     have been unstyled if it had. Read from the source this time. */
+  .aipanel.show { display: flex; }
+
+  .ai-msg { display: grid; }
+  .ai-msg.me { justify-items: end; }
+  .ai-msg.ai { justify-items: start; }
+  .ai-bub {
+    max-width: 85%;
+    padding: var(--s-3);
+    border-radius: var(--r-button);
+    background: var(--surface);
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+    /* Answers contain figures; they must stay copyable. */
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .ai-msg.me .ai-bub { background: var(--primary-tint); border-bottom-right-radius: var(--s-1); }
+  .ai-msg.ai .ai-bub { border-bottom-left-radius: var(--s-1); }
+  .ai-src { display: block; margin-top: var(--s-2); font-size: var(--t-caption); color: var(--text-faint); }
+  .ai-head { display: flex; align-items: center; justify-content: space-between; }
+  .ai-title { font-size: var(--t-heading); font-weight: var(--w-bold); }
+  .ai-inputrow { display: flex; gap: var(--s-2); align-items: center; }
+}
