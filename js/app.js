@@ -193,9 +193,22 @@ function renderMover(){ // day-change attribution: which holdings drove today's 
   $('moverBody').querySelectorAll('.drow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
 }
 function renderAll(){
-  renderMover(); renderGoal(); renderHomePr(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
+  // Each section renders independently. This used to be one straight sequence, so
+  // the first section to throw silently blanked every section after it — the same
+  // defect renderInsights() had, and the reason Portfolio came up empty after a
+  // Face ID unlock: unlocking with a glance beats the data, one early section
+  // throws on missing history, and the rest never run.
+  const sections = [renderMover, renderGoal, renderHomePr, renderStale, renderHeader,
+    renderChips, renderList, renderChart, renderAlloc, renderIncome, setStatus];
+  const failed = [];
+  for(const fn of sections){
+    try { fn(); } catch(e){ failed.push((fn.name||'section') + ': ' + (e && e.message)); }
+  }
+  if(failed.length) console.warn('[portfolio] sections deferred:', failed);
+  window.__portfolioFailed = failed;
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-explore').classList.contains('hidden')) renderMarkets();
+  return failed.length;
 }
 $('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → Nasdaq 100 → off
   const next = state.view.bench==='off' ? 'VOO' : state.view.bench==='VOO' ? 'VT' : state.view.bench==='VT' ? 'QQQ' : 'off';
@@ -465,7 +478,7 @@ function maybeShowRecap(){
       //
       // Two catch-up renders rather than one: the second covers a slow network.
       // renderInsights/renderMarkets are idempotent, so re-running them is safe.
-      if (p !== 'portfolio') {
+      {
         clearTimeout(window.__catchUp);
         // Self-correcting rather than two fixed timers. renderInsights() now
         // reports which sections could not render, so this keeps retrying only
@@ -477,6 +490,7 @@ function maybeShowRecap(){
           if (current !== p) return;                    // user moved on; leave it alone
           tries++;
           let failed = 0;
+          if (p === 'portfolio' && typeof renderAll === 'function') failed = renderAll() || 0;
           if (p === 'insights' && typeof renderInsights === 'function') failed = renderInsights() || 0;
           if (p === 'explore' && typeof renderMarkets === 'function') renderMarkets();
           // Back off, and give up after ~12s rather than polling forever.
@@ -486,6 +500,23 @@ function maybeShowRecap(){
       }
     };
   }
+
+  /* THE INITIAL PAINT.
+     The retry above only runs when showPage() is called. After unlocking you land
+     on Portfolio without any tab being tapped, so nothing kicked it off — which is
+     precisely why Portfolio came up empty after a Face ID unlock and filled in the
+     moment you switched tabs and came back. Kick the same self-correcting retry
+     once at boot. */
+  (function initialPaint(){
+    let tries = 0;
+    const tick = () => {
+      tries++;
+      let failed = 0;
+      try { if (typeof renderAll === 'function') failed = renderAll() || 0; } catch (_) {}
+      if (failed > 0 && tries < 8) setTimeout(tick, 400 * tries);
+    };
+    setTimeout(tick, 500);
+  })();
 
   /* theme-color must track the theme or the iOS status bar clashes with the app. */
   const meta = document.querySelector('meta[name=theme-color]');
