@@ -284,13 +284,42 @@ function boot(){
     };
     $id('unlockBtn').onclick=tryUnlock;
     $id('unlockPass').addEventListener('keydown',e=>{ if(e.key==='Enter') tryUnlock(); });
+    /* ---------- Face ID first ----------
+       Ported from the redesign branch on its own, because this part is purely
+       behavioural — it changes which door opens first, not how anything looks.
+       The crypto is untouched: unlockWithFace / kekFromPrf / unwrapMK and the
+       pt_v_prf key are exactly as they were.
+
+       Before this, opening the app always presented the passcode field and Face
+       ID was a secondary button you had to find and tap, so every refresh meant
+       typing the passcode. */
     if(window.vaultFaceEnabled()){
-      window.vaultFaceAvailable().then(ok=>{ if(ok) $id('faceBtn').style.display=''; });
-      $id('faceBtn').onclick=async()=>{
+      const runFace=async(fromTap)=>{
         err('');
-        try{ await unlockWithFace(); startApp(); }
-        catch(e){ err(e&&e.name==='NotAllowedError'?'Face ID cancelled — use your passcode.':'Face ID didn’t work — use your passcode.'); }
+        const t0=Date.now();
+        try{ await unlockWithFace(); startApp(); return true; }
+        catch(e){
+          const quick = Date.now()-t0 < 300;
+          // Safari and WKWebView reject navigator.credentials.get() outside a
+          // user gesture with NotAllowedError — the SAME error a real
+          // cancellation throws. A gesture rejection returns almost instantly; a
+          // person dismissing the system sheet cannot. So a sub-300ms rejection
+          // on the automatic attempt means "needs a tap", not "user said no",
+          // and we surface the button instead of an error.
+          if(e&&e.name==='NotAllowedError'&&!fromTap&&quick){ $id('faceBtn').style.display=''; return false; }
+          if(e&&e.name==='NotAllowedError') err('Face ID cancelled — use your passcode.');
+          else err('Face ID didn’t work — use your passcode.');
+          $id('faceBtn').style.display='';
+          return false;
+        }
       };
+      $id('faceBtn').onclick=()=>runFace(true);
+      window.vaultFaceAvailable().then(ok=>{
+        if(!ok) return;
+        $id('faceBtn').style.display='';
+        // Auto-invoke, so the system Face ID sheet is the first thing you see.
+        runFace(false);
+      });
     }
     $id('forgotLink').onclick=e=>{
       e.preventDefault();
