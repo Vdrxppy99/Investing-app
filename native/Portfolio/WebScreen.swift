@@ -69,10 +69,10 @@ struct WebScreen: UIViewRepresentable {
           window.BasisNative = {
             available: true,
             bioAvailable: function () { return call('available'); },
-            bioEnrolled:  function () { return call('enrolled'); },
-            bioSave:      function (secret) { return call('save', { secret: String(secret) }); },
-            bioLoad:      function () { return call('load'); },
-            bioClear:     function () { return call('clear'); }
+            bioEnrolled:  function (user) { return call('enrolled', { user: String(user || '') }); },
+            bioSave:      function (user, secret) { return call('save', { user: String(user || ''), secret: String(secret) }); },
+            bioLoad:      function (user) { return call('load', { user: String(user || '') }); },
+            bioClear:     function (user) { return call('clear', { user: String(user || '') }); }
           };
         })();
         """
@@ -82,19 +82,21 @@ struct WebScreen: UIViewRepresentable {
                   let action = body["action"] as? String,
                   let id = body["id"] as? Int else { return }
 
+            let user = body["user"] as? String ?? ""
+
             switch action {
             case "available":
                 reply(id, ok: true, value: Biometrics.available())
             case "enrolled":
-                reply(id, ok: true, value: Biometrics.isEnrolled())
+                reply(id, ok: true, value: Biometrics.isEnrolled(account: user))
             case "save":
                 let secret = body["secret"] as? String ?? ""
-                reply(id, ok: true, value: secret.isEmpty ? false : Biometrics.save(secret))
+                reply(id, ok: true, value: secret.isEmpty ? false : Biometrics.save(account: user, secret: secret))
             case "clear":
-                Biometrics.remove()
+                Biometrics.remove(account: user)
                 reply(id, ok: true, value: true)
             case "load":
-                Biometrics.load(reason: "Unlock your portfolio") { [weak self] secret, failure in
+                Biometrics.load(account: user, reason: "Sign in to Basis") { [weak self] secret, failure in
                     if let secret {
                         self?.reply(id, ok: true, value: secret)
                     } else {

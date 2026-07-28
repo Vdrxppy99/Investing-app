@@ -223,6 +223,24 @@ function enterDemo(){
 window.exitDemo=()=>location.reload(); // DEMO_MODE isn't persisted → reload returns to the lock screen
 
 
+
+/* ---------- username ----------
+   The vault key is derived from the PASSCODE ALONE, and that cannot change
+   without making the existing encrypted data unopenable — so the username is an
+   identity label, not a second secret. It gates the form and it is the Keychain
+   account under which the credential pair is saved, which is what makes Face ID
+   store a real login rather than a bare password. It is NOT extra encryption
+   strength: it is stored in the clear and pre-filled.
+
+   Defaults to the owner's name so an existing vault, created before this field
+   existed, keeps opening. */
+const USER_KEY = 'pt_user';
+const DEFAULT_USER = 'Isaacamsalu';
+const normUser = u => String(u || '').trim().toLowerCase();
+function savedUser(){ return LS.getItem(USER_KEY) || DEFAULT_USER; }
+window.vaultUser = savedUser;
+window.vaultSetUser = u => { const v = String(u || '').trim(); if(v) LS.setItem(USER_KEY, v); };
+
 /* ---------- native Face ID (the iOS shell) ----------
    WKWebView does not expose WebAuthn, so the passkey path cannot run inside the
    app at all — which is why every launch there fell back to typing the passcode.
@@ -242,10 +260,10 @@ async function nativeCanEnrol(){
 async function nativeUnlock(){
   const n = NATIVE(); if(!n) return false;
   let enrolled = false;
-  try { enrolled = await n.bioEnrolled(); } catch(_) { return false; }
+  try { enrolled = await n.bioEnrolled(savedUser()); } catch(_) { return false; }
   if(!enrolled) return false;
   try{
-    const pass = await n.bioLoad();       // this IS the Face ID prompt
+    const pass = await n.bioLoad(savedUser());   // this IS the Face ID prompt
     if(!pass) return false;
     await unlockWithPass(pass);
     startApp();
@@ -256,7 +274,7 @@ async function nativeUnlock(){
     if(why === 'invalidated'){
       // .biometryCurrentSet invalidates the item when a face is added or removed,
       // so it has to be re-enrolled with the passcode. Clear the stale one.
-      try { await n.bioClear(); } catch(_) {}
+      try { await n.bioClear(savedUser()); } catch(_) {}
       err('Face ID changed on this device. Enter your passcode once to re-enable it.');
     }
     return false;
@@ -267,13 +285,13 @@ async function nativeUnlock(){
 async function nativeOfferEnrol(pass){
   const n = NATIVE(); if(!n || !pass) return;
   try{
-    if(await n.bioEnrolled()) return;
+    if(await n.bioEnrolled(savedUser())) return;
     if(!await n.bioAvailable()) return;
     if(LS.getItem('pt_bio_declined')) return;
-    await n.bioSave(pass);
+    await n.bioSave(savedUser(), pass);
   }catch(_){ /* enrolment is a convenience; never block unlocking on it */ }
 }
-window.basisBioClear = async () => { const n = NATIVE(); if(n) { try { await n.bioClear(); } catch(_) {} } };
+window.basisBioClear = async () => { const n = NATIVE(); if(n) { try { await n.bioClear(savedUser()); } catch(_) {} } };
 
 /* ---------- lock screen UI ----------
    Phase 3 of the redesign rewired WHICH DOOR OPENS FIRST. The locks are
@@ -329,7 +347,8 @@ async function showFaceStepOrStart(){
 let userChose = false;
 
 function showPasscode(msg){
-  showStep('lockEnter','Enter your passcode');
+  showStep('lockEnter','Sign in');
+  const u = $id('unlockUser'); if(u && !u.value) u.value = savedUser();
   if(msg) err(msg);
   const i=$id('unlockPass'); if(i) setTimeout(()=>i.focus(), 50);
 }
@@ -457,8 +476,10 @@ function boot(){
       if(a===DEMO_PASS){ enterDemo(); return; }   // never derives a real key
       if(a.length<6){ err('Use at least 6 characters.'); return; }
       if(a!==b){ err('Those don’t match.'); return; }
+      const who = $id('setUser') ? $id('setUser').value.trim() : '';
+      if(!who){ err('Choose a username.'); return; }
       err(''); const btn=$id('setupBtn'); btn.textContent='Encrypting'; btn.disabled=true;
-      try{ await doSetup(a); await showFaceStepOrStart(); }
+      try{ window.vaultSetUser(who); await doSetup(a); await showFaceStepOrStart(); }
       catch(e){ err('Setup failed. Try again.'); btn.textContent='Create passcode'; btn.disabled=false; }
     };
   } else {
@@ -491,6 +512,11 @@ function boot(){
 
   const tryUnlock = async () => {
     if($id('unlockPass').value===DEMO_PASS){ enterDemo(); return; }
+    const who = $id('unlockUser') ? $id('unlockUser').value : savedUser();
+    if(normUser(who) !== normUser(savedUser())){
+      err('That username does not match this device.');
+      return;
+    }
     err(''); const btn=$id('unlockBtn'); btn.textContent='Unlocking'; btn.disabled=true;
     try{
       const typed = $id('unlockPass').value;

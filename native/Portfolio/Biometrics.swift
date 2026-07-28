@@ -30,11 +30,16 @@ import Security
 /// unlockWithPass(), which derives the same KEK through the same PBKDF2 path.
 enum Biometrics {
     private static let service = "de.portfolio.app.vault"
-    /// The Keychain account field. It is only an identifier inside this app's own
-    /// service namespace — nothing authenticates against it — but a real name is
-    /// worth having: it is what shows if the item ever surfaces in a system UI,
-    /// and it leaves room for more than one identity later.
-    private static let account = "isaacamsalu"
+    /// The Keychain account IS the username, and the stored data is the passcode —
+    /// which is the correct model for a generic-password item and means Face ID
+    /// restores a real credential pair rather than a bare secret. Passed in from
+    /// the web layer so the account is whatever the owner signed in as.
+    private static let fallbackAccount = "Isaacamsalu"
+
+    private static func acct(_ a: String) -> String {
+        let t = a.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? fallbackAccount : t
+    }
 
     /// Is biometry usable on this device right now?
     static func available() -> Bool {
@@ -47,11 +52,11 @@ enum Biometrics {
     /// kSecUseAuthenticationUIFail makes the Keychain report that the item exists
     /// but needs authentication, which is exactly the answer we want without
     /// putting a Face ID sheet in front of the user just to check.
-    static func isEnrolled() -> Bool {
+    static func isEnrolled(account: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: acct(account),
             kSecReturnData as String: false,
             kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
         ]
@@ -59,8 +64,8 @@ enum Biometrics {
         return status == errSecInteractionNotAllowed || status == errSecSuccess
     }
 
-    static func save(_ secret: String) -> Bool {
-        remove()
+    static func save(account: String, secret: String) -> Bool {
+        remove(account: account)
         guard let acl = SecAccessControlCreateWithFlags(
             nil,
             kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
@@ -71,7 +76,7 @@ enum Biometrics {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: acct(account),
             kSecValueData as String: Data(secret.utf8),
             kSecAttrAccessControl as String: acl,
         ]
@@ -81,7 +86,7 @@ enum Biometrics {
     /// Prompts Face ID and returns the secret, or nil on cancel/failure.
     /// Runs off the main thread because SecItemCopyMatching blocks while the
     /// biometric sheet is up.
-    static func load(reason: String, completion: @escaping (String?, String?) -> Void) {
+    static func load(account: String, reason: String, completion: @escaping (String?, String?) -> Void) {
         let context = LAContext()
         context.localizedReason = reason
         // No "Enter Password" escape hatch in the system sheet — the app's own
@@ -91,7 +96,7 @@ enum Biometrics {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: acct(account),
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
             kSecUseAuthenticationContext as String: context,
@@ -123,11 +128,11 @@ enum Biometrics {
         }
     }
 
-    static func remove() {
+    static func remove(account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrAccount as String: acct(account),
         ]
         SecItemDelete(query as CFDictionary)
     }

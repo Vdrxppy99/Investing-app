@@ -46,6 +46,11 @@
     <!-- Passcode fallback. Only the default view when no passkey is enrolled. -->
     <div class="lock__step" id="lockEnter" hidden>
       <label class="field">
+        <span class="field__label">Username</span>
+        <input class="input" id="unlockUser" type="text" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false">
+      </label>
+      <label class="field">
         <span class="field__label">Passcode</span>
         <input class="input" id="unlockPass" type="password" autocomplete="current-password">
       </label>
@@ -55,6 +60,11 @@
 
     <!-- First run. -->
     <div class="lock__step" id="lockSetup" hidden>
+      <label class="field">
+        <span class="field__label">Username</span>
+        <input class="input" id="setUser" type="text" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false" value="Isaacamsalu">
+      </label>
       <label class="field">
         <span class="field__label">Create a passcode</span>
         <input class="input" id="setPass1" type="password" autocomplete="new-password">
@@ -242,7 +252,7 @@
     </aside>
   </div>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v4.1.0</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v4.2.0</span></p>
 </div>
 
 <!-- ═══════════════════ EXPLORE ═══════════════════ -->
