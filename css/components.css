@@ -1,0 +1,1261 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTS — every component in DESIGN.md §6, in the order documented there.
+   Emitted by the builders in js/ui.js. Nothing anywhere composes markup by hand.
+
+   If you find yourself writing a rule here that overrides an earlier rule in
+   this file, stop — that is the old failure mode returning. Fix the component.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ── 6.1 Button — 5 variants x 3 sizes ────────────────────────────────────
+     States: default · :active (§5) · :focus-visible · disabled · loading.
+     Loading preserves width so the surrounding row never reflows. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    height: var(--tap);
+    padding: 0 var(--s-4);
+    border-radius: var(--r-button);
+    font-size: var(--t-label);
+    line-height: var(--lh-label);
+    font-weight: var(--w-semibold);
+    white-space: nowrap;
+    transition: transform var(--dur-micro) var(--ease-out),
+                background-color var(--dur-micro) var(--ease-out);
+  }
+  .btn:active { transform: scale(var(--press-scale)); transition: none; }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+  .btn svg { width: 20px; height: 20px; }
+
+  .btn--sm { height: 36px; padding: 0 var(--s-3); }
+  .btn--lg { height: 52px; padding: 0 var(--s-5); font-size: var(--t-body); }
+  .btn--full { width: 100%; }
+
+  /* Primary is the only control with a physical edge — that is what makes the
+     CTA feel different from everything else rather than just look different. */
+  .btn--primary {
+    background: var(--primary-fill);
+    color: var(--on-primary);
+    border-bottom: var(--edge) solid var(--primary-edge);
+  }
+  .btn--primary:active {
+    border-bottom-width: 0;
+    transform: translateY(var(--edge)) scale(var(--press-scale));
+  }
+
+  .btn--secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: var(--hairline) solid var(--line);
+  }
+  .btn--secondary:active { background: var(--surface-3); }
+
+  .btn--ghost { background: none; color: var(--primary); }
+  .btn--ghost:active { background: var(--primary-tint); }
+
+  /* Deliberately not a filled red button — too loud for an app about someone's
+     savings. Destructive intent is carried by the word and the confirm step. */
+  .btn--danger { background: var(--surface-2); color: var(--loss); }
+  .btn--danger:active { background: var(--surface-3); }
+
+  .btn__spin {
+    width: 18px;
+    height: 18px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: var(--r-pill);
+    animation: spin var(--dur-spin) linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 6.2 Icon button ─────────────────────────────────────────────────────
+     44x44 regardless of the 24px glyph box. Always carries aria-label. */
+  .iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--tap);
+    height: var(--tap);
+    border-radius: var(--r-button);
+    color: var(--text-muted);
+    transition: transform var(--dur-micro) var(--ease-out),
+                background-color var(--dur-micro) var(--ease-out),
+                color var(--dur-micro) var(--ease-out);
+  }
+  .iconbtn:active {
+    transform: scale(var(--press-scale));
+    background: var(--surface-2);
+    color: var(--text);
+    transition: none;
+  }
+  .iconbtn svg { width: 24px; height: 24px; }
+
+  /* ── 6.3 Segmented control ───────────────────────────────────────────────
+     Also the fix for Explore's three stacked screener cards. */
+  .seg {
+    display: flex;
+    gap: var(--s-1);
+    padding: var(--s-1);
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+  }
+  .seg__item {
+    flex: 1;
+    height: 32px;
+    padding: 0 var(--s-3);
+    border-radius: var(--r-pill);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-muted);
+    transition: background-color var(--dur-enter) var(--ease-out),
+                color var(--dur-enter) var(--ease-out);
+  }
+  .seg__item[aria-selected="true"] {
+    background: var(--primary-tint);
+    color: var(--primary);
+    font-weight: var(--w-semibold);
+  }
+
+  /* ── 6.4 Chip / pill ─────────────────────────────────────────────────────── */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 28px;
+    padding: 0 var(--s-3);
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+  }
+  .chip--gain { background: var(--gain-tint); color: var(--gain); }
+  .chip--loss { background: var(--loss-tint); color: var(--loss); }
+  .chip--attn { background: var(--secondary-tint); color: var(--secondary); }
+  .chip--primary { background: var(--primary-tint); color: var(--primary); }
+
+  /* ── 6.5 List row — the workhorse ────────────────────────────────────────
+     Divided by a bottom hairline rather than being a bordered card each. That
+     is the fix for "every box has the same weight, so nothing is prioritised". */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    min-height: 56px;
+    padding: var(--s-3) 0;
+    border-bottom: var(--hairline) solid var(--line);
+    text-align: left;
+  }
+  .row:last-child { border-bottom: none; }
+  .row--press { transition: background-color var(--dur-micro) var(--ease-out); }
+  .row--press:active { background: var(--surface-2); }
+  .row__main { flex: 1; min-width: 0; }
+  .row__title {
+    font-size: var(--t-body);
+    font-weight: var(--w-semibold);
+    color: var(--text);
+  }
+  .row__sub {
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row__trail { text-align: right; flex-shrink: 0; }
+  .row__value {
+    font-size: var(--t-label);
+    font-weight: var(--w-bold);
+    color: var(--text);
+  }
+  .row__chev { color: var(--text-faint); flex-shrink: 0; }
+  .row__chev svg { width: 20px; height: 20px; }
+
+  /* ── 6.6 Card ────────────────────────────────────────────────────────────
+     No border in dark mode: the surface lightness IS the elevation. Adding a
+     border as well is what made every box in the old app read identically. */
+  .card {
+    background: var(--surface);
+    border-radius: var(--r-card);
+    padding: var(--s-4);
+    box-shadow: var(--shadow-1);
+  }
+  .card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+  }
+  .card__title {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    letter-spacing: var(--tr-heading);
+    font-weight: var(--w-bold);
+  }
+
+  /* ── 6.7 Stat tile ───────────────────────────────────────────────────────── */
+  .stat {
+    background: var(--surface-2);
+    border-radius: var(--r-button);
+    padding: var(--s-4);
+  }
+  .stat__label {
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    margin-bottom: var(--s-1);
+  }
+  .stat__value {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--w-bold);
+  }
+  .stat__delta { font-size: var(--t-caption); margin-top: var(--s-1); }
+
+  /* ── 6.8 Input ───────────────────────────────────────────────────────────
+     16px floor is enforced in base.css. Border uses --border-control, which
+     exists specifically because a control boundary needs 3:1. */
+  .field { display: block; }
+  .field__label {
+    display: block;
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-muted);
+    margin-bottom: var(--s-2);
+  }
+  .input {
+    width: 100%;
+    height: var(--tap);
+    padding: 0 var(--s-3);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--border-control);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font-weight: var(--w-semibold);
+  }
+  .input:focus-visible {
+    border-color: var(--primary);
+    outline: var(--ring) solid var(--primary);
+    outline-offset: 0;
+  }
+  .input[aria-invalid="true"] { border-color: var(--loss); }
+  .input:disabled { opacity: 0.5; }
+  .field__error {
+    font-size: var(--t-caption);
+    color: var(--loss);
+    margin-top: var(--s-1);
+  }
+  .input--num { text-align: right; }
+
+  /* ── 6.9 Search field — the hero of Explore, so it sticks ────────────────── */
+  .search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    height: var(--tap);
+    padding: 0 var(--s-3);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--border-control);
+    border-radius: var(--r-input);
+  }
+  .search:focus-within { border-color: var(--primary); }
+  .search__icon { color: var(--text-muted); flex-shrink: 0; }
+  .search__icon svg { width: 20px; height: 20px; }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-weight: var(--w-semibold);
+  }
+  .search input::placeholder { color: var(--text-faint); font-weight: var(--w-medium); }
+  /* Only present when there is something to clear — never a dead control. */
+  .search__clear {
+    display: none;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-pill);
+  }
+  .search--filled .search__clear { display: flex; }
+  .search__clear svg { width: 18px; height: 18px; }
+
+  /* ── 6.10 Sheet ──────────────────────────────────────────────────────────
+     Level 3. A real scrim, not a backdrop-blur crutch — blur was standing in
+     for hierarchy in the old app. Becomes a centred modal at >=1024px (layout). */
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: var(--scrim);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-sheet) var(--ease-sheet);
+    z-index: 40;
+  }
+  .scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 88dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-2);
+    border-top: var(--hairline) solid var(--line-strong);
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    box-shadow: var(--shadow-3), var(--highlight);
+    padding-bottom: env(safe-area-inset-bottom);
+    transform: translateY(100%);
+    transition: transform var(--dur-sheet) var(--ease-sheet);
+    z-index: 50;
+  }
+  .sheet[data-open="true"] { transform: translateY(0); }
+  /* Set by the drag handler; must not be eased or the finger feels laggy. */
+  .sheet[data-dragging="true"] { transition: none; }
+
+  .sheet__grip {
+    display: flex;
+    justify-content: center;
+    padding: var(--s-3) 0 var(--s-2);
+    flex-shrink: 0;
+    cursor: grab;
+    touch-action: none;
+  }
+  .sheet__grip::after {
+    content: "";
+    width: 36px;
+    height: 4px;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+  }
+  .sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: 0 var(--s-5) var(--s-3);
+    flex-shrink: 0;
+  }
+  .sheet__body {
+    padding: 0 var(--s-5) var(--s-5);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── 6.11 Modal — destructive confirmations, replacing every confirm() ───── */
+  .modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: calc(100% - var(--s-8));
+    max-width: 520px;
+    background: var(--surface-2);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-3), var(--highlight);
+    padding: var(--s-5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-enter) var(--ease-out),
+                transform var(--dur-enter) var(--ease-out);
+    z-index: 50;
+  }
+  .modal[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .modal__actions {
+    display: flex;
+    gap: var(--s-2);
+    margin-top: var(--s-5);
+  }
+  .modal__actions .btn { flex: 1; }
+
+  /* ── 6.12 Toast ──────────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed;
+    left: var(--s-5);
+    right: var(--s-5);
+    bottom: calc(var(--s-9) + env(safe-area-inset-bottom) + var(--s-5));
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--line-strong);
+    border-radius: var(--r-button);
+    box-shadow: var(--shadow-3), var(--highlight);
+    font-size: var(--t-label);
+    font-weight: var(--w-semibold);
+    transform: translateY(var(--s-3));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-enter) var(--ease-out),
+                transform var(--dur-enter) var(--ease-out);
+    z-index: 60;
+  }
+  .toast[data-open="true"] { opacity: 1; transform: translateY(0); }
+  .toast--warn { color: var(--secondary); }
+  .toast--error { color: var(--loss); }
+
+  /* ── 6.13 Tab bar — opaque level 3, NOT backdrop-blurred ─────────────────── */
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    background: var(--surface-2);
+    border-top: var(--hairline) solid var(--line);
+    box-shadow: var(--highlight);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 30;
+  }
+  .tabbar__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-1);
+    min-height: var(--tap);
+    padding: var(--s-2) 0;
+    color: var(--text-faint);
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    transition: color var(--dur-micro) var(--ease-out);
+  }
+  .tabbar__item svg { width: 24px; height: 24px; }
+  .tabbar__item[aria-current="page"] { color: var(--primary); }
+
+  /* ── 6.14 Progress bar ───────────────────────────────────────────────────── */
+  .bar {
+    height: var(--s-2);
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+  }
+  .bar__fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: var(--r-pill);
+    transition: width var(--dur-data) var(--ease-out);
+  }
+  /* Off-track uses the attention colour, never --loss: a goal behind schedule
+     is not a loss, and --loss is reserved for numbers. */
+  .bar__fill--attn { background: var(--secondary); }
+
+  /* ── 6.15 Ring — the goal ring ───────────────────────────────────────────── */
+  /* .ring is emitted by renderGoal() via ringSvg() with .rc track / .rp progress
+     / .rt centre label. The design-system ring is scoped to .ring--c so the two
+     stop fighting — that collision is why the goal rendered as a misshapen
+     circle. */
+  .ring, .ring--c { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
+  .ring svg { transform: rotate(-90deg); overflow: visible; }
+  .ring .rc { fill: none; stroke: var(--surface-2); stroke-width: 10; }
+  .ring .rp { fill: none; stroke: var(--primary); stroke-width: 10; stroke-linecap: round;
+              transition: stroke-dashoffset var(--dur-data) var(--ease-out); }
+  .ring .rt {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    line-height: 1.1;
+  }
+  .ring .rt b { font-size: var(--t-heading); font-weight: var(--w-bold); }
+  .ring .rt span { font-size: var(--t-micro); letter-spacing: var(--tr-micro);
+                   text-transform: uppercase; color: var(--text-faint); }
+  .goalwrap { display: flex; align-items: center; gap: var(--s-4); }
+  .goalinfo { flex: 1; min-width: 0; }
+  .goalinfo .gt { font-size: var(--t-label); font-weight: var(--w-bold); }
+  .goalinfo .gs { font-size: var(--t-caption); color: var(--text-muted); margin-top: var(--s-1); }
+  .eta { color: var(--primary); font-weight: var(--w-semibold); }
+  .ring svg { transform: rotate(-90deg); }
+  .ring__track { stroke: var(--surface-2); }
+  .ring__fill {
+    stroke: var(--primary);
+    transition: stroke-dashoffset var(--dur-data) var(--ease-out);
+  }
+  .ring__fill--attn { stroke: var(--secondary); }
+  .ring__label {
+    position: absolute;
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--w-bold);
+  }
+
+  /* ── 6.16 Skeleton — every first paint, never a bare spinner ─────────────── */
+  .skel {
+    background: var(--skeleton);
+    border-radius: var(--r-input);
+    position: relative;
+    overflow: hidden;
+  }
+  .skel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+    transform: translateX(-100%);
+    animation: sheen var(--dur-shimmer) ease-in-out infinite;
+  }
+  @keyframes sheen { to { transform: translateX(100%); } }
+  .skel--line { height: var(--s-3); }
+  .skel--title { height: var(--s-5); }
+  .skel--tile { height: 72px; border-radius: var(--r-button); }
+  .skel--badge { width: 40px; height: 40px; border-radius: var(--r-button); }
+  .skel--chart { height: 200px; border-radius: var(--r-button); }
+
+  /* ── 6.17 Empty state · 6.18 Error state ────────────────────────────────── */
+  .empty {
+    display: grid;
+    justify-items: center;
+    gap: var(--s-3);
+    padding: var(--s-8) var(--s-5);
+    text-align: center;
+  }
+  .empty__icon { color: var(--text-faint); }
+  .empty__icon svg { width: 32px; height: 32px; }
+  .empty--error .empty__icon { color: var(--secondary); }
+  .empty__title {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    font-weight: var(--w-bold);
+  }
+  .empty__note {
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    max-width: 28ch;
+  }
+
+  /* ── 6.19 Banner ─────────────────────────────────────────────────────────── */
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    background: var(--secondary-tint);
+    border-left: var(--s-1) solid var(--secondary);
+    border-radius: var(--r-button);
+    font-size: var(--t-caption);
+    color: var(--text);
+  }
+  .banner__text { flex: 1; }
+
+  /* ── 6.20 Badge / logo tile ──────────────────────────────────────────────── */
+  /* Read from core.js badgeHtml(), not guessed. The tile is .badge; it holds a
+     letter monogram plus an <img class="blogo"> that crossfades over it once the
+     remote logo loads. Styling .blogo as the tile — the first attempt — left
+     .badge undefined, so it behaved as a full-width block and crushed the name
+     column into a ~100px box that wrapped one word per line. */
+  .badge {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-button);
+    overflow: hidden;
+    font-size: var(--t-caption);
+    font-weight: var(--w-bold);
+    color: #fff;
+    line-height: 1;
+  }
+  .badge.sm { width: 28px; height: 28px; flex-basis: 28px; font-size: var(--t-micro); }
+  .blogo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* ── 6.21 Chart container ────────────────────────────────────────────────
+     Fixed aspect so the page never shifts when data lands. */
+  .chart {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    /* Chart.js writes its own canvas height; without a cap the main chart grew to
+       fill most of the viewport and pushed the holdings list below the fold. */
+    max-height: 240px;
+  }
+  .chart--short { max-height: 170px; }
+  .chart canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+  .chart__readout {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    min-height: var(--lh-heading);
+    margin-bottom: var(--s-3);
+  }
+  .spark { width: 56px; height: 20px; flex-shrink: 0; }
+
+  /* ── 6.22 Table — genuinely tabular data only ───────────────────────────── */
+  .tablewrap { overflow-x: auto; overscroll-behavior-x: contain; }
+  .table { width: 100%; border-collapse: collapse; }
+  .table th {
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    text-align: left;
+    padding: var(--s-2) var(--s-3);
+    white-space: nowrap;
+  }
+  .table td {
+    font-size: var(--t-label);
+    padding: var(--s-3);
+    border-top: var(--hairline) solid var(--line);
+    white-space: nowrap;
+  }
+  .table th:not(:first-child),
+  .table td:not(:first-child) { text-align: right; }
+
+  /* ── Disclosure row — how a demoted module is reached on mobile ─────────── */
+  .disclose {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    min-height: var(--tap);
+    padding: var(--s-3) 0;
+    border-bottom: var(--hairline) solid var(--line);
+    text-align: left;
+    transition: background-color var(--dur-micro) var(--ease-out);
+  }
+  .disclose:active { background: var(--surface-2); }
+  .disclose__title { flex: 1; font-size: var(--t-body); font-weight: var(--w-semibold); }
+  .disclose__meta { font-size: var(--t-caption); color: var(--text-muted); }
+  .disclose svg { width: 20px; height: 20px; color: var(--text-faint); }
+
+  /* ── Insight group card — the Insights restructure (DESIGN.md §8) ───────── */
+  .group { text-align: left; width: 100%; }
+  .group__label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    margin-bottom: var(--s-3);
+  }
+  .group__figures { display: grid; gap: var(--s-2); }
+  .group__fig {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    font-size: var(--t-label);
+  }
+  .group__fig dt { color: var(--text-muted); font-weight: var(--w-medium); }
+  .group__fig dd { font-weight: var(--w-bold); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOCK SCREEN — the first thing anyone sees, so it gets its own section.
+   Previously the heaviest concentration of inline styles and emoji in the app.
+   DESIGN.md §8, §14.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .lock {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: var(--canvas);
+    padding: var(--s-5);
+    padding-top: calc(var(--s-5) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
+    z-index: 100;
+  }
+  /* Dissolve into the app rather than snapping. Pure presentation — the crypto
+     path is untouched by this. */
+  body:not(.locked) .lock { display: none; }
+  body.unlocking .lock { opacity: 0; transition: opacity var(--dur-enter) var(--ease-out); }
+
+  .lock__box {
+    width: 100%;
+    max-width: 360px;
+    display: grid;
+    gap: var(--s-4);
+    text-align: center;
+  }
+  .lock__logo {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--r-card);
+    margin: 0 auto;
+  }
+  .lock__title {
+    font-size: var(--t-title);
+    line-height: var(--lh-title);
+    letter-spacing: var(--tr-title);
+    font-weight: var(--w-bold);
+  }
+  .lock__sub { font-size: var(--t-caption); color: var(--text-muted); }
+
+  /* Each step is a state of the same box, never a separate screen. */
+  .lock__step { display: grid; gap: var(--s-3); }
+  .lock__step[hidden] { display: none; }
+
+  /* The tertiary entrances (restore, example) sit visually below the fold of
+     attention — present, findable, not competing with the one primary control. */
+  .lock__alt {
+    display: grid;
+    gap: var(--s-1);
+    padding-top: var(--s-4);
+    border-top: var(--hairline) solid var(--line);
+  }
+  .lock__alt .btn { justify-content: center; }
+
+  /* Designed error state, not a raw string dumped into a div. */
+  .lock__err {
+    display: none;
+    align-items: flex-start;
+    gap: var(--s-2);
+    padding: var(--s-3);
+    background: var(--secondary-tint);
+    border-left: var(--s-1) solid var(--secondary);
+    border-radius: var(--r-input);
+    font-size: var(--t-caption);
+    text-align: left;
+    color: var(--text);
+  }
+  .lock__err[data-shown="true"] { display: flex; }
+  .lock__err svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--secondary); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP CHROME — the pieces that live outside a page: status line, demo badge,
+   mini bar, pull-to-refresh, the assistant, and the Insights group disclosure.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Live-price status. The dot is the only always-on animation in the app. */
+  .status {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+    margin-bottom: var(--s-3);
+  }
+  .status__dot {
+    width: var(--s-2);
+    height: var(--s-2);
+    border-radius: var(--r-pill);
+    background: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .status.live .status__dot { background: var(--gain); }
+
+  /* Chart controls. Wraps rather than scrolls — nine ranges on a 390px screen
+     needs two rows, and a hidden overflow would hide half the options. */
+  .chartctl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    align-items: center;
+    margin-top: var(--s-4);
+  }
+  .chartctl .seg { flex: 1 1 auto; min-width: 0; }
+  .chart--short { aspect-ratio: 2 / 1; }
+  .chart__msg {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    text-align: center;
+    padding: var(--s-4);
+  }
+  .chart__msg:empty { display: none; }
+
+  .alloc { display: grid; gap: var(--s-4); }
+  .alloc__donut { position: relative; aspect-ratio: 1; max-width: 200px; margin-inline: auto; }
+  .alloc__donut canvas { position: absolute; inset: 0; }
+
+  .foot { margin-top: var(--s-8); max-width: 60ch; }
+
+  /* Search stays put — it is the hero of Explore. */
+  .searchsticky {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding-block: var(--s-3);
+    background: var(--canvas);
+  }
+
+  /* Demo badge — a designed affordance, not a construction sign. */
+  .demobadge {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + var(--s-2));
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    align-items: center;
+    gap: var(--s-2);
+    height: 32px;
+    padding: 0 var(--s-3);
+    background: var(--secondary-tint);
+    color: var(--secondary);
+    border-radius: var(--r-pill);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    z-index: 35;
+  }
+  body.demo .demobadge { display: flex; }
+  .demobadge svg { width: 16px; height: 16px; }
+
+  .minibar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: none;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: calc(env(safe-area-inset-top) + var(--s-2)) var(--s-5) var(--s-2);
+    background: var(--surface-2);
+    border-bottom: var(--hairline) solid var(--line);
+    font-size: var(--t-label);
+    font-weight: var(--w-bold);
+    z-index: 25;
+  }
+  .minibar[data-open="true"] { display: flex; }
+
+  .ptr {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + var(--s-3));
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    color: var(--text-muted);
+    z-index: 25;
+  }
+  .ptr[data-open="true"] { display: block; }
+
+  /* ── Assistant ─────────────────────────────────────────────────────────── */
+  .fab {
+    position: fixed;
+    right: var(--s-5);
+    bottom: calc(var(--s-9) + env(safe-area-inset-bottom) + var(--s-4));
+    display: grid;
+    place-items: center;
+    width: var(--s-9);
+    height: var(--s-9);
+    border-radius: var(--r-pill);
+    background: var(--primary-fill);
+    color: var(--on-primary);
+    border-bottom: var(--edge) solid var(--primary-edge);
+    box-shadow: var(--shadow-3);
+    z-index: 32;
+  }
+  .fab svg { width: 24px; height: 24px; }
+  .fab:active { border-bottom-width: 0; transform: translateY(var(--edge)) scale(var(--press-scale)); }
+
+  .aipanel {
+    position: fixed;
+    inset: auto var(--s-5) calc(var(--s-9) + env(safe-area-inset-bottom) + var(--s-4)) var(--s-5);
+    display: none;
+    flex-direction: column;
+    max-height: 70dvh;
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--line-strong);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-3), var(--highlight);
+    z-index: 34;
+  }
+  .aipanel[data-open="true"] { display: flex; }
+  .aipanel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
+    border-bottom: var(--hairline) solid var(--line);
+  }
+  .aipanel__msgs {
+    flex: 1;
+    display: grid;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* Bubbles: the assistant's own messages are surface, yours are primary-tint.
+     A tail would be decoration — the alignment already says who is speaking. */
+  .bub {
+    max-width: 85%;
+    padding: var(--s-3);
+    border-radius: var(--r-button);
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+  }
+  .bub--ai { background: var(--surface); justify-self: start; border-bottom-left-radius: var(--s-1); }
+  .bub--me { background: var(--primary-tint); color: var(--text); justify-self: end; border-bottom-right-radius: var(--s-1); }
+  .bub__src { display: block; margin-top: var(--s-2); font-size: var(--t-caption); color: var(--text-faint); }
+
+  .typing { display: inline-flex; gap: var(--s-1); align-items: center; }
+  .typing span {
+    width: var(--s-1);
+    height: var(--s-1);
+    border-radius: var(--r-pill);
+    background: var(--text-faint);
+    animation: typing var(--dur-shimmer) ease-in-out infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: var(--dur-stagger); }
+  .typing span:nth-child(3) { animation-delay: calc(var(--dur-stagger) * 2); }
+  @keyframes typing { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
+
+  .aipanel__chips { display: flex; gap: var(--s-2); overflow-x: auto; padding: 0 var(--s-4) var(--s-3); scrollbar-width: none; }
+  .aipanel__chips::-webkit-scrollbar { display: none; }
+  .aipanel__chips .chip { flex: 0 0 auto; }
+  .aipanel__inputrow {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    padding: var(--s-3);
+    border-top: var(--hairline) solid var(--line);
+  }
+  .aipanel__inputrow .input { flex: 1; }
+
+  /* ── Insights group disclosure ─────────────────────────────────────────────
+     Native <details> on purpose: it gives keyboard operation, correct semantics
+     and works with no JS, so the ~20 preserved metrics inside cannot be orphaned
+     by a script error. Was 20 expanded cards in one scroll. */
+  .group2 {
+    background: var(--surface);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-1);
+    overflow: hidden;
+  }
+  .group2__sum {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    min-height: var(--tap);
+    padding: var(--s-3) var(--s-4);
+    cursor: pointer;
+    list-style: none;
+    transition: background-color var(--dur-micro) var(--ease-out);
+  }
+  .group2__sum::-webkit-details-marker { display: none; }
+  .group2__sum:active { background: var(--surface-2); }
+  .group2__label {
+    font-size: var(--t-heading);
+    line-height: var(--lh-heading);
+    letter-spacing: var(--tr-heading);
+    font-weight: var(--w-bold);
+  }
+  .group2__sum svg {
+    width: 20px;
+    height: 20px;
+    color: var(--text-faint);
+    transition: transform var(--dur-enter) var(--ease-out);
+  }
+  .group2[open] > .group2__sum svg { transform: rotate(180deg); }
+  .group2__body { display: grid; gap: var(--s-3); padding: 0 var(--s-4) var(--s-4); }
+  /* Nested cards inside a group sit on surface-2, so they read as contained
+     rather than as another peer card floating on the page. */
+  .group2__body .card { background: var(--surface-2); box-shadow: none; padding: var(--s-4); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SURVIVING CLASS CONTRACT
+
+   The engine JS signals selection with .on and visibility with .hidden. Those
+   are the only two class names that survive from the old stylesheet, and they
+   are defined here on purpose: rewiring ~15 call sites to a different attribute
+   would mean editing logic the preservation contract protects, for no user-
+   visible gain. Everything else from the old sheet is gone.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .hidden { display: none !important; }
+
+  .seg__item.on {
+    background: var(--primary-tint);
+    color: var(--primary);
+  }
+  .tabbar__item.on,
+  .rail-nav__item.on { color: var(--primary); }
+  .rail-nav__item.on { background: var(--primary-tint); }
+
+  /* Benchmark toggle: an active ghost button. */
+  #benchBtn.on { background: var(--primary-tint); color: var(--primary); }
+
+  /* core.js adds .on to a logo <img> once it has actually loaded, so a broken
+     remote logo never leaves a half-painted tile. */
+  .blogo img { opacity: 0; transition: opacity var(--dur-micro) var(--ease-out); }
+  .blogo img.on { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   JS-EMITTED CLASSES
+
+   The engine JS builds rows, pills and bars with its own class names. Those
+   names are part of its output, and renaming every one of ~120 emission sites is
+   logic churn with no user-visible gain — so instead the names are DEFINED here,
+   in tokens, as real components. Same contract the .on/.hidden block above uses.
+
+   The inline styles those sites also emit are the remaining debt; see
+   redesign/STATUS.md. Nothing below contains a literal value.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Holding rows and market rows — the list-row anatomy under other names. */
+  .hrow, .mrow, .drow, .nrow, .idx-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    width: 100%;
+    min-height: 56px;
+    padding: var(--s-3) 0;
+    border-bottom: var(--hairline) solid var(--line);
+    text-align: left;
+    transition: background-color var(--dur-micro) var(--ease-out);
+  }
+  .hrow:last-child, .mrow:last-child, .drow:last-child, .nrow:last-child { border-bottom: none; }
+  .hrow:active, .mrow:active, .nrow:active { background: var(--surface-2); }
+
+  .hmid, .mmid, .row-mid { flex: 1 1 auto; min-width: 0; }
+  .htick { color: var(--text-faint); font-weight: var(--w-semibold); }
+  .hinfo { font-size: var(--t-caption); color: var(--text-muted); white-space: nowrap; }
+  .hspark { flex: 0 0 56px; width: 56px; height: 20px; }
+  .hsym, .msym {
+    font-size: var(--t-label);
+    font-weight: var(--w-semibold);
+    color: var(--text);
+    /* One line, truncated. Fund names are long ("Total Stock Market ETF") and
+       wrapping them is what made the list unreadable. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hm, .hmet, .mname, .msub, .sub-n {
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hright, .mright { text-align: right; flex-shrink: 0; }
+  .hval, .mval {
+    font-size: var(--t-label);
+    font-weight: var(--w-bold);
+    color: var(--text);
+  }
+  .hpl, .cmove { font-size: var(--t-caption); font-weight: var(--w-semibold); }
+  .hspark, .mspark { width: 56px; height: 20px; flex-shrink: 0; }
+  .hsplit, .htip, .htips { font-size: var(--t-caption); color: var(--text-muted); }
+
+  /* Delta pills. Gain/loss colour is permitted here — these ARE numbers. */
+  .pctpill, .prpill, .daypill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 24px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums;
+  }
+  .pos, .up { color: var(--gain); }
+  .neg, .down { color: var(--loss); }
+  .pctpill.pos, .prpill.pos, .daypill.pos { background: var(--gain-tint); color: var(--gain); }
+  .pctpill.neg, .prpill.neg, .daypill.neg { background: var(--loss-tint); color: var(--loss); }
+
+  /* Bars: share-of-whole and ranked magnitude. */
+  .wbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: transparent;
+  }
+  .wbar > i { display: block; height: 100%; background: var(--primary); border-radius: var(--r-pill); }
+
+  .sbar, .rb-track, .tgtrack, .fi-track {
+    height: var(--s-2);
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+    display: flex;
+  }
+  .hbars { display: grid; gap: var(--s-3); }
+  .hbrow { display: grid; gap: var(--s-1); font-size: var(--t-caption); }
+
+  /* Small metadata blocks the engine sprinkles around. */
+  .estnote, .locknote, .inc-note, .buyhint, .goalinfo {
+    font-size: var(--t-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-faint);
+  }
+  .eyebrow, .it, .lt, .card-title, .drivehead, .tgthead, .listhead, .sntitle, .buytitle {
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    letter-spacing: var(--tr-micro);
+    text-transform: uppercase;
+    font-weight: var(--w-bold);
+    color: var(--text-faint);
+  }
+  .chev { color: var(--text-faint); }
+  .del { color: var(--loss); }
+
+  /* Insight sub-cards and grids the engine renders into. */
+  .igrid { display: grid; gap: var(--s-4); }
+  .icard {
+    background: var(--surface-2);
+    border-radius: var(--r-button);
+    padding: var(--s-4);
+  }
+  .mload, .spin, .askthinking { font-size: var(--t-caption); color: var(--text-muted); }
+
+  /* Editor rows — rebuilt as a real form rather than a table of bare inputs. */
+  .etable, .tgtedit { display: grid; gap: var(--s-3); }
+  .etable input, .tgtedit-row input, .buyrow input, .goalset input, .cashedit input {
+    height: var(--tap);
+    padding: 0 var(--s-3);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--border-control);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font-weight: var(--w-semibold);
+    text-align: right;
+    /* 16px floor is inherited from base.css and must never be overridden here. */
+  }
+  .tgtedit-row, .buyrow, .cashrow, .inc-row, .krow, .snrow, .tgtrow {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-2) 0;
+  }
+
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
+  .chips, .nchips { display: flex; gap: var(--s-2); }
+  .dlegend, .alloc-legend { display: grid; gap: var(--s-2); font-size: var(--t-caption); }
+  .gtable { width: 100%; border-collapse: collapse; font-size: var(--t-label); }
+  .gtable td, .gtable th { padding: var(--s-2) var(--s-3); border-top: var(--hairline) solid var(--line); }
+  .gtable th { color: var(--text-faint); text-align: left; font-weight: var(--w-semibold); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTE — collapsed explanatory prose.
+
+   Owner feedback: "there a lot of plain text … like 60 percent of the app is
+   text information about something. yeah collapse it, but not most of the app."
+   That was the right correction and the inverse of what the first pass did: the
+   Insights groups now open by default and the PROSE is what folds away.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .note { margin-top: var(--s-2); }
+  .note > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    min-height: var(--s-6);
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-faint);
+    cursor: pointer;
+    list-style: none;
+  }
+  .note > summary::-webkit-details-marker { display: none; }
+  /* A caret drawn in text rather than an icon, so a collapsed note costs one
+     line and reads as an aside instead of another control competing for the eye. */
+  .note > summary::before { content: "＋"; font-weight: var(--w-bold); }
+  .note[open] > summary::before { content: "－"; }
+  .note > p {
+    margin-top: var(--s-2);
+    font-size: var(--t-caption);
+    line-height: var(--lh-caption);
+    color: var(--text-muted);
+    max-width: 56ch;
+  }
+}
+
+@layer components {
+  /* The hero sub-chips emit `<span class="cq">?</span>` as an "explain this"
+     affordance. Unstyled it rendered as a literal question mark inside the text —
+     "Total profit ? +$46,007.16" — which is what made the top of the screen read
+     as raw type rather than a designed row. It becomes a small circled glyph,
+     clearly a control and clearly separate from the number.
+
+     Owner: "the top part with total profit exc look unpolished and just type
+     stuff and not from a polished app." */
+  #totalSub { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  #totalSub .chip { gap: var(--s-2); height: 32px; }
+  #totalSub .chip .lbl {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--text-muted);
+    font-weight: var(--w-medium);
+  }
+  .cq {
+    display: inline-grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--r-pill);
+    background: var(--surface-3);
+    color: var(--text-faint);
+    font-size: var(--t-micro);
+    font-weight: var(--w-bold);
+    line-height: 1;
+  }
+}
+
+@layer components {
+  /* The allocation donut was rendering at zero height, so the card showed only
+     its legend — which is what "allocation just looks like a bunch of text"
+     was. Chart.js needs a parent with real dimensions, and aspect-ratio alone
+     collapsed once min-width:0 was applied for horizontal containment. */
+  .alloc__donut { width: 180px; height: 180px; aspect-ratio: auto; max-width: none; }
+  .alloc { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+
+  /* Scrub readouts: the value that tracks your finger across a chart. */
+  .scrubro { min-height: var(--lh-body); font-size: var(--t-label); font-weight: var(--w-semibold); }
+
+  /* Part-of-whole bar (Where your money lives) — segments sit side by side. */
+  .sbar { height: 10px; display: flex; border-radius: var(--r-pill); overflow: hidden; background: var(--surface-2); }
+  .sbar > * { height: 100%; }
+  .dlegend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: var(--t-caption); color: var(--text-muted); }
+}

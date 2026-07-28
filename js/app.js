@@ -42,7 +42,7 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) clearBa
 function showPage(p){
   if(p!=='explore' && $('searchResults')){ $('searchResults').style.display='none'; if($('mktSearch')) $('mktSearch').value=''; if($('mktSearchX')) $('mktSearchX').style.display='none'; }
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('hidden', el.id!=='page-'+p));
-  document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on', b.dataset.page===p));
+  document.querySelectorAll('[data-page]').forEach(b=>{ b.classList.toggle('on', b.dataset.page===p); if(b.dataset.page===p) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
   window.scrollTo(0,0);
   // entrance animation plays once per page per session, not on every revisit
   const pg=$('page-'+p); if(pg && !pg.classList.contains('seen')) setTimeout(()=>pg.classList.add('seen'), 450);
@@ -55,7 +55,7 @@ function showPage(p){
   if(p==='explore') refreshMarkets(false);
   if(p==='insights') renderInsights();
 }
-document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{ haptic(); showPage(b.dataset.page); });
+document.querySelectorAll('[data-page]').forEach(b=> b.onclick=()=>{ haptic(); showPage(b.dataset.page); });
 /* one delegated tap handler for every symbol row/card on Explore — survives any re-render */
 $('page-explore').addEventListener('click', e=>{
   const el=e.target.closest('.mrow, .idx-card');
@@ -101,7 +101,7 @@ function ringSvg(pct, color, r){
 }
 function renderGoalForm(prefill){ // shared by first-time setup and "Change goal" (prefilled — never lose the number)
   const card=$('goalCard');
-  card.querySelector('.card-title').style.display='';
+  const gt1 = card.querySelector('.card__title, .group2__label'); if (gt1) gt1.hidden = false;
   $('goalBody').innerHTML=`<div class="goalset">
     <div style="color:var(--mut);font-size:12.5px;line-height:1.5;margin-bottom:10px;font-weight:500">Set a target and track your progress with a projected finish date based on your real return.</div>
     <input id="goalInput" type="number" inputmode="decimal" placeholder="Target amount, e.g. 100000" aria-label="Goal amount"${prefill>0?` value="${prefill}"`:''}>
@@ -124,7 +124,7 @@ function renderGoal(){
     const yr=new Date(); yr.setMonth(yr.getMonth()+m);
     eta = (m<720 && t.value>0) ? `Today's money alone gets there <span class="eta">${yr.toLocaleDateString([],{month:'short',year:'numeric'})}</span> at ~${(r*100).toFixed(0)}%/yr — every new buy pulls that date closer.` : `Today's balance alone won't compound to this within 60 years — new deposits will do the heavy lifting.`;
   } else { eta=`<span class="eta">Goal reached</span> — ${fmt(-remain)} past target. Time for a bigger one?`; }
-  card.querySelector('.card-title').style.display='none';
+  const gt2 = card.querySelector('.card__title, .group2__label'); if (gt2) gt2.hidden = true;
   $('goalBody').innerHTML=`<div class="goalwrap">
     <div class="ring">${ringSvg(pct, remain>0?'var(--brand)':'var(--green)')}<div class="rt"><b>${(pct*100).toFixed(0)}%</b><span>of goal</span></div></div>
     <div class="goalinfo"><div class="gt">${fmt(t.value)} of ${fmt(goal)}</div>
@@ -272,7 +272,11 @@ $('miniBar').onclick=()=>{
 
 (function(){ const h=new Date().getHours();
   const g = h<5?'Good night':h<12?'Good morning':h<18?'Good afternoon':'Good evening';
-  document.querySelector('.brand').innerHTML = g+`<span class="bdate"> · ${new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</span>`;
+  // The greeting used to go into the appbar h1, next to five icon buttons, where
+  // it truncated to "Good nig…" on a 390px screen. It gets its own line above the
+  // hero now, which is where a greeting belongs anyway.
+  const gl = document.getElementById('greetLine');
+  if (gl) gl.innerHTML = g+`<span class="bdate"> · ${new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</span>`;
 })();
 renderAll();
 animateTotal();
@@ -408,3 +412,59 @@ function maybeShowRecap(){
   const off=$('recapOff'); if(off) off.onclick=e=>{ e.preventDefault(); lsSet('pt_recap_off',true); closeDetail(); };
   lsSet('pt_recap_last', key);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Redesign wiring — controls the rebuilt markup introduced, and the per-tab
+   scroll restoration the native-feel checklist requires.
+   No calculation, storage key or API call is touched here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  /* Explore: the three stacked screener cards became one card with a segmented
+     control, so the panels need switching. The lists themselves are still
+     rendered by the same code into the same three element ids. */
+  const seg = document.getElementById('screenSeg');
+  if (seg) {
+    seg.addEventListener('click', e => {
+      const b = e.target.closest('.seg__item'); if (!b) return;
+      const want = b.dataset.screen;
+      seg.querySelectorAll('.seg__item').forEach(i => i.setAttribute('aria-selected', String(i === b)));
+      document.querySelectorAll('[data-screen-panel]').forEach(pnl => {
+        pnl.hidden = pnl.getAttribute('data-screen-panel') !== want;
+      });
+    });
+  }
+
+  /* Search: the clear button only exists when there is something to clear, so it
+     is never a dead control. */
+  document.querySelectorAll('[data-search]').forEach(box => {
+    const input = box.querySelector('input');
+    const sync = () => box.classList.toggle('search--filled', !!input.value);
+    input.addEventListener('input', sync);
+    sync();
+  });
+
+  /* Scroll position per tab. Without this, switching away from a long Insights
+     scroll and back dumps you at the top, which no native app does. */
+  const pos = {};
+  let current = 'portfolio';
+  const origShow = window.showPage;
+  if (typeof origShow === 'function') {
+    window.showPage = function (p) {
+      pos[current] = window.scrollY;
+      origShow(p);
+      current = p;
+      // After the page-in animation commits, not before, or the restore is lost.
+      requestAnimationFrame(() => window.scrollTo(0, pos[p] || 0));
+    };
+  }
+
+  /* theme-color must track the theme or the iOS status bar clashes with the app. */
+  const meta = document.querySelector('meta[name=theme-color]');
+  const syncTheme = () => {
+    if (!meta) return;
+    const c = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
+    if (c) meta.setAttribute('content', c);
+  };
+  syncTheme();
+  new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+})();

@@ -13,233 +13,409 @@
 <title>My Portfolio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
-<link rel="stylesheet" href="css/app.css">
+<!-- Vendored, not CDN. Loading this remotely meant the app could not chart at
+     all offline, which contradicts the offline requirement. 200 KB, cached by
+     the service worker like everything else. -->
+<script src="vendor/chart.umd.min.js" defer></script>
+<!-- Layered stylesheet. Load order IS the cascade order; @layer makes
+     specificity structural rather than a race. See DESIGN.md. -->
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/layout.css">
 </head>
 <body class="locked">
-<div id="lockScreen">
-  <div class="lockbox">
-    <img src="icon-192.png" alt="" class="locklogo">
-    <div class="locktitle">My Portfolio</div>
-    <div class="locksub" id="lockSub">Unlocking…</div>
-    <div id="lockSetup" style="display:none">
-      <div id="restoreFirst" style="border:1px solid var(--brand);border-radius:14px;padding:14px;margin-bottom:16px;background:rgba(38,208,124,.06)">
-        <div style="font-weight:700;font-size:14px;margin-bottom:3px">Reinstalling or on a new phone?</div>
-        <div class="locknote" style="margin:0 0 10px">Don't make a new passcode — bring your saved data back instead.</div>
-        <button class="btn pri" id="cloudRestoreLink" style="width:100%">☁️ Restore my data from backup</button>
-      </div>
-      <div class="locknote" style="text-align:center;margin-bottom:10px">— or start fresh —</div>
-      <input id="setPass1" type="password" placeholder="Create passcode (min 6 characters)" autocomplete="new-password" aria-label="Create passcode">
-      <input id="setPass2" type="password" placeholder="Repeat passcode" autocomplete="new-password" aria-label="Repeat passcode">
-      <button class="btn sec" id="setupBtn">Create passcode</button>
-      <div class="locknote">Your holdings are encrypted with this passcode on this device — nothing is sent anywhere. If you forget it, only a backup can bring the data back.</div>
+<!-- Lock screen. Face ID is the front door; the passcode is a fallback reached
+     by a quiet link. Zero inline styles, zero emoji. DESIGN.md §14. -->
+<div class="lock" id="lockScreen" role="dialog" aria-modal="true" aria-label="Unlock My Portfolio">
+  <div class="lock__box">
+    <img src="icon-192.png" alt="" class="lock__logo">
+    <h1 class="lock__title">My Portfolio</h1>
+    <p class="lock__sub" id="lockSub">Unlocking</p>
+
+    <!-- Face ID front door. Shown only when the automatic attempt was rejected
+         for want of a user gesture — otherwise the system sheet appears first
+         and this is never seen. -->
+    <div class="lock__step" id="lockFace" hidden>
+      <button class="btn btn--primary btn--lg btn--full" id="faceBtn">
+        <svg aria-hidden="true"><use href="#i-scan-face"/></svg><span>Unlock with Face ID</span>
+      </button>
+      <button class="btn btn--ghost" id="usePassLink">Use passcode</button>
     </div>
-    <div id="lockEnter" style="display:none">
-      <input id="unlockPass" type="password" placeholder="Passcode" autocomplete="current-password" aria-label="Passcode">
-      <button class="btn pri" id="unlockBtn">Unlock</button>
-      <button class="btn sec" id="faceBtn" style="display:none">Unlock with Face ID</button>
-      <a href="#" id="forgotLink" class="locknote" style="display:block;text-align:center;margin-top:12px">Forgot passcode?</a>
+
+    <!-- Passcode fallback. Only the default view when no passkey is enrolled. -->
+    <div class="lock__step" id="lockEnter" hidden>
+      <label class="field">
+        <span class="field__label">Passcode</span>
+        <input class="input" id="unlockPass" type="password" autocomplete="current-password">
+      </label>
+      <button class="btn btn--primary btn--lg btn--full" id="unlockBtn">Unlock</button>
+      <button class="btn btn--ghost" id="forgotLink">Forgot passcode?</button>
     </div>
-    <div id="lockFaceStep" style="display:none">
-      <div class="locknote" style="margin-bottom:12px">Passcode set ✓ &nbsp;Add Face ID so future opens are one glance?</div>
-      <button class="btn pri" id="faceEnrollBtn">Enable Face ID</button>
-      <button class="btn sec" id="faceSkipBtn">Not now</button>
+
+    <!-- First run. -->
+    <div class="lock__step" id="lockSetup" hidden>
+      <label class="field">
+        <span class="field__label">Create a passcode</span>
+        <input class="input" id="setPass1" type="password" autocomplete="new-password">
+      </label>
+      <label class="field">
+        <span class="field__label">Repeat it</span>
+        <input class="input" id="setPass2" type="password" autocomplete="new-password">
+      </label>
+      <button class="btn btn--primary btn--lg btn--full" id="setupBtn">Create passcode</button>
+      <details class="note"><summary>What this means</summary><p>Your holdings are encrypted on this device. Nothing is sent anywhere. If you forget this passcode only a backup can recover the data.</p>
+    </section>
     </div>
-    <div id="lockErr" class="lockerr"></div>
-    <a href="#" id="demoLink" class="demolink">👀 View the example portfolio — no login</a>
+
+    <!-- Enrolment, promoted: full-width primary with an explanation, and "Not
+         now" demoted to a text link rather than an equal-weight peer button. -->
+    <div class="lock__step" id="lockFaceStep" hidden>
+      <button class="btn btn--primary btn--lg btn--full" id="faceEnrollBtn">
+        <svg aria-hidden="true"><use href="#i-scan-face"/></svg><span>Enable Face ID</span>
+      </button>
+      <p class="t-caption muted">Open with a glance instead of typing. Your passcode keeps working as the recovery key.</p>
+      <button class="btn btn--ghost" id="faceSkipBtn">Not now</button>
+    </div>
+
+    <!-- Replaces prompt(), which WKWebView silently no-ops. -->
+    <div class="lock__step" id="lockRestore" hidden>
+      <label class="field">
+        <span class="field__label">Passcode from your old device</span>
+        <input class="input" id="restorePass" type="password" autocomplete="current-password">
+      </label>
+      <button class="btn btn--primary btn--lg btn--full" id="restoreGo">Restore</button>
+      <button class="btn btn--ghost" id="restoreCancel">Cancel</button>
+    </div>
+
+    <div class="lock__err" id="lockErr" role="alert">
+      <svg aria-hidden="true"><use href="#i-alert"/></svg><span id="lockErrText"></span>
+    </div>
+
+    <!-- Host for the erase confirmation modal, which replaces confirm(). -->
+    <div id="lockModalHost"></div>
+
+    <div class="lock__alt">
+      <button class="btn btn--ghost btn--sm" id="cloudRestoreLink">Restore from backup</button>
+      <button class="btn btn--ghost btn--sm" id="demoLink">See an example portfolio</button>
+    </div>
   </div>
 </div>
-<button id="demoBadge" aria-label="Exit the example portfolio">DEMO · example data · tap to exit</button>
-<div id="miniBar"><span id="mbVal"></span><span id="mbDay"></span></div>
-<div id="ptr"><span class="ptr-spin"></span></div>
 
-<!-- floating AI assistant -->
-<button id="aiFab" aria-label="Ask about your money"><span>💬</span></button>
-<div id="aiPanel" role="dialog" aria-label="Portfolio assistant">
-  <div class="ai-head"><span class="ai-title">💬 Portfolio Assistant</span><button id="aiClose" aria-label="Close">✕</button></div>
-  <div id="aiMsgs"></div>
-  <div id="aiChips"></div>
-  <div class="ai-inputrow"><input id="aiInput" type="text" placeholder="Ask about your money…" autocomplete="off" aria-label="Ask a question"><button id="aiSend" aria-label="Send">➤</button></div>
+<!-- Demo badge — a designed product affordance, not a construction sign. -->
+<button id="demoBadge" class="demobadge press" aria-label="Exit the example portfolio">
+  <svg aria-hidden="true"><use href="#i-eye"/></svg><span>Example data</span>
+  <svg aria-hidden="true"><use href="#i-x"/></svg>
+</button>
+
+<div id="miniBar" class="minibar"><span id="mbVal"></span><span id="mbDay"></span></div>
+<div id="ptr" class="ptr"><span class="btn__spin"></span></div>
+
+<!-- Assistant -->
+<button id="aiFab" class="fab press" aria-label="Ask about your money">
+  <svg aria-hidden="true"><use href="#i-message"/></svg>
+</button>
+<div id="aiPanel" class="aipanel" role="dialog" aria-label="Portfolio assistant">
+  <div class="aipanel__head">
+    <span class="card__title">Assistant</span>
+    <button id="aiClose" class="iconbtn" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+  </div>
+  <div id="aiMsgs" class="aipanel__msgs"></div>
+  <div id="aiChips" class="aipanel__chips"></div>
+  <div class="aipanel__inputrow">
+    <label class="sr" for="aiInput">Ask a question</label>
+    <input id="aiInput" class="input" type="text" placeholder="Ask about your money" autocomplete="off">
+    <button id="aiSend" class="iconbtn" aria-label="Send"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
+  </div>
 </div>
+
+<div class="shell">
+
+<!-- Desktop nav rail — replaces the tab bar at >=1024px so the app stops looking
+     like a phone screenshot pasted onto white. -->
+<nav class="rail-nav" aria-label="Sections">
+  <div class="rail-nav__brand"><svg aria-hidden="true"><use href="#i-wallet"/></svg>My Portfolio</div>
+  <button class="rail-nav__item" data-page="portfolio" aria-current="page"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
+  <button class="rail-nav__item" data-page="explore"><svg aria-hidden="true"><use href="#i-compass"/></svg>Explore</button>
+  <button class="rail-nav__item" data-page="insights"><svg aria-hidden="true"><use href="#i-activity"/></svg>Insights</button>
+  <span class="rail-nav__spacer"></span>
+</nav>
 
 <div class="wrap">
 
-<!-- ================= PORTFOLIO ================= -->
+<!-- ═══════════════════ PORTFOLIO ═══════════════════ -->
 <div id="page-portfolio" class="page">
-  <div id="staleBanner" class="stale hidden"></div>
-  <header>
-    <div class="row-top">
-      <div class="brand">My Portfolio</div>
-      <div class="hdr-actions">
-        <button id="privBtn" title="Hide amounts" aria-label="Hide amounts"></button>
-        <button id="themeBtn" title="Light / dark" aria-label="Toggle theme"></button>
-        <button id="ccyBtn" title="Switch currency" aria-label="Switch currency">$</button>
-        <button id="editBtn" title="Edit holdings" aria-label="Edit"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 8 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H2a2 2 0 0 1 0-4h.1A1.6 1.6 0 0 0 3.6 8a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H8a1.6 1.6 0 0 0 1-1.5V2a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V8a1.6 1.6 0 0 0 1.5 1H22a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
-        <button id="refreshBtn" title="Refresh prices" aria-label="Refresh"><svg viewBox="0 0 24 24"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>
-      </div>
+  <div class="appbar">
+    <h1 class="t-title" id="pfTitle">Portfolio</h1>
+    <div class="appbar__actions">
+      <button id="privBtn" class="iconbtn" aria-label="Hide amounts"><svg aria-hidden="true"><use href="#i-eye"/></svg></button>
+      <button id="themeBtn" class="iconbtn" aria-label="Toggle theme"><svg aria-hidden="true"><use href="#i-moon"/></svg></button>
+      <button id="ccyBtn" class="iconbtn" aria-label="Switch currency"><svg aria-hidden="true"><use href="#i-dollar"/></svg></button>
+      <button id="editBtn" class="iconbtn" aria-label="Edit holdings"><svg aria-hidden="true"><use href="#i-settings"/></svg></button>
+      <button id="refreshBtn" class="iconbtn" aria-label="Refresh prices"><svg aria-hidden="true"><use href="#i-refresh"/></svg></button>
     </div>
-    <div id="status" class="status"><span class="dot"></span><span id="statusTx">Loading…</span></div>
-    <div class="big" id="totalVal">—</div>
-    <div class="todayline" id="todayLine"></div>
-    <div class="sub" id="totalSub"></div>
-    <div class="chips" id="accChips"></div>
+  </div>
+
+  <div id="staleBanner" class="banner" hidden></div>
+
+  <!-- HERO. Deliberately has no card around it: a number this large does not need
+       a box, and boxing it made it peer with the day-change box beside it. Four
+       stacked divs are now one composed unit. -->
+  <header class="hero">
+    <div class="greet" id="greetLine"></div>
+    <div id="status" class="status"><span class="status__dot"></span><span id="statusTx">Loading</span></div>
+    <div class="t-hero hero__total" id="totalVal" data-selectable aria-live="polite">&mdash;</div>
+    <div class="hero__delta" id="todayLine"></div>
+    <div class="hero__sub" id="totalSub"></div>
+    <div class="rail" id="accChips"></div>
   </header>
 
-  <section class="card chart-card">
-    <div class="chart-head">
-      <div class="seg" id="metricSeg">
-        <button data-m="value">Value</button>
-        <button data-m="profit" class="on">Profit</button>
-      </div>
-      <button id="benchBtn" title="Compare with putting the same money into the S&amp;P 500">vs S&amp;P 500</button>
-      <div class="seg" id="rangeSeg">
-        <button data-r="1D">1D</button>
-        <button data-r="1W">1W</button>
-        <button data-r="2W">2W</button>
-        <button data-r="1M" class="on">1M</button>
-        <button data-r="6M">6M</button>
-        <button data-r="YTD">YTD</button>
-        <button data-r="1Y">1Y</button>
-        <button data-r="5Y">5Y</button>
-        <button data-r="MAX">Max</button>
-      </div>
+  <div class="split">
+    <div class="split__main stack">
+
+      <section class="card">
+        <div class="chart__readout" id="chartDelta"></div>
+        <div class="chart"><canvas id="mainChart"></canvas><div id="chartMsg" class="chart__msg"></div></div>
+        <div class="chartctl">
+          <div class="seg" id="metricSeg" role="tablist" aria-label="Metric">
+            <button class="seg__item" data-m="value" role="tab" aria-selected="false">Value</button>
+            <button class="seg__item" data-m="profit" role="tab" aria-selected="true">Profit</button>
+          </div>
+          <div class="seg" id="rangeSeg" role="tablist" aria-label="Range">
+            <button class="seg__item" data-r="1D" role="tab" aria-selected="false">1D</button>
+            <button class="seg__item" data-r="1W" role="tab" aria-selected="false">1W</button>
+            <button class="seg__item" data-r="2W" role="tab" aria-selected="false">2W</button>
+            <button class="seg__item" data-r="1M" role="tab" aria-selected="true">1M</button>
+            <button class="seg__item" data-r="6M" role="tab" aria-selected="false">6M</button>
+            <button class="seg__item" data-r="YTD" role="tab" aria-selected="false">YTD</button>
+            <button class="seg__item" data-r="1Y" role="tab" aria-selected="false">1Y</button>
+            <button class="seg__item" data-r="5Y" role="tab" aria-selected="false">5Y</button>
+            <button class="seg__item" data-r="MAX" role="tab" aria-selected="false">Max</button>
+          </div>
+          <button class="btn btn--ghost btn--sm" id="benchBtn">vs S&amp;P 500</button>
+        </div>
+        <div class="t-caption faint" id="athLine"></div>
+        <div class="rail" id="homePr"></div>
+      </section>
+
+      <!-- Visibility is owned by renderMovers() via style.display; do NOT add
+           `hidden` here, because [hidden] carries !important and would win. -->
+      <section class="card" id="moverCard"><div id="moverBody"></div></section>
+
+      <section class="card">
+        <div class="card__head">
+          <h2 class="card__title">Holdings</h2>
+          <div class="seg" id="sortSeg" role="tablist" aria-label="Sort holdings">
+            <button class="seg__item" data-s="value" role="tab" aria-selected="true">Value</button>
+            <button class="seg__item" data-s="day" role="tab" aria-selected="false">Today</button>
+            <button class="seg__item" data-s="profit" role="tab" aria-selected="false">Profit</button>
+          </div>
+        </div>
+        <div id="holdList"></div>
+        <div id="cashRow"></div>
+      </section>
     </div>
-    <div class="chart-box"><canvas id="mainChart"></canvas><div id="chartMsg"></div></div>
-    <div class="chart-delta" id="chartDelta"></div>
-    <div class="athline" id="athLine"></div>
-    <div class="prstrip" id="homePr"></div>
-  </section>
 
-  <section class="card" id="moverCard" style="display:none"><div id="moverBody"></div></section>
-
-  <section class="card"><div class="listhead"><span class="lt">Holdings</span><div class="seg mini" id="sortSeg">
-    <button data-s="value">Value</button><button data-s="day">Today</button><button data-s="profit">Profit</button>
-  </div></div><div id="holdList"></div><div class="cashrow" id="cashRow"></div></section>
-
-  <section class="card" id="allocCard">
-    <div class="card-title">Allocation</div>
-    <div class="alloc-wrap">
-      <div class="alloc-donut"><canvas id="allocChart"></canvas></div>
-      <div class="alloc-legend" id="allocLegend"></div>
-    </div>
-    <div class="alloc-classes" id="allocClasses"></div>
-    <div id="tgtWrap"></div>
-  </section>
-
-  <section class="card" id="incomeCard">
-    <div class="card-title" id="divTitle" style="cursor:pointer">Dividends <span class="chev" style="float:right;color:var(--faint);font-weight:400">›</span></div>
-    <div class="income-body" id="incomeBody"></div>
-  </section>
-
-  <section class="card" id="goalCard"><div class="card-title">Goal</div><div id="goalBody"></div></section>
-
-  <div class="foot">Chart history is rebuilt from your actual Vanguard purchase lots.<br>Prices: Yahoo Finance free feed — refreshes every few seconds while the US market is open · Not financial advice.<br>Back up your data now and then: ⚙︎ → Export backup.<br>v3.2.1</div>
-</div><!-- /page-portfolio -->
-
-<!-- ================= EXPLORE ================= -->
-<div id="page-explore" class="page hidden">
-  <div class="pagehead" style="margin-top:14px">Explore</div>
-  <div class="searchbar"><svg viewBox="0 0 24 24" class="si"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-    <input id="mktSearch" type="search" placeholder="Search any stock or ETF…" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="Search stocks and ETFs">
-    <button id="mktSearchX" style="display:none" aria-label="Clear search">✕</button></div>
-  <div id="searchResults" class="card" style="display:none"></div>
-  <div id="watchWrap" style="display:none">
-    <div class="eyebrow">Following</div>
-    <h2>Watchlist</h2>
-    <section class="card"><div id="watchList"></div></section>
-    <div class="estnote" style="margin:8px 4px 0">Search any stock and tap ☆ to follow it here.</div>
-  </div>
-  <div class="eyebrow">The big picture</div>
-  <h2>Indices</h2>
-  <div class="idx-row" id="idxRow"><div class="mload">Loading indices…</div></div>
-  <div class="eyebrow">Who's leading today</div>
-  <h2>Sector Pulse</h2>
-  <div class="idx-row" id="sectorRow"><div class="mload">Loading sectors…</div></div>
-  <div class="eyebrow">Ideas</div>
-  <h2>Broaden the portfolio</h2>
-  <section class="card"><div id="ideaList"><div class="mload">Loading…</div></div></section>
-  <div class="estnote" style="margin:8px 4px 0">Funds that add something your current mix doesn't have. Ideas to research, not advice — tap one to see its chart and ☆ it to watch.</div>
-  <div class="eyebrow">Discover</div>
-  <h2>Most Active</h2>
-  <section class="card"><div id="activeList"><div class="mload">Loading…</div></div></section>
-  <h2 style="margin-top:18px">Top Gainers</h2>
-  <section class="card"><div id="gainList"><div class="mload">Loading…</div></div></section>
-  <h2 style="margin-top:18px">Top Losers</h2>
-  <section class="card"><div id="loseList"><div class="mload">Loading…</div></div></section>
-  <div class="foot">Market data: Yahoo Finance free feed · US screeners · Not financial advice.</div>
-</div><!-- /page-explore -->
-
-<!-- ================= INSIGHTS ================= -->
-<div id="page-insights" class="page hidden">
-  <div class="pagehead" style="margin-top:14px">Insights</div>
-  <div class="eyebrow" style="margin-top:6px">Your standing</div>
-  <h2>Portfolio Health</h2>
-  <section class="card" id="healthCard"><div id="healthBody"></div></section>
-
-  <div class="eyebrow">Track record</div>
-  <h2>Performance</h2>
-  <section class="card" id="perfCard"><div class="income-body" id="perfBody"></div></section>
-  <div class="igrid">
-    <div class="icard wide" id="ddCard"><div class="it">Drawdown · 1Y</div><div class="sub-n" id="ddStat"></div>
-      <div style="position:relative;height:150px;margin-top:10px"><canvas id="ddChart"></canvas></div>
-      <div class="estnote">How far the portfolio sat below its previous peak — the discomfort you actually lived through.</div></div>
-    <div class="icard wide" id="hmCard"><div class="it">Monthly Returns</div><div id="hmBody"></div><div class="estnote">Deposit-adjusted (modified Dietz) — measures market performance, not your contributions.</div></div>
-    <div class="icard" id="riskCard"><div class="it">Risk</div></div>
-    <div class="icard" id="peCard"><div class="it">Portfolio P/E</div></div>
-    <div class="icard wide" id="crashCard" style="cursor:pointer"><div class="it">Crash Test <span class="chev">›</span></div><div id="crashBody"></div>
-      <div class="estnote">If history's worst markets replayed tomorrow — and how long each took to heal.</div></div>
+    <!-- Demoted modules. Disclosure rows on mobile, real cards in this column at
+         >=1024px — same components, different slot. -->
+    <!-- Demoted, not hidden. Collapsed disclosures on mobile; the media query at
+         >=1024px forces them open and strips the summary so they read as plain
+         cards in the side column. Same markup, two presentations. -->
+    <aside class="split__side">
+      <section class="card" id="allocCard">
+        <h2 class="card__title">Allocation</h2>
+        <div class="cardstack">
+          <div class="alloc"><div class="alloc__donut"><canvas id="allocChart"></canvas></div>
+          <div id="allocLegend"></div></div>
+          <div id="allocClasses"></div>
+          <div id="tgtWrap"></div>
+        </div>
+      </section>
+      <section class="card" id="goalCard">
+        <h2 class="card__title">Goal</h2>
+        <div class="cardstack"><div id="goalBody"></div></div>
+      </section>
+      <section class="card" id="incomeCard">
+        <h2 class="card__title" id="divTitle">Dividends</h2>
+        <div class="cardstack"><div id="incomeBody"></div></div>
+      </section>
+    </aside>
   </div>
 
-  <div class="eyebrow">Looking ahead</div>
-  <h2>Your Next Moves</h2>
-  <div class="igrid" id="coachGrid"></div>
-  <div class="estnote" style="margin:8px 4px 0">Tap a tile for the full story · rules computed from your own numbers · not advice.</div>
-  <div class="igrid">
-    <div class="icard wide" id="projCard">
-      <div class="it" style="display:flex;justify-content:space-between;align-items:center">Where This Is Headed
-        <span class="seg mini" id="projSeg"><button data-y="5">5y</button><button data-y="10" class="on">10y</button><button data-y="20">20y</button></span></div>
-      <div class="scrubro" id="projRO"></div>
-      <div style="position:relative;height:190px;margin-top:10px"><canvas id="projChart"></canvas></div>
-      <div class="estnote" id="projNote"></div>
-      <div class="estnote" id="projMC" style="color:var(--mut)"></div>
-    </div>
-    <div class="icard wide" id="fiCard" style="cursor:pointer"><div class="it">Financial Independence <span class="chev">›</span></div><div id="fiBody"></div>
-      <div class="estnote">The "4% rule": a portfolio can safely pay out ~4%/yr for life. This is what yours could cover — and when.</div></div>
-  </div>
-
-  <div class="eyebrow">What you own</div>
-  <h2>Under the hood</h2>
-  <div class="h2sub" id="lookSub"></div>
-  <section class="card"><div class="card-title">Stocks you secretly own</div><div id="lookList" style="margin-top:6px"></div></section>
-  <div class="estnote" style="margin:8px 4px 0">Your largest indirect positions via each fund's published top holdings — dollar amounts estimated, prices live. Tap one.</div>
-  <div class="igrid">
-    <div class="icard wide" id="locCard"><div class="it">Where Your Money Lives <span class="chev">›</span></div><div class="sbar" id="locBar"></div><div class="dlegend" id="locLegend"></div></div>
-    <div class="icard wide" id="sectorCard"><div class="it">Sectors <span class="chev">›</span></div><div class="sub-n" id="sectorSub" style="margin:-3px 0 9px"></div><div id="sectorBars"></div></div>
-    <div class="icard wide"><div class="it">Asset Worth · 1Y</div><div class="scrubro" id="worthRO"></div><div style="position:relative;height:190px;margin-top:6px"><canvas id="worthChart"></canvas></div><div class="dlegend" id="worthLegend" style="display:flex;gap:14px;flex-wrap:wrap"></div></div>
-  </div>
-
-  <div class="eyebrow">Dive deeper</div>
-  <h2>Gains &amp; Taxes</h2>
-  <section class="card" style="padding:6px 10px 10px"><table class="gtable" id="gainsTable"></table>
-    <div class="estnote" style="padding:0 6px">Dividends = cash your funds actually paid you, reinvested into more shares. Unrealized = paper profit on what you still hold.</div></section>
-  <div class="igrid">
-    <div class="icard wide" id="taxCard"><div class="it">Tax Lots</div></div>
-    <div class="icard wide"><div class="it">Contributions</div><div class="sub-n" id="contribSub" style="margin:-3px 0 4px"></div><div class="scrubro" id="contribRO"></div><div style="position:relative;height:150px;margin-top:6px"><canvas id="contribChart"></canvas></div></div>
-  </div>
-  <div class="foot">P/E and fee figures are estimates from published fund data · Risk computed from your real price history · Not financial advice.</div>
-</div><!-- /page-insights -->
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v4.0.1</span></p>
 </div>
 
-<nav class="tabbar">
-  <button data-page="portfolio" class="on"><svg viewBox="0 0 24 24"><path d="M21.2 15.2A9 9 0 1 1 8.8 2.8"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg>Portfolio</button>
-  <button data-page="explore"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2l-1.8 4.4-4.4 1.8 1.8-4.4z"/></svg>Explore</button>
-  <button data-page="insights"><svg viewBox="0 0 24 24"><path d="M4 20V14"/><path d="M10 20V10"/><path d="M16 20v-6"/><path d="M4 8l6-4 5 5 5-4"/></svg>Insights</button>
+<!-- ═══════════════════ EXPLORE ═══════════════════ -->
+<div id="page-explore" class="page hidden">
+  <div class="appbar"><h1 class="t-title">Explore</h1></div>
+
+  <!-- Search is the hero of this screen and sticks: it must never scroll away. -->
+  <div class="searchsticky">
+    <div class="search" data-search>
+      <span class="search__icon"><svg aria-hidden="true"><use href="#i-search"/></svg></span>
+      <label class="sr" for="mktSearch">Search stocks and ETFs</label>
+      <input id="mktSearch" type="search" placeholder="Search any stock or ETF" autocomplete="off" spellcheck="false" enterkeyhint="search">
+      <button id="mktSearchX" class="search__clear" aria-label="Clear search"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+  </div>
+  <section class="card" id="searchResults" hidden></section>
+
+  <div class="stack">
+    <div id="watchWrap" hidden>
+      <div class="section__label">Watchlist</div>
+      <section class="card"><div id="watchList"></div></section>
+    </div>
+
+    <div>
+      <div class="section__label">Indices</div>
+      <div class="tiles" id="idxRow"><div class="skel skel--tile"></div><div class="skel skel--tile"></div><div class="skel skel--tile"></div></div>
+    </div>
+
+    <div>
+      <div class="section__label">Sectors today</div>
+      <div class="tiles" id="sectorRow"><div class="skel skel--tile"></div><div class="skel skel--tile"></div><div class="skel skel--tile"></div></div>
+    </div>
+
+    <!-- THE FIX: Most Active / Gainers / Losers were three separate stacked cards
+         containing the same row shape — a layout that never decided what
+         mattered. One card, one segmented control. -->
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">Movers</h2>
+        <div class="seg" id="screenSeg" role="tablist" aria-label="Screener">
+          <button class="seg__item" data-screen="active" role="tab" aria-selected="true">Active</button>
+          <button class="seg__item" data-screen="gain" role="tab" aria-selected="false">Gainers</button>
+          <button class="seg__item" data-screen="lose" role="tab" aria-selected="false">Losers</button>
+        </div>
+      </div>
+      <div id="activeList" data-screen-panel="active"></div>
+      <div id="gainList" data-screen-panel="gain" hidden></div>
+      <div id="loseList" data-screen-panel="lose" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2 class="card__title">Ideas</h2>
+      <p class="t-caption muted">Funds that add something your current mix doesn't have. To research, not advice.</p>
+      <div id="ideaList"></div>
+    </section>
+  </div>
+
+  <p class="t-caption faint foot">Market data from the Yahoo Finance free feed. Not financial advice.</p>
+</div>
+
+<!-- ═══════════════════ INSIGHTS ═══════════════════ -->
+<!-- Was ~20 expanded cards in one endless scroll. Now four labelled groups,
+     collapsed by default, so the screen is scannable in ten seconds. Every
+     original metric is preserved inside — none deleted, and every element ID the
+     frozen JS writes into is unchanged. -->
+<div id="page-insights" class="page hidden">
+  <div class="appbar"><h1 class="t-title">Insights</h1></div>
+
+  <section class="card" id="healthCard"><div id="healthBody"></div></section>
+
+  <div class="stack--tight stack">
+    <section class="card">
+        <h2 class="card__title">Performance</h2>
+        <div class="cardstack">
+        <div id="perfBody"></div>
+        <div class="card" id="ddCard">
+          <h3 class="card__title">Drawdown · 1Y</h3><div id="ddStat"></div>
+          <div class="chart chart--short"><canvas id="ddChart"></canvas></div>
+          <details class="note"><summary>What this means</summary><p>How far the portfolio sat below its previous peak.</p>
+    </section>
+        </div>
+        <div class="card" id="hmCard">
+          <h3 class="card__title">Monthly returns</h3><div id="hmBody"></div>
+          <details class="note"><summary>What this means</summary><p>Deposit-adjusted, so it measures the market and not your contributions.</p>
+    </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Risk</h2>
+        <div class="cardstack">
+        <div class="card" id="riskCard"><h3 class="card__title">Risk</h3></div>
+        <div class="card" id="peCard"><h3 class="card__title">Portfolio P/E</h3></div>
+        <div class="card press" id="crashCard"><h3 class="card__title">Crash test</h3><div id="crashBody"></div>
+          <details class="note"><summary>What this means</summary><p>If history's worst markets replayed tomorrow, and how long each took to heal.</p>
+    </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Income &amp; tax</h2>
+        <div class="cardstack">
+        <section class="card"><div class="tablewrap"><table class="table" id="gainsTable"></table></div>
+          <details class="note"><summary>What this means</summary><p>Dividends are cash your funds paid you, reinvested. Unrealised is paper profit on what you still hold.</p>
+    </section>
+        </section>
+        <div class="card" id="taxCard"><h3 class="card__title">Tax lots</h3></div>
+        <div class="card"><h3 class="card__title">Contributions</h3><div id="contribSub"></div><div class="scrubro" id="contribRO"></div>
+          <div class="chart chart--short"><canvas id="contribChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Future</h2>
+        <div class="cardstack">
+        <div class="card" id="projCard">
+          <div class="card__head"><h3 class="card__title">Where this is headed</h3>
+            <div class="seg" id="projSeg" role="tablist" aria-label="Projection years">
+              <button class="seg__item" data-y="5" role="tab" aria-selected="false">5y</button>
+              <button class="seg__item" data-y="10" role="tab" aria-selected="true">10y</button>
+              <button class="seg__item" data-y="20" role="tab" aria-selected="false">20y</button>
+            </div>
+          </div>
+          <div class="scrubro" id="projRO"></div>
+          <div class="chart"><canvas id="projChart"></canvas></div>
+          <p class="t-caption faint" id="projNote"></p>
+          <p class="t-caption faint" id="projMC"></p>
+        </div>
+        <div class="card press" id="fiCard"><h3 class="card__title">Financial independence</h3><div id="fiBody"></div>
+          <details class="note"><summary>What this means</summary><p>The 4% rule: a portfolio can pay out about 4% a year for life. This is what yours could cover, and when.</p>
+    </section>
+        </div>
+        <div class="card" id="coachCard"><h3 class="card__title">Next moves</h3><div class="grid-2" id="coachGrid"></div></div>
+      </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card__title">Under the hood</h2>
+        <div class="cardstack">
+        <div class="t-caption muted" id="lookSub"></div>
+        <section class="card"><h3 class="card__title">Stocks you indirectly own</h3><div id="lookList"></div></section>
+        <div class="card" id="locCard"><h3 class="card__title">Where your money lives</h3><div class="sbar" id="locBar"></div><div class="dlegend" id="locLegend"></div></div>
+        <div class="card" id="sectorCard"><h3 class="card__title">Sectors</h3><div id="sectorSub"></div><div id="sectorBars"></div></div>
+        <div class="card"><h3 class="card__title">Asset worth · 1Y</h3><div class="scrubro" id="worthRO"></div>
+          <div class="chart chart--short"><canvas id="worthChart"></canvas></div><div class="dlegend" id="worthLegend"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <p class="t-caption faint foot">P/E and fee figures are estimates from published fund data. Risk is computed from your real price history. Not financial advice.</p>
+</div>
+
+</div><!-- /wrap -->
+</div><!-- /shell -->
+
+<nav class="tabbar" aria-label="Sections">
+  <button class="tabbar__item" data-page="portfolio" aria-current="page"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
+  <button class="tabbar__item" data-page="explore"><svg aria-hidden="true"><use href="#i-compass"/></svg>Explore</button>
+  <button class="tabbar__item" data-page="insights"><svg aria-hidden="true"><use href="#i-activity"/></svg>Insights</button>
 </nav>
 
-<div id="detail" class="overlay hidden"><div class="sheet" id="detailSheet" role="dialog" aria-modal="true"></div></div>
-<div id="editModal" class="overlay hidden"><div class="sheet" id="editSheet" role="dialog" aria-modal="true"></div></div>
-<div id="toast" role="status"></div>
+<div class="scrim" id="detail" data-open="false"><div class="sheet" id="detailSheet" data-open="false" role="dialog" aria-modal="true"></div></div>
+<div class="scrim" id="editModal" data-open="false"><div class="sheet" id="editSheet" data-open="false" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status" data-open="false"></div>
 
+<!-- Loaded before vault.js: the lock screen references the icon sprite and
+     renders through the ui builders, so both must exist before it paints. -->
+<script src="js/icons.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/vault.js"></script>
 </body>
 </html>

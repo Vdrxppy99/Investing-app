@@ -276,18 +276,18 @@ async function swReady(ms){
 async function pushEnable(){
   if(window.DEMO_MODE){ toast('Notifications aren’t part of the example portfolio.', true); return false; }
   if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
-    alert('This browser can’t do notifications. Open My Portfolio from your Home Screen icon (needs iOS 16.4+).'); return false;
+    toast('This browser can’t do notifications. Open My Portfolio from your Home Screen icon (needs iOS 16.4+).', true); return false;
   }
   // iOS only grants web push to Home-Screen apps — a Safari tab silently does nothing
   const standalone = navigator.standalone===true || matchMedia('(display-mode: standalone)').matches;
   if(!standalone && /iPhone|iPad/.test(navigator.userAgent)){
-    alert('Open My Portfolio from your Home Screen icon — not Safari — then turn on reports. (iOS only allows notifications for the installed app.)'); return false;
+    toast('Open My Portfolio from your Home Screen icon — not Safari — then turn on reports. (iOS only allows notifications for the installed app.)', true); return false;
   }
   // check the current state first; iOS only shows a prompt from 'default' — from 'denied' it silently returns denied
   let perm = Notification.permission;
   if(perm==='default'){ try{ perm = await Notification.requestPermission(); }catch(e){} }
   if(perm==='denied'){
-    alert('iOS is blocking notifications for this app, so it can’t ask again.\n\nFix it here:\niPhone Settings → Notifications → My Portfolio → turn ON “Allow Notifications”.\n(If it’s not listed there, look under Settings → Apps → My Portfolio → Notifications.)\n\nThen come back and tap “Turn on reports” again.');
+    toast('iOS is blocking notifications for this app, so it can’t ask again.\n\nFix it here:\niPhone Settings → Notifications → My Portfolio → turn ON “Allow Notifications”.\n(If it’s not listed there, look under Settings → Apps → My Portfolio → Notifications.)\n\nThen come back and tap “Turn on reports” again.', true);
     return false;
   }
   if(perm!=='granted'){ toast('Tap “Turn on reports” again and choose Allow.', true); return false; }
@@ -303,7 +303,7 @@ async function pushEnable(){
     toast('Daily reports on — sending you a test now…');
     setTimeout(()=>{ pushTest(); }, 1200); // auto-fire a test so you immediately see it working
     return true;
-  }catch(e){ alert('Couldn’t finish turning on reports.\n\nReason: '+((e&&e.message)||e)+'\n\n(Screenshot this and send it to me.)'); return false; }
+  }catch(e){ toast('Couldn’t finish turning on reports.\n\nReason: '+((e&&e.message)||e)+'\n\n(Screenshot this and send it to me.)', true); return false; }
 }
 async function pushDisable(){
   try{ const reg=await swReady(4000); const sub=await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}

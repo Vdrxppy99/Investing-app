@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Components — My Portfolio</title>
+<!--
+  The living style guide. Renders every component in DESIGN.md §6 in every state,
+  in both themes, side by side. Kept and maintained — if a component is not in
+  here it does not exist.
+
+  Deliberately built from the same js/ui.js the app uses, so this page cannot
+  drift from reality: if a builder changes, this page changes.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../css/tokens.css" />
+<link rel="stylesheet" href="../css/base.css" />
+<link rel="stylesheet" href="../css/components.css" />
+<link rel="stylesheet" href="../css/layout.css" />
+</head>
+<body>
+
+<div class="wrap" id="root"></div>
+
+<script src="../js/icons.js"></script>
+<script src="../js/ui.js"></script>
+<script>
+/* Gallery scaffolding only — never shipped in the app. */
+(function () {
+  // The gallery is the one place a wrapper div is allowed to be ad-hoc, so it
+  // uses a class defined at the bottom of this file rather than inline styles.
+  function box(label, content) {
+    return '<div class="gal__cell"><span class="gal__tag">' + ui.esc(label) + '</span>' +
+           '<div class="gal__demo">' + content + '</div></div>';
+  }
+  function section(title, note, cells) {
+    return '<section class="gal__sec">' +
+      '<h2 class="t-heading">' + ui.esc(title) + '</h2>' +
+      (note ? '<p class="t-caption muted gal__note">' + ui.esc(note) + '</p>' : '') +
+      '<div class="gal__grid">' + cells.join('') + '</div></section>';
+  }
+
+  var S = [];
+
+  /* 6.1 Button — 5 variants x 3 sizes x states */
+  S.push(section('6.1 Button', '5 variants x 3 sizes. Primary is the only control with a physical edge.', [
+    box('primary md', ui.button({ label: 'Save changes', variant: 'primary' })),
+    box('primary lg full', ui.button({ label: 'Unlock with Face ID', variant: 'primary', size: 'lg', full: true, icon: 'scan-face' })),
+    box('primary sm', ui.button({ label: 'Add', variant: 'primary', size: 'sm', icon: 'plus' })),
+    box('secondary', ui.button({ label: 'Cancel', variant: 'secondary' })),
+    box('ghost', ui.button({ label: 'Use passcode', variant: 'ghost' })),
+    box('danger', ui.button({ label: 'Erase device data', variant: 'danger', icon: 'trash' })),
+    box('disabled', ui.button({ label: 'Save changes', variant: 'primary', disabled: true })),
+    box('loading (width kept)', ui.button({ label: 'Save changes', variant: 'primary', loading: true })),
+  ]));
+
+  /* 6.2 Icon button */
+  S.push(section('6.2 Icon button', '44x44 minimum. aria-label is required by the builder — it throws without one.', [
+    box('refresh', ui.iconButton({ icon: 'refresh', label: 'Refresh prices' })),
+    box('settings', ui.iconButton({ icon: 'settings', label: 'Settings' })),
+    box('close', ui.iconButton({ icon: 'x', label: 'Close' })),
+    box('theme', ui.iconButton({ icon: 'moon', label: 'Switch to light theme' })),
+  ]));
+
+  /* 6.3 Segmented control */
+  S.push(section('6.3 Segmented control', 'Also the fix for Explore: three stacked screener cards become one card with this.', [
+    box('range', ui.seg({ label: 'Range', value: '1M', items: [
+      { value: '1D', label: '1D' }, { value: '1W', label: '1W' }, { value: '1M', label: '1M' },
+      { value: '3M', label: '3M' }, { value: '1Y', label: '1Y' }, { value: 'ALL', label: 'ALL' }] })),
+    box('screener', ui.seg({ label: 'Screener', value: 'active', items: [
+      { value: 'active', label: 'Active' }, { value: 'gain', label: 'Gainers' }, { value: 'lose', label: 'Losers' }] })),
+  ]));
+
+  /* 6.4 Chip */
+  S.push(section('6.4 Chip / pill', 'Gain and loss tones appear ONLY on deltas and data marks — never on a button or nav item.', [
+    box('neutral', ui.chip('ETF')),
+    box('gain delta', ui.delta(1.29, '+1.29%')),
+    box('loss delta', ui.delta(-0.14, '-0.14%')),
+    box('attention', ui.chip({ label: 'Off track', tone: 'attn', icon: 'alert' })),
+    box('primary', ui.chip({ label: 'Selected', tone: 'primary', icon: 'check' })),
+  ]));
+
+  /* 6.5 List row */
+  S.push(section('6.5 List row', 'The workhorse. Divided by a hairline, NOT a bordered card per row — that is the fix for "every box has the same weight".', [
+    box('holding', ui.row({ logo: ui.logo('VTI'), title: 'VTI', sub: 'Vanguard Total Stock Market',
+      spark: ui.spark('gal-s1'), value: '$82,875.82', delta: ui.delta(0.83, '+0.83%'), press: true, tag: 'button' })),
+    box('with chevron', ui.row({ logo: ui.logo('BND'), title: 'BND', sub: 'Vanguard Total Bond Market',
+      value: '$16,067.92', delta: ui.delta(-0.1, '-0.10%'), chevron: true, press: true, tag: 'button' })),
+    box('minimal', ui.row({ title: 'Realised gains', value: '$4,350.60' })),
+  ]));
+
+  /* 6.6 / 6.7 Card and stat */
+  S.push(section('6.6 Card · 6.7 Stat tile', 'No border in dark mode — the surface lightness IS the elevation.', [
+    box('card + action', ui.card({ title: 'Allocation',
+      action: ui.iconButton({ icon: 'info', label: 'About allocation' }),
+      body: '<div class="grid-2">' + ui.stat({ label: 'Stocks', value: '72%' }) + ui.stat({ label: 'Bonds', value: '11%' }) + '</div>' })),
+    box('stat + delta', ui.stat({ label: 'Total return', value: '16.25%', delta: '+$46,007', tone: 'gain' })),
+  ]));
+
+  /* 6.8 / 6.9 Inputs */
+  S.push(section('6.8 Input · 6.9 Search', 'Every input is 16px minimum — below that iOS zooms the viewport on focus. Always a real label, never placeholder-as-label.', [
+    box('text', ui.field({ label: 'Goal amount', value: '250000', numeric: true })),
+    box('invalid', ui.field({ label: 'Shares', value: '-4', numeric: true, invalid: true, error: 'Must be a positive number' })),
+    box('disabled', ui.field({ label: 'Ticker', value: 'VTI', disabled: true })),
+    box('search', ui.search({ placeholder: 'Search stocks & funds' })),
+  ]));
+
+  /* 6.12 / 6.19 Toast and banner */
+  S.push(section('6.12 Toast · 6.19 Banner', 'The stale-data notice becomes a real component instead of an inline-styled div.', [
+    box('banner', ui.banner({ text: 'Prices are 20 minutes delayed.', icon: 'info' })),
+    box('banner + action', ui.banner({ text: 'Last updated 3 days ago.', icon: 'alert',
+      action: ui.button({ label: 'Refresh', variant: 'ghost', size: 'sm' }) })),
+  ]));
+
+  /* 6.14 / 6.15 Progress and ring */
+  S.push(section('6.14 Progress bar · 6.15 Ring', 'Off-track uses --secondary, never --loss: a goal behind schedule is not a loss, and loss colour is reserved for numbers.', [
+    box('on track', ui.bar({ pct: 59, label: 'Goal progress' })),
+    box('off track', ui.bar({ pct: 22, attn: true, label: 'Goal progress' })),
+    box('ring 59%', ui.ring({ pct: 59, label: '59%' })),
+    box('ring off track', ui.ring({ pct: 22, label: '22%', attn: true })),
+  ]));
+
+  /* 6.16 Skeleton */
+  S.push(section('6.16 Skeleton', 'Every first paint uses these. A bare spinner on a blank screen appears nowhere in the app.', [
+    box('lines', ui.skeleton('title') + '<div class="stack--tight">' + ui.skeleton('line', 3) + '</div>'),
+    box('rows', ui.skeletonRows(3)),
+    box('chart', ui.skeleton('chart')),
+  ]));
+
+  /* 6.17 / 6.18 Empty and error */
+  S.push(section('6.17 Empty · 6.18 Error', 'Written as product copy, not as an apology. Error always offers a way forward.', [
+    box('empty', ui.empty({ title: 'Nothing here yet', note: 'Search above to add a fund to your watchlist.', icon: 'star' })),
+    box('error', ui.empty({ error: true, title: 'Could not load prices', note: 'Check your connection.',
+      action: ui.button({ label: 'Retry', variant: 'secondary', size: 'sm', icon: 'refresh' }) })),
+  ]));
+
+  /* 6.20 / 6.21 Logo and chart */
+  S.push(section('6.20 Logo tile · 6.21 Chart shell', 'Monogram when no image is available.', [
+    box('monogram', '<div class="gal__row">' + ui.logo('VTI') + ui.logo('VXUS') + ui.logo('BND') + ui.logo('SCHD') + '</div>'),
+    box('chart container', ui.chart({ id: 'gal-chart', label: 'Portfolio value over time' })),
+  ]));
+
+  /* 6.22 Table */
+  S.push(section('6.22 Table', 'Only for genuinely tabular data. Right-aligned numerics, no zebra striping, scrolls inside its own container.', [
+    box('tax lots', ui.table({
+      head: ['Lot', 'Shares', 'Cost', 'Value', 'Gain'],
+      rows: [
+        ['2023-04-12', '42', '$8,120', '$10,089', { html: ui.delta(24, '+24.2%') }],
+        ['2024-01-08', '19', '$4,410', '$5,227', { html: ui.delta(18, '+18.5%') }],
+        ['2025-06-02', '12', '$3,100', '$2,904', { html: ui.delta(-6, '-6.3%') }],
+      ] })),
+  ]));
+
+  /* Disclosure + insight group */
+  S.push(section('Disclosure row · Insight group', 'How a demoted module is reached on mobile, and the Insights restructure: headline plus at most three figures, the rest behind the tap.', [
+    box('disclosure', ui.disclose({ title: 'Allocation', meta: 'VTI 56%' }) +
+        ui.disclose({ title: 'Goal', meta: '59% of $250,000' }) +
+        ui.disclose({ title: 'Dividends', meta: '$2,776 / yr' })),
+    box('group', ui.group({ label: 'Performance', figures: [
+      { label: 'Total return', value: '+16.25%', tone: 'gain' },
+      { label: 'vs S&P 500', value: '+12.1%', tone: 'gain' },
+      { label: 'Max drawdown', value: '-13.0%', tone: 'loss' }] })),
+  ]));
+
+  /* Tab bar + rail */
+  S.push(section('6.13 Tab bar · nav rail', 'Opaque level 3 — no backdrop blur. Becomes a 240px left rail at >=1024px.', [
+    box('tab bar', '<div class="gal__tabbar"><div class="tabbar">' +
+      '<button class="tabbar__item" aria-current="page">' + ui.icon('wallet') + 'Portfolio</button>' +
+      '<button class="tabbar__item">' + ui.icon('compass') + 'Explore</button>' +
+      '<button class="tabbar__item">' + ui.icon('activity') + 'Insights</button>' +
+      '</div></div>'),
+  ]));
+
+  /* Type + colour reference */
+  var steps = ['hero', 'display', 'title', 'heading', 'body', 'label', 'caption', 'micro'];
+  S.push(section('Type — 7 steps + 1 exception', 'The hero total is the only bespoke size permitted. Old app: 25 sizes, 8 of them half-pixel.', [
+    box('scale', steps.map(function (s) {
+      return '<div class="t-' + s + '">' + s + ' — $146,984.16</div>';
+    }).join('')),
+  ]));
+
+  var swatches = ['primary', 'primary-fill', 'secondary', 'gain', 'loss', 'canvas', 'surface', 'surface-2', 'surface-3', 'line', 'line-strong', 'border-control', 'text', 'text-muted', 'text-faint'];
+  var cats = ['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6', 'cat-7', 'cat-8'];
+  S.push(section('Colour', 'Brand blue and P&L green are now different things. Old app: --brand and --green were byte-identical.', [
+    box('tokens', '<div class="gal__sw">' + swatches.map(function (t) {
+      return '<div class="gal__chip" data-tok="' + t + '"><span class="gal__dot gal__dot--' + t + '"></span>' + t + '</div>';
+    }).join('') + '</div>'),
+    box('categorical ramp', '<div class="gal__sw">' + cats.map(function (t) {
+      return '<div class="gal__chip"><span class="gal__dot gal__dot--' + t + '"></span>' + t + '</div>';
+    }).join('') + '</div>'),
+  ]));
+
+  document.getElementById('root').innerHTML =
+    '<div class="appbar"><h1 class="t-title">Components</h1>' +
+    '<div class="appbar__actions">' +
+    '<span class="chip" id="vw">—</span>' +
+    ui.iconButton({ icon: 'sun', label: 'Toggle theme', id: 'themeToggle' }) +
+    '</div></div>' +
+    '<p class="t-caption muted gal__note">Living style guide. Every component in DESIGN.md §6, every state, both themes.</p>' +
+    S.join('');
+
+  ui.hydrate();
+
+  /* Theme toggle + viewport readout — the two things the owner needs to judge it. */
+  var root = document.documentElement;
+  document.getElementById('themeToggle').onclick = function () {
+    root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    this.querySelector('use').setAttribute('href', root.dataset.theme === 'dark' ? '#i-sun' : '#i-moon');
+  };
+  function vw() { document.getElementById('vw').textContent = window.innerWidth + 'px'; }
+  vw(); window.addEventListener('resize', vw);
+
+  /* Segmented controls are interactive here so their selected state is real. */
+  document.querySelectorAll('.seg').forEach(function (seg) {
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('.seg__item'); if (!b) return;
+      seg.querySelectorAll('.seg__item').forEach(function (i) { i.setAttribute('aria-selected', String(i === b)); });
+    });
+  });
+  document.querySelectorAll('[data-search]').forEach(function (s) {
+    var i = s.querySelector('input');
+    i.addEventListener('input', function () { s.classList.toggle('search--filled', !!i.value); });
+    s.querySelector('[data-search-clear]').onclick = function () { i.value = ''; s.classList.remove('search--filled'); i.focus(); };
+  });
+})();
+</script>
+
+<style>
+/* Gallery-only layout. Not part of the design system — this file is scaffolding,
+   and keeping its scaffolding here means components.css stays honest. */
+.gal__sec { margin-bottom: var(--s-9); }
+.gal__note { margin-bottom: var(--s-4); max-width: 60ch; }
+.gal__grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); margin-top: var(--s-4); }
+.gal__cell { background: var(--canvas); border: var(--hairline) dashed var(--line); border-radius: var(--r-card); padding: var(--s-4); }
+.gal__tag { display: block; font-size: var(--t-micro); letter-spacing: var(--tr-micro); text-transform: uppercase; font-weight: var(--w-bold); color: var(--text-faint); margin-bottom: var(--s-3); }
+.gal__demo { display: grid; gap: var(--s-3); }
+.gal__row { display: flex; gap: var(--s-2); }
+.gal__tabbar { position: relative; height: 72px; }
+.gal__tabbar .tabbar { position: absolute; }
+.gal__sw { display: grid; gap: var(--s-2); }
+.gal__chip { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-caption); font-family: ui-monospace, monospace; }
+.gal__dot { width: 20px; height: 20px; border-radius: var(--r-input); border: var(--hairline) solid var(--line); flex-shrink: 0; }
+.gal__dot--primary { background: var(--primary); }
+.gal__dot--primary-fill { background: var(--primary-fill); }
+.gal__dot--secondary { background: var(--secondary); }
+.gal__dot--gain { background: var(--gain); }
+.gal__dot--loss { background: var(--loss); }
+.gal__dot--canvas { background: var(--canvas); }
+.gal__dot--surface { background: var(--surface); }
+.gal__dot--surface-2 { background: var(--surface-2); }
+.gal__dot--surface-3 { background: var(--surface-3); }
+.gal__dot--line { background: var(--line); }
+.gal__dot--line-strong { background: var(--line-strong); }
+.gal__dot--border-control { background: var(--border-control); }
+.gal__dot--text { background: var(--text); }
+.gal__dot--text-muted { background: var(--text-muted); }
+.gal__dot--text-faint { background: var(--text-faint); }
+.gal__dot--cat-1 { background: var(--cat-1); }
+.gal__dot--cat-2 { background: var(--cat-2); }
+.gal__dot--cat-3 { background: var(--cat-3); }
+.gal__dot--cat-4 { background: var(--cat-4); }
+.gal__dot--cat-5 { background: var(--cat-5); }
+.gal__dot--cat-6 { background: var(--cat-6); }
+.gal__dot--cat-7 { background: var(--cat-7); }
+.gal__dot--cat-8 { background: var(--cat-8); }
+</style>
+</body>
+</html>
