@@ -137,8 +137,17 @@ async function refreshAll(force){
   // even after days away, instead of waiting behind 10-year history downloads
   const qres = await Promise.allSettled(syms.map(fetchQuote));
   const quotesOk = qres.some(r=>r.status==='fulfilled' && r.value===true);
-  // phase 1 renders only the light surfaces — the heavy charts rebuild once, in phase 2
-  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); renderHeader(); renderList(); renderMover(); renderStale(); setStatus(); }
+  // Phase 1 used to render only five light surfaces, leaving the chart, allocation,
+  // goal and dividends blank until phase 2 finished — which is behind EVERY history
+  // download. Unlocking with Face ID gets you to the screen fast enough to sit in
+  // that half-painted state, which is what "Portfolio doesn't load fully" was.
+  //
+  // Those sections do not need the download: state.history is restored from the
+  // pt_history cache at boot (core.js), so they can draw from it immediately and be
+  // refreshed by the phase 2 render below. This changes only the ORDER things
+  // render in — no calculation, no API call, no storage key.
+  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); }
+  try { renderAll(); } catch(_) { /* a section that cannot draw yet must not stop the rest */ }
   // PHASE 2 — heavy history + FX refresh quietly behind the already-live screen
   const hjobs = syms.filter(s=>{
     const h=state.history[s];
