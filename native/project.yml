@@ -22,7 +22,12 @@ targets:
     info:
       path: Portfolio/Info.plist
       properties:
-        CFBundleDisplayName: Portfolio
+        # Renamed from "Portfolio" so it is distinguishable from the PWA, which
+        # keeps that name. Both were identical in Spotlight and on the home
+        # screen, which made it impossible to tell which one was being opened.
+        # Bundle id deliberately unchanged: this UPDATES the installed app rather
+        # than adding a third icon.
+        CFBundleDisplayName: Basis
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         UILaunchScreen:
           UIColorName: LaunchBackground
