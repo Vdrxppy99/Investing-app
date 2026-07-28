@@ -1554,3 +1554,28 @@
   }
   .askthinking::after { animation-delay: var(--dur-stagger); }
 }
+
+@layer components {
+  /* ── Overlay class contract ───────────────────────────────────────────────
+     sheets.js opens an overlay with classList.remove('closing','hidden') and
+     closes it by adding 'closing' then 'hidden'. The rebuilt scrim listened for
+     data-open, so removing .hidden made it display:block while it was still
+     opacity:0 and pointer-events:none — invisible and untouchable.
+
+     That is why tapping a holding "did nothing": the row's click handler fired
+     and openDetail() ran correctly, but the sheet it opened could never be seen.
+     Same defect as the assistant panel. */
+  .scrim:not(.hidden) { opacity: 1; pointer-events: auto; }
+  .scrim:not(.hidden) > .sheet { transform: translateY(0); opacity: 1; }
+  .scrim.closing { opacity: 0; pointer-events: none; }
+  .scrim.closing > .sheet { transform: translateY(100%); }
+
+  @media (min-width: 1024px) {
+    .scrim:not(.hidden) > .sheet { transform: translate(-50%, -50%) scale(1); }
+    .scrim.closing > .sheet { transform: translate(-50%, -50%) scale(0.96); }
+  }
+
+  /* The toast uses the same .show contract as the assistant. */
+  .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .toast.bad { color: var(--loss); }
+}

@@ -481,14 +481,40 @@ function attachScrubAny(c, onMove){ // onMove(i) with index, onMove(null) when r
     return Math.round(t*(n-1));
   };
   const move=e=>{ const i=idx(e); if(i===c._scrub) return; c._scrub=i; c.update('none'); onMove(i); };
+
+  // DIRECTIONAL LOCK. touch-action:pan-y lets the browser claim the gesture the
+  // instant a finger drifts vertically, which fires pointercancel and drops the
+  // scrub — so reading the chart felt hair-trigger and deselected constantly.
+  //
+  // Now the first few pixels decide: mostly-horizontal locks INTO scrubbing and
+  // stays locked however much the finger wanders after that; mostly-vertical
+  // hands the gesture to the page so the chart never traps a scroll.
+  const LOCK = 6;   // px of travel before committing either way
   el.onpointerdown=e=>{
-    try{ el.setPointerCapture(e.pointerId); }catch(x){}
     if(c.chartArea && !(c.chartArea.right-c.chartArea.left>2)){ try{ c.resize(); }catch(x){} } // throttled layouts
-    if(c.options.plugins.tooltip){ c._ttWas=c.options.plugins.tooltip.enabled!==false; c.options.plugins.tooltip.enabled=false; }
-    c._scrubbing=true; move(e);
+    c._start = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    c._axis = null;          // 'x' = scrubbing, 'y' = page scroll, null = undecided
+    c._scrubbing = false;
   };
-  el.onpointermove=e=>{ if(c._scrubbing) move(e); };
+  el.onpointermove=e=>{
+    if(c._axis === 'y') return;                       // page owns this gesture
+    if(c._axis === 'x'){ move(e); return; }
+    if(!c._start) return;
+    const dx = Math.abs(e.clientX - c._start.x), dy = Math.abs(e.clientY - c._start.y);
+    if(dx < LOCK && dy < LOCK) return;                // not enough travel to decide
+    if(dy > dx){ c._axis = 'y'; return; }             // a scroll, leave it alone
+    c._axis = 'x';
+    // Capture only AFTER committing, so an abandoned gesture is never stolen from
+    // the scroller, and pin touch-action so vertical drift cannot cancel the scrub.
+    try{ el.setPointerCapture(c._start.id); }catch(x){}
+    el.style.touchAction = 'none';
+    if(c.options.plugins.tooltip){ c._ttWas=c.options.plugins.tooltip.enabled!==false; c.options.plugins.tooltip.enabled=false; }
+    c._scrubbing = true;
+    move(e);
+  };
   el.onpointerup=el.onpointercancel=()=>{
+    c._start = null; c._axis = null;
+    el.style.touchAction = 'pan-y';   // hand vertical scrolling back to the page
     if(!c._scrubbing) return;
     c._scrubbing=false; c._scrub=null;
     if(c.options.plugins.tooltip && c._ttWas!==undefined) c.options.plugins.tooltip.enabled=c._ttWas;
