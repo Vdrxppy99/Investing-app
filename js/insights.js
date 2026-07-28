@@ -318,7 +318,12 @@ function renderPerf(){
   });
 }
 function ensureChartsSized(){ // charts created mid page-transition can get stamped width:0 — heal them
-  ['ddChart','projChart','worthChart','contribChart'].forEach(id=>{
+  // Portfolio's own charts were missing from this list, and nothing outside
+  // renderInsights() ever called the function — so a Portfolio chart stamped at
+  // width 0 stayed that way until you visited Insights and came back, which forced
+  // a re-render. That is exactly the reported symptom: the sections at the end of
+  // Portfolio and Explore only appearing after opening Insights.
+  ['mainChart','allocChart','ddChart','projChart','worthChart','contribChart'].forEach(id=>{
     const el=$(id); if(!el||!window.Chart) return;
     const c=Chart.getChart(el);
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }

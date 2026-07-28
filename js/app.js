@@ -208,6 +208,10 @@ function renderAll(){
   window.__portfolioFailed = failed;
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-explore').classList.contains('hidden')) renderMarkets();
+  // Heal any canvas that got stamped width:0 while the page was mid-transition.
+  // This only ever ran from renderInsights(), which is why Portfolio's chart and
+  // allocation donut stayed blank until you opened Insights and came back.
+  if(typeof ensureChartsSized === 'function') setTimeout(ensureChartsSized, 150);
   return failed.length;
 }
 $('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → Nasdaq 100 → off
