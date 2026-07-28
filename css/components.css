@@ -1036,7 +1036,7 @@
 
 @layer components {
   /* Holding rows and market rows — the list-row anatomy under other names. */
-  .hrow, .mrow, .drow, .nrow, .idx-card {
+  .hrow, .mrow, .drow, .nrow {
     position: relative;
     display: flex;
     align-items: center;
@@ -1080,7 +1080,7 @@
   }
   .hpl, .cmove { font-size: var(--t-caption); font-weight: var(--w-semibold); }
   .hspark, .mspark { width: 56px; height: 20px; flex-shrink: 0; }
-  .hsplit, .htip, .htips { font-size: var(--t-caption); color: var(--text-muted); }
+  .htip, .htips { font-size: var(--t-caption); color: var(--text-muted); }
 
   /* Delta pills. Gain/loss colour is permitted here — these ARE numbers. */
   .pctpill, .prpill, .daypill {
@@ -1258,4 +1258,99 @@
   .sbar { height: 10px; display: flex; border-radius: var(--r-pill); overflow: hidden; background: var(--surface-2); }
   .sbar > * { height: 100%; }
   .dlegend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: var(--t-caption); color: var(--text-muted); }
+}
+
+@layer components {
+  /* ── Index and sector tiles ───────────────────────────────────────────────
+     Read from explore.js, not guessed: .idx-card holds .n (name), .p (price),
+     .c (change) and a sparkline, stacked. It had been swept into the list-row
+     rule, which made it a horizontal flex row — so the name, the value and the
+     percentage were drawn on top of one another. */
+  .idx-card {
+    display: grid;
+    align-content: start;
+    gap: var(--s-1);
+    padding: var(--s-3);
+    min-width: 0;
+    background: var(--surface);
+    border-radius: var(--r-button);
+    text-align: left;
+    transition: background-color var(--dur-micro) var(--ease-out);
+  }
+  .idx-card:active { background: var(--surface-2); }
+  .idx-card .n {
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-muted);
+    /* Sector names are long ("Consumer Discretionary"); one clipped line beats
+       reflowing every tile in the grid. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .idx-card .p {
+    font-size: var(--t-label);
+    font-weight: var(--w-bold);
+    color: var(--text);
+  }
+  .idx-card .c { font-size: var(--t-caption); font-weight: var(--w-semibold); }
+  .idx-card svg, .idx-card canvas { width: 100%; height: 22px; display: block; }
+
+  /* explore.js paints a heat colour onto sector tiles inline. Keep the tile
+     legible on top of whatever it sets by giving the text its own contrast
+     rather than relying on the fill being light or dark. */
+  #sectorRow .idx-card .n { color: var(--text); }
+}
+
+@layer components {
+  /* ── Portfolio health card ────────────────────────────────────────────────
+     Read from app.js renderHealth(), not guessed. Structure is:
+       .hsplit  > .hscore (ring + .rt centre label) + .hgrade (.hg, .hd)
+       .hbars   > .hmet  > .t (label + .s detail) + .bar > i
+       .htips   > .htip  > .ti + text
+
+     Every one of these was undefined, which is why the ring drew empty with the
+     grade stranded underneath, why "Diversification" ran straight into "No
+     concentrated bets", and why the bars looked like empty grey tracks. */
+  .hsplit { display: flex; align-items: center; gap: var(--s-4); }
+  .hscore { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
+  .hscore .rt {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    line-height: 1.15;
+    text-align: center;
+  }
+  .hscore .rt b { display: block; font-size: var(--t-heading); font-weight: var(--w-black); }
+  .hscore .rt span { font-size: var(--t-micro); color: var(--text-faint); }
+  .hgrade { flex: 1; min-width: 0; }
+  .hgrade .hg { font-size: var(--t-heading); line-height: var(--lh-heading); font-weight: var(--w-bold); }
+  .hgrade .hd { margin-top: var(--s-1); font-size: var(--t-caption); color: var(--text-muted); }
+
+  .hbars { display: grid; gap: var(--s-3); margin-top: var(--s-4); }
+  .hmet { display: grid; gap: var(--s-1); min-width: 0; }
+  /* The label and its detail are two spans that need pushing apart — without
+     this they concatenate into one run of text. */
+  .hmet .t {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    font-size: var(--t-caption);
+  }
+  .hmet .t > span:first-child { color: var(--text); font-weight: var(--w-semibold); }
+  .hmet .t .s { color: var(--text-muted); text-align: right; }
+
+  /* The engine emits `.bar > i` with an inline width and colour. Without a rule
+     the <i> is an inline element with no height, so every track read as empty. */
+  .bar > i {
+    display: block;
+    height: 100%;
+    border-radius: var(--r-pill);
+    transition: width var(--dur-data) var(--ease-out);
+  }
+
+  .htips { display: grid; gap: var(--s-2); margin-top: var(--s-4); }
+  .htip { display: flex; gap: var(--s-2); align-items: flex-start; }
+  .htip .ti { color: var(--primary); font-weight: var(--w-bold); flex-shrink: 0; }
 }
