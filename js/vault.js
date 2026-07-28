@@ -222,248 +222,92 @@ function enterDemo(){
 }
 window.exitDemo=()=>location.reload(); // DEMO_MODE isn't persisted → reload returns to the lock screen
 
-/* ---------- lock screen UI ----------
-   Phase 3 of the redesign rewired WHICH DOOR OPENS FIRST. The locks are
-   untouched: kekFromPass, kekFromPrf, wrapMK, unwrapMK, saveVaultNow,
-   loadVaultData, doSetup, the PBKDF2 iterations, the HKDF parameters, the PRF
-   salt handling and the keys pt_v_pass / pt_v_prf / pt_vault_data are all exactly
-   as they were. Nothing below derives, stores or moves a key differently.
-
-   The defect this fixes was purely presentational: the app had Vanguard-grade
-   unlock (a WebAuthn platform passkey with the PRF extension, wrapping the same
-   AES-256-GCM master key the passcode wraps) and opened on a password field
-   with Face ID as a secondary button the user had to find. */
-
-const $step = id => $id(id);
-const STEPS = ['lockFace','lockEnter','lockSetup','lockFaceStep','lockRestore'];
-function showStep(id, sub){
-  STEPS.forEach(s => { const el=$step(s); if(el) el.hidden = (s!==id); });
-  if(sub!==undefined) $id('lockSub').textContent = sub;
-}
-function err(m){
-  const box=$id('lockErr');
-  $id('lockErrText').textContent = m||'';
-  box.setAttribute('data-shown', m ? 'true' : 'false');
-}
-
+/* ---------- lock screen UI ---------- */
+function err(m){ $id('lockErr').textContent=m||''; }
 function startApp(){
   APP_SCRIPTS.reduce((p,src)=>p.then(()=>new Promise((res,rej)=>{
     const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej;
     document.body.appendChild(s);
   })), Promise.resolve())
-  .then(()=>{ // dissolve rather than snap (pure UI — crypto untouched)
+  .then(()=>{ // dissolve the lock screen into the app instead of snapping (pure UI — crypto untouched)
     document.body.classList.add('unlocking');
     setTimeout(()=>{ document.body.classList.remove('locked'); document.body.classList.remove('unlocking'); }, 240);
   })
-  .catch(()=>err('Couldn’t load the app. Check your connection and reload.'));
+  .catch(()=>err('Couldn’t load the app — check your connection and reload.'));
 }
-
-/* Enrolment is now the promoted path, not a peer of "Not now". */
 async function showFaceStepOrStart(){
-  if(await window.vaultFaceAvailable()) showStep('lockFaceStep','Set up Face ID');
-  else startApp();
+  if(await window.vaultFaceAvailable()){
+    $id('lockSetup').style.display='none';
+    $id('lockEnter').style.display='none';
+    $id('lockFaceStep').style.display='';
+    $id('lockSub').textContent='One more thing';
+  } else startApp();
 }
-
-/* ---------- the fallback ladder ----------
-   Face ID → (cancelled/failed) → "Use passcode" → passcode field → (forgotten)
-   → restore from backup, or erase. The passcode is never the front door unless
-   no passkey is enrolled on this device. */
-function showPasscode(msg){
-  showStep('lockEnter','Enter your passcode');
-  if(msg) err(msg);
-  const i=$id('unlockPass'); if(i) setTimeout(()=>i.focus(), 50);
-}
-
-async function attemptFace(fromGesture){
-  err('');
-  const t0 = Date.now();
-  try{
-    await unlockWithFace();
-    startApp();
-    return true;
-  }catch(e){
-    const elapsed = Date.now() - t0;
-    // THE DETAIL THAT BITES: Safari and WKWebView reject
-    // navigator.credentials.get() outside a user gesture with NotAllowedError —
-    // the same error a real cancellation throws. A gesture rejection comes back
-    // essentially instantly; a human dismissing the system sheet cannot. So
-    // sub-300ms NotAllowedError is treated as "needs a tap", not "user said no".
-    const gestureBlocked = e && e.name === 'NotAllowedError' && !fromGesture && elapsed < 300;
-    if(gestureBlocked){
-      showStep('lockFace','Unlock to continue');
-      return false;
-    }
-    if(e && e.name === 'NotAllowedError'){
-      // A real cancellation, or biometrics locked out after failed attempts.
-      showStep('lockFace','Unlock to continue');
-      err('Face ID was cancelled. Use your passcode if it keeps failing.');
-      return false;
-    }
-    if(e && e.message === 'prf-unsupported'){
-      showPasscode('This browser can’t do Face ID unlock. Your passcode still works.');
-      return false;
-    }
-    // pt_v_prf present but the credential no longer resolves — deleted from
-    // iCloud Keychain, or enrolled against a different origin.
-    showPasscode('Face ID isn’t available on this device any more. Use your passcode.');
-    return false;
-  }
-}
-
-/* ---------- re-lock policy ----------
-   The app previously only locked when the page was destroyed. Locking means
-   DISCARDING the in-memory master key and re-running the unlock flow — it is
-   never persisted anywhere, so there is nothing to clean up but the reference. */
-const RELOCK_KEY = 'pt_relock_min';
-function relockMinutes(){
-  const v = LS.getItem(RELOCK_KEY);
-  return v === null ? 5 : Number(v);   // default 5 minutes
-}
-window.vaultRelockMinutes = relockMinutes;
-window.vaultSetRelockMinutes = m => LS.setItem(RELOCK_KEY, String(m));
-
-function installRelock(){
-  let hiddenAt = 0;
-  const onHide = () => { hiddenAt = Date.now(); };
-  const onShow = () => {
-    const mins = relockMinutes();
-    if(mins < 0 || !hiddenAt) return;                 // -1 = Never
-    if(window.DEMO_MODE) return;                       // demo has no real key
-    const idleMin = (Date.now() - hiddenAt) / 60000;
-    if(idleMin >= mins){
-      // Reload is the honest way to drop the key: it guarantees no reference to
-      // the master key survives anywhere in the page.
-      location.reload();
-    }
-  };
-  document.addEventListener('visibilitychange', () => {
-    if(document.visibilityState === 'hidden') onHide(); else onShow();
-  });
-  window.addEventListener('pagehide', onHide);
-}
-
 function boot(){
-  // The example portfolio needs no crypto at all — it never derives a key and
-  // never reads the real ciphertext — so it must be wired BEFORE the secure
-  // context check. Previously this whole function returned early on an insecure
-  // origin, which left every button on the lock screen inert with no
-  // explanation: opening the app over plain HTTP on a phone (a LAN address, so
-  // not a secure context, unlike 127.0.0.1) produced a screen where nothing
-  // responded to a tap.
-  $id('demoLink').onclick = e => { e.preventDefault(); enterDemo(); };
-
   if(!window.crypto||!crypto.subtle){
-    showStep(null, 'Unlocking needs a secure connection');
-    err('Your encrypted data can only be unlocked over HTTPS. The example portfolio below works anywhere.');
-    // Restore genuinely cannot run without crypto.subtle — but a control that
-    // does nothing at all is the bug that got reported, so it explains itself.
-    $id('cloudRestoreLink').onclick = () =>
-      err('Restoring needs HTTPS too, because the backup is decrypted on this device. Open the app from its normal address.');
+    $id('lockSub').textContent='This page needs HTTPS to unlock your encrypted data.';
     return;
   }
-  installRelock();
-
-  const hasVault = !!LS.getItem('pt_v_pass');
-
-  /* ---- restore, replacing prompt() (a silent no-op inside WKWebView) ---- */
-  const openRestore = () => { err(''); showStep('lockRestore','Restore from a backup'); };
-  $id('cloudRestoreLink').onclick = openRestore;
-  $id('restoreCancel').onclick = () => { err(''); hasVault ? startFront() : showSetup(); };
-  $id('restoreGo').onclick = async () => {
-    const p = $id('restorePass').value;
-    if(!p) { err('Enter the passcode from your old device.'); return; }
-    err(''); $id('lockSub').textContent = 'Restoring your encrypted backup';
-    const btn = $id('restoreGo'); btn.disabled = true;
-    try{
-      await cloudRestore(p);
-      await showFaceStepOrStart();
-    }catch(ex){
-      btn.disabled = false;
-      err(ex && ex.message === 'rate'
-        ? 'Too many attempts. Wait an hour and try again.'
-        : 'No backup found for that passcode.');
-    }
-  };
-
-  function showSetup(){
-    showStep('lockSetup','Create a passcode to encrypt this device');
-  }
-
+  const dl=$id('demoLink'); if(dl) dl.onclick=e=>{ e.preventDefault(); enterDemo(); }; // "View the example portfolio"
+  const hasVault=!!LS.getItem('pt_v_pass');
   if(!hasVault){
-    showSetup();
-    $id('setupBtn').onclick = async () => {
+    $id('lockSetup').style.display='';
+    $id('lockSub').textContent='Create a passcode to encrypt your data on this device';
+    const rl=$id('cloudRestoreLink');
+    if(rl) rl.onclick=async e=>{
+      e.preventDefault();
+      const p=prompt('Enter the passcode from your old phone'); if(p==null||!p) return;
+      err(''); $id('lockSub').textContent='Restoring your encrypted backup…';
+      try{ const n=await cloudRestore(p); $id('lockSetup').style.display='none'; await showFaceStepOrStart(); }
+      catch(ex){
+        $id('lockSub').textContent='Create a passcode to encrypt your data on this device';
+        err(ex&&ex.message==='rate' ? 'Too many tries — wait an hour and try again.' : 'No cloud backup found for that passcode.');
+      }
+    };
+    $id('setupBtn').onclick=async()=>{
       const a=$id('setPass1').value, b=$id('setPass2').value;
-      if(a===DEMO_PASS){ enterDemo(); return; }   // never derives a real key
+      if(a===DEMO_PASS){ enterDemo(); return; } // demo passcode works on a fresh device too — no vault created
       if(a.length<6){ err('Use at least 6 characters.'); return; }
-      if(a!==b){ err('Those don’t match.'); return; }
-      err(''); const btn=$id('setupBtn'); btn.textContent='Encrypting'; btn.disabled=true;
+      if(a!==b){ err('Passcodes don’t match.'); return; }
+      err(''); $id('setupBtn').textContent='Encrypting…'; $id('setupBtn').disabled=true;
       try{ await doSetup(a); await showFaceStepOrStart(); }
-      catch(e){ err('Setup failed. Try again.'); btn.textContent='Create passcode'; btn.disabled=false; }
+      catch(e){ err('Setup failed — try again.'); $id('setupBtn').textContent='Create passcode'; $id('setupBtn').disabled=false; }
     };
   } else {
-    startFront();
-  }
-
-  /* ---- the front door ---- */
-  async function startFront(){
-    const canFace = window.vaultFaceEnabled() && await window.vaultFaceAvailable();
-    if(!canFace){
-      // No passkey on this device: the passcode legitimately IS the front door.
-      showPasscode();
-      return;
+    $id('lockEnter').style.display='';
+    $id('lockSub').textContent='Enter your passcode';
+    const tryUnlock=async()=>{
+      if($id('unlockPass').value===DEMO_PASS){ enterDemo(); return; } // demo passcode → example portfolio, real vault untouched
+      err(''); $id('unlockBtn').textContent='Unlocking…';
+      try{ await unlockWithPass($id('unlockPass').value); startApp(); }
+      catch(e){ err('Wrong passcode.'); $id('unlockBtn').textContent='Unlock'; $id('unlockPass').value=''; $id('unlockPass').focus(); }
+    };
+    $id('unlockBtn').onclick=tryUnlock;
+    $id('unlockPass').addEventListener('keydown',e=>{ if(e.key==='Enter') tryUnlock(); });
+    if(window.vaultFaceEnabled()){
+      window.vaultFaceAvailable().then(ok=>{ if(ok) $id('faceBtn').style.display=''; });
+      $id('faceBtn').onclick=async()=>{
+        err('');
+        try{ await unlockWithFace(); startApp(); }
+        catch(e){ err(e&&e.name==='NotAllowedError'?'Face ID cancelled — use your passcode.':'Face ID didn’t work — use your passcode.'); }
+      };
     }
-    // Auto-invoke. The system Face ID sheet should be the first thing on screen.
-    showStep(null, 'Unlocking');
-    attemptFace(false);
+    $id('forgotLink').onclick=e=>{
+      e.preventDefault();
+      if(confirm('Without the passcode your encrypted data cannot be recovered.\n\nErase everything on this device and start fresh? (You can restore from an exported backup afterwards.)')) window.vaultWipe();
+    };
   }
-
-  $id('faceBtn').onclick = () => attemptFace(true);
-  $id('usePassLink').onclick = () => { err(''); showPasscode(); };
-
-  const tryUnlock = async () => {
-    if($id('unlockPass').value===DEMO_PASS){ enterDemo(); return; }
-    err(''); const btn=$id('unlockBtn'); btn.textContent='Unlocking'; btn.disabled=true;
-    try{ await unlockWithPass($id('unlockPass').value); startApp(); }
-    catch(e){
-      err('Wrong passcode.');
-      btn.textContent='Unlock'; btn.disabled=false;
-      $id('unlockPass').value=''; $id('unlockPass').focus();
-    }
-  };
-  $id('unlockBtn').onclick = tryUnlock;
-  $id('unlockPass').addEventListener('keydown', e => { if(e.key==='Enter') tryUnlock(); });
-
-  /* Erase confirmation — replaces confirm(), which WKWebView also no-ops. */
-  $id('forgotLink').onclick = () => {
-    const host = document.getElementById('lockModalHost');
-    host.innerHTML = ui.modal({
-      id:'eraseModal', title:'Erase this device’s data?',
-      body:'Without the passcode the encrypted data cannot be recovered. You can restore from a backup afterwards.',
-      confirm:'Erase', cancel:'Keep', destructive:true
-    });
-    const m = document.getElementById('eraseModal');
-    const close = () => { m.setAttribute('data-open','false'); setTimeout(()=>host.innerHTML='', 200); };
-    m.querySelector('[data-modal-cancel]').onclick = close;
-    m.querySelector('[data-modal-confirm]').onclick = () => window.vaultWipe();
-    requestAnimationFrame(()=>m.setAttribute('data-open','true'));
-  };
-
-  /* Enrolment — promoted to the full-width primary; "Not now" is a text link. */
-  $id('faceEnrollBtn').onclick = async () => {
-    err(''); const btn=$id('faceEnrollBtn');
-    btn.querySelector('span').textContent='Follow the Face ID prompt';
+  // post-setup Face ID step
+  $id('faceEnrollBtn').onclick=async()=>{
+    err(''); $id('faceEnrollBtn').textContent='Follow the Face ID prompt…';
     try{ await enrollFace(); startApp(); }
     catch(e){
-      btn.querySelector('span').textContent='Enable Face ID';
-      if(e&&e.message==='prf-unsupported') err('This browser can’t do Face ID unlock yet. Your passcode still works.');
-      else err('Face ID setup was cancelled. Your passcode still works.');
+      $id('faceEnrollBtn').textContent='Enable Face ID';
+      if(e&&e.message==='prf-unsupported') err('This device’s browser can’t do Face ID unlock yet — your passcode still works.');
+      else err('Face ID setup cancelled — your passcode still works.');
     }
   };
-  $id('faceSkipBtn').onclick = () => {
-    // Asked once, then not again for 60 days — politely, and dismissible for good.
-    LS.setItem('pt_face_asked', String(Date.now()));
-    startApp();
-  };
+  $id('faceSkipBtn').onclick=()=>startApp();
 }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
 })();

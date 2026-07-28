@@ -1,18 +1,15 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v4.0.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v3.2.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
-  // The stylesheet is now four layered files (app.css was deleted in the redesign).
-  './css/tokens.css', './css/base.css', './css/components.css', './css/layout.css',
-  './js/icons.js', './js/ui.js',
+  './css/app.css',
   './js/vault.js', './js/boot.js', './js/seed.js', './js/demo.js', './js/core.js', './js/portfolio.js', './js/api.js',
   './js/explore.js', './js/insights.js', './js/sheets.js', './js/app.js',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png',
-  // Chart.js is vendored now rather than fetched from a CDN. Loading it remotely
-  // meant the app could not chart at all offline, however well the SW behaved.
-  './vendor/chart.umd.min.js'];
+  // the chart library must survive offline too — without it every chart is blank
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();

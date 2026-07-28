@@ -46,28 +46,6 @@ function showConfirm(title, msg, yesLabel, onYes){
   $('cfYes').onclick=()=>{ closeDetail(); onYes(); };
   $('cfNo').onclick=closeDetail;
 }
-
-/* Designed replacement for native prompt(). WKWebView silently no-ops prompt()
-   and hands back null, so every one of these was already a dead control inside
-   the iOS wrapper — the same class of bug that made vault restore a dead button.
-   Returns a Promise so call sites read the same as before. */
-function askValue(opts){
-  return new Promise(resolve => {
-    const id = 'ask-' + Math.random().toString(36).slice(2, 8);
-    openInfoSheet(opts.title, `
-      <label class="field" for="${id}"><span class="field__label">${opts.label || opts.title}</span>
-      <input class="input${opts.numeric ? ' input--num' : ''}" id="${id}" type="${opts.password ? 'password' : 'text'}"${opts.numeric ? ' inputmode="decimal"' : ''}${opts.value != null ? ` value="${opts.value}"` : ''}></label>
-      <div class="modal__actions"><button class="btn btn--secondary" id="${id}-no">Cancel</button>
-      <button class="btn btn--primary" id="${id}-ok">${opts.ok || 'Save'}</button></div>`);
-    const input = $(id);
-    input.focus({ preventScroll: true });
-    const done = v => { closeDetail(); resolve(v); };
-    $(id + '-ok').onclick = () => done(input.value);
-    $(id + '-no').onclick = () => done(null);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') done(input.value); });
-  });
-}
-
 function explainStat(key){ const e=EXPLAIN[key]; if(e) openInfoSheet(e[0], `<p>${e[1]}</p>`); }
 function openListSheet(title, bodyHtml, note){
   $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>

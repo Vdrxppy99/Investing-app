@@ -531,11 +531,8 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
   const orphan = Chart.getChart(el); if(orphan) orphan.destroy();
   if(labels.length<2) return null;
   const up = data.length>1 ? data[data.length-1]>=data[0] : true;
-  // DESIGN.md §9: the main series is interaction-coloured, NOT P&L-coloured —
-  // the delta readout above the chart carries the gain/loss meaning. Sparklines
-  // stay direction-coloured, which is what `hero` distinguishes.
-  const rgb = hero ? cvar('--brand-rgb') : (up?cvar('--green-rgb'):cvar('--red-rgb'));
-  const solid = hero ? cvar('--brand') : (up?cvar('--green'):cvar('--red'));
+  const rgb = up?cvar('--green-rgb'):cvar('--red-rgb');
+  const solid = up?cvar('--green'):cvar('--red');
   const ctx=el.getContext('2d');
   // three-stop fill: present under the line, gone by mid-chart — the Apple Stocks look
   const g=ctx.createLinearGradient(0,0,0,(el.parentNode.clientHeight||220));
@@ -709,11 +706,11 @@ function openDetail(sym){
   $('detailX').onclick = closeDetail;
   $('detailX').focus({preventScroll:true});
   const ab=$('alertBtn');
-  if(ab) ab.onclick=async ()=>{
+  if(ab) ab.onclick=()=>{
     const list=lsGet('pt_alerts')||[];
     const i=list.findIndex(a=>a.sym===sym);
     if(i>-1){ list.splice(i,1); lsSet('pt_alerts',list); toast('Price alert removed.'); if(typeof pushSyncNow==='function') pushSyncNow(); openDetail(sym); return; }
-    const v=await askValue({title:'Price alert', label:`Notify me when ${sym.replace('-','.')} reaches`, numeric:true, ok:'Set alert'}); if(v==null) return;
+    const v=prompt(`Push me when ${sym.replace('-','.')} reaches $`); if(v==null) return;
     const at=parseFloat(String(v).replace(',','.'));
     if(!(at>0)){ toast('Enter a price like 700 or 89.50', true); return; }
     const dir=at>=priceOf(sym)?'up':'down';
@@ -826,11 +823,11 @@ function openEdit(){
     paintFt();
   };
   $('chgPass').onclick=async()=>{
-    const o=await askValue({title:'Change passcode', label:'Current passcode', password:true, ok:'Next'}); if(o==null) return;
-    const n=await askValue({title:'Change passcode', label:'New passcode, at least 6 characters', password:true, ok:'Change'}); if(n==null) return;
-    if(n.length<6){ toast('Use at least 6 characters.', true); return; }
-    try{ await vaultChangePass(o,n); toast('Passcode changed.'); }
-    catch(e){ toast('That passcode was wrong.', true); }
+    const o=prompt('Current passcode'); if(o==null) return;
+    const n=prompt('New passcode (min 6 characters)'); if(n==null) return;
+    if(n.length<6){ alert('Too short — use at least 6 characters.'); return; }
+    try{ await vaultChangePass(o,n); alert('Passcode changed.'); }
+    catch(e){ alert('Current passcode was wrong.'); }
   };
   const paintCloud=()=>{ const b=lsGet('pt_bk'); $('cloudTgl').textContent = (b&&b.k) ? '☁️ Cloud backup: on' : '☁️ Cloud backup: off'; };
   paintCloud();
@@ -841,7 +838,7 @@ function openEdit(){
         async()=>{ await cloudDisable(); paintCloud(); toast('Cloud backup off.'); });
     } else {
       (async()=>{
-        const p=await askValue({title:'Enable cloud backup', label:'Confirm your passcode', password:true, ok:'Enable'}); if(p==null) return;
+        const p=prompt('Confirm your passcode to enable encrypted cloud backup'); if(p==null) return;
         $('cloudTgl').textContent='Encrypting…';
         try{
           const ok=await cloudEnable(p);

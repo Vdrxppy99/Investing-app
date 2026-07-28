@@ -407,8 +407,8 @@ function openFISheet(){
   body+=`<div class="ebtns" style="margin-top:14px"><button class="btn pri" id="fiSet">${need>0?'Change':'Set'} my monthly target</button></div>
     <div class="inc-note">Today's holdings compounded at your own growth rate — no assumed future deposits (your rule). Not advice.</div>`;
   openInfoSheet('Financial Independence', body);
-  const b=$('fiSet'); if(b) b.onclick=async ()=>{
-    const v=await askValue({title:'Target monthly income', label:'What monthly income would make work optional?', numeric:true, value:need||'', ok:'Save'});
+  const b=$('fiSet'); if(b) b.onclick=()=>{
+    const v=prompt('What monthly income would make work optional for you?', need||'');
     if(v==null) return; const n=parseFloat(String(v).replace(',','.'));
     state.goal=Object.assign({amt:0}, state.goal||{}, {fimo:n>0?n:0}); persist();
     closeDetail(); renderFI();
