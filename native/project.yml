@@ -12,7 +12,7 @@ settings:
     # build, so the content is already identical by construction — this keeps the
     # number the user sees in Settings honest too. scripts/sync-version.sh reads it
     # from index.html so the two cannot drift.
-    MARKETING_VERSION: "5.3.1"
+    MARKETING_VERSION: "5.4.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic

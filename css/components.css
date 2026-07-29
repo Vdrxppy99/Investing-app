@@ -2085,3 +2085,21 @@
   /* The FAB matches the send button, so the entry point and the action rhyme. */
   .fab { background: linear-gradient(180deg, var(--primary-fill) 0%, var(--primary-edge) 100%); }
 }
+
+@layer components {
+  /* Language toggle — a text pill rather than an icon, because "DE"/"EN" IS the
+     clearest possible icon for a language and no glyph would beat it. */
+  .langbtn {
+    width: auto;
+    min-width: 38px;
+    padding: 0 var(--s-2);
+    font-size: var(--t-micro);
+    letter-spacing: var(--tr-micro);
+    font-weight: var(--w-bold);
+    color: var(--text-muted);
+    border: var(--hairline) solid var(--line);
+    border-radius: var(--r-pill);
+    background: var(--surface-2-grad);
+  }
+  .langbtn:active { color: var(--primary); }
+}
