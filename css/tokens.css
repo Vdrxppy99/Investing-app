@@ -232,3 +232,46 @@
     --brand-rgb: 31, 95, 224;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEPTH — added after the owner's note that the UI "looks like it was created in
+   5 minutes". They were right, and the diagnosis is specific: the system was
+   CONSISTENT but FLAT. Every surface was one solid fill, every card the same
+   weight, no light source anywhere. Consistency is table stakes; what the
+   premium trackers have is craft.
+
+   What actually reads as expensive on a dark finance UI, and what these add:
+     • surfaces that are gradients, not fills — a card lit from above
+     • a hairline top highlight, so an edge catches the light
+     • real depth under raised things, tuned dark rather than pure black
+     • tinted glows behind the few elements that carry meaning
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer tokens {
+  :root, :root[data-theme="dark"] {
+    /* Card surfaces become a subtle top-lit gradient rather than one flat fill. */
+    --surface-grad: linear-gradient(180deg, #1b2029 0%, #171b22 100%);
+    --surface-2-grad: linear-gradient(180deg, #232833 0%, #1f242d 100%);
+    /* The line that catches the light along a card's top edge. */
+    --edge-light: rgba(255, 255, 255, 0.055);
+    /* Depth tuned for a blue-black canvas — pure black reads as a smudge. */
+    --depth-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.22);
+    --depth-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
+    /* Coloured glows, used only where the colour already means something. */
+    --glow-primary: 0 4px 16px rgba(76, 130, 247, 0.28);
+    --glow-gain: 0 0 24px rgba(47, 190, 122, 0.16);
+    --glow-loss: 0 0 24px rgba(242, 107, 117, 0.16);
+    --hero-sheen: linear-gradient(180deg, #ffffff 0%, #b8c4d6 100%);
+  }
+  :root[data-theme="light"] {
+    --surface-grad: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+    --surface-2-grad: linear-gradient(180deg, #f6f8fa 0%, #f1f3f6 100%);
+    --edge-light: rgba(255, 255, 255, 0.9);
+    --depth-1: 0 1px 2px rgba(16, 21, 29, 0.07), 0 2px 8px rgba(16, 21, 29, 0.05);
+    --depth-2: 0 2px 6px rgba(16, 21, 29, 0.09), 0 8px 24px rgba(16, 21, 29, 0.09);
+    --glow-primary: 0 4px 14px rgba(31, 95, 224, 0.22);
+    --glow-gain: none;
+    --glow-loss: none;
+    --hero-sheen: linear-gradient(180deg, #10151d 0%, #3a4453 100%);
+  }
+}

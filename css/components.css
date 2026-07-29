@@ -1803,3 +1803,106 @@
     .hspark { display: none; }
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE CRAFT PASS
+
+   Applies the depth tokens. Everything here is presentation only — no structure,
+   no markup, no behaviour. Each rule earns its place by fixing something that
+   read as unfinished, not by decorating.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ── Cards: lit from above, with an edge that catches light ──────────────── */
+  .card, .group2 {
+    background: var(--surface-grad);
+    box-shadow: var(--depth-1), inset 0 1px 0 var(--edge-light);
+  }
+  .icard, .stat, .cmove, .idx-card {
+    background: var(--surface-2-grad);
+    box-shadow: inset 0 1px 0 var(--edge-light);
+  }
+  /* Nested cards stay flat — two levels of lighting inside one card reads busy. */
+  .cardstack .card, .group2__body .card { background: var(--surface-2-grad); box-shadow: inset 0 1px 0 var(--edge-light); }
+
+  /* ── Hero: the number is the product ─────────────────────────────────────
+     A vertical sheen on the total is the single highest-leverage detail on the
+     screen — it is what makes a figure look struck rather than typed. */
+  .hero__total, #totalVal {
+    background: var(--hero-sheen);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: var(--tr-hero);
+  }
+  /* The day-change pill beside it gets a matching tinted glow. */
+  #totalVal + * .pctpill.pos, .hero__delta .pos { text-shadow: var(--glow-gain); }
+  #totalVal + * .pctpill.neg, .hero__delta .neg { text-shadow: var(--glow-loss); }
+
+  /* ── Logo tiles: a ring, so they sit ON the surface rather than in a hole ── */
+  .badge {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), var(--depth-1);
+  }
+  :root[data-theme="light"] .badge { box-shadow: inset 0 0 0 1px rgba(16,21,29,.08), var(--depth-1); }
+
+  /* ── Primary button: lift it off the page ────────────────────────────────── */
+  .btn--primary, .btn.pri { box-shadow: var(--glow-primary); }
+  .btn--primary:active, .btn.pri:active { box-shadow: none; }
+  .fab { box-shadow: var(--glow-primary), var(--depth-2); }
+
+  /* ── Segmented control: the selected pill is a real raised object ────────── */
+  .seg { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28); }
+  :root[data-theme="light"] .seg { box-shadow: inset 0 1px 3px rgba(16,21,29,.06); }
+  .seg__item[aria-selected="true"], .seg__item.on {
+    background: var(--surface-grad);
+    color: var(--primary);
+    box-shadow: var(--depth-1), inset 0 1px 0 var(--edge-light);
+  }
+
+  /* ── Delta pills: tinted, bordered, not just coloured text ───────────────── */
+  .pctpill, .prpill, .daypill, .chip--gain, .chip--loss {
+    box-shadow: inset 0 0 0 1px currentColor;
+    --tw: 0;
+  }
+  .pctpill.pos, .prpill.pos, .daypill.pos, .chip--gain { box-shadow: inset 0 0 0 1px rgba(47,190,122,.22); }
+  .pctpill.neg, .prpill.neg, .daypill.neg, .chip--loss { box-shadow: inset 0 0 0 1px rgba(242,107,117,.22); }
+
+  /* ── Tab bar: a lit top edge and a real active indicator ─────────────────── */
+  .tabbar { box-shadow: 0 -1px 0 var(--line), inset 0 1px 0 var(--edge-light); }
+  .tabbar__item { position: relative; }
+  .tabbar__item[aria-current="page"]::before,
+  .tabbar__item.on::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 28px;
+    height: 3px;
+    border-radius: 0 0 var(--r-pill) var(--r-pill);
+    background: var(--primary);
+    box-shadow: var(--glow-primary);
+  }
+
+  /* ── Health ring and progress bars: give the fill some presence ──────────── */
+  .ring .rp, .ring__fill { filter: drop-shadow(0 0 6px currentColor); opacity: .95; }
+  .bar > i, .bar__fill { box-shadow: 0 0 8px -2px currentColor; }
+
+  /* ── Section labels: a small accent rule, so a heading reads as a divider ── */
+  .section__label, .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+  }
+  .section__label::before, .eyebrow::before {
+    content: "";
+    width: 3px;
+    height: 11px;
+    border-radius: var(--r-pill);
+    background: var(--primary);
+    flex-shrink: 0;
+  }
+
+  /* ── Divided rows: hairlines only between, never a heavy grid ───────────── */
+  .hrow, .mrow, .nrow { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
+}
