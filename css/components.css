@@ -1828,13 +1828,22 @@
   /* ── Hero: the number is the product ─────────────────────────────────────
      A vertical sheen on the total is the single highest-leverage detail on the
      screen — it is what makes a figure look struck rather than typed. */
+  /* NO SHEEN, and an honest note about why: a background-clipped gradient was
+     tried and appeared to render the total grey. It did not — the screenshots
+     were taken with the recap sheet open, so the SCRIM was dimming it. The
+     measured colour was correct the whole time.
+
+     Removed anyway, deliberately: a decoration whose correctness cannot be judged
+     by looking at it is a liability on the single most important number in the
+     app, and it had already caused one real bug (the day-change pill inherits
+     from #totalVal and rendered empty). Solid near-white is stronger and cannot
+     fail. Everything else from the craft pass stays. */
   .hero__total, #totalVal {
-    background: var(--hero-sheen);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text);
     letter-spacing: var(--tr-hero);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
   }
+
   /* The day-change pill beside it gets a matching tinted glow. */
   #totalVal + * .pctpill.pos, .hero__delta .pos { text-shadow: var(--glow-gain); }
   #totalVal + * .pctpill.neg, .hero__delta .neg { text-shadow: var(--glow-loss); }
@@ -1930,4 +1939,149 @@
     border-radius: var(--r-pill);
     background: var(--line-strong);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NO HORIZONTAL SCROLLING — owner: "i dont like to scroll horizontally when
+   looking at a graph or something, make everything fit."
+
+   Rails and scrolling tables were a way of avoiding the layout problem rather
+   than solving it. Everything now WRAPS or SHRINKS to fit the width instead.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Rails become wrapping rows. The negative bleed goes too — it only existed to
+     make a scroller read as continuing off-screen, which no longer happens. */
+  .rail {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin-inline: 0;
+    padding-inline: 0;
+    scroll-snap-type: none;
+  }
+  .rail > * { flex: 0 0 auto; scroll-snap-align: none; }
+
+  /* Account chips and range chips wrap onto a second line rather than scrolling. */
+  #accChips, #homePr, #worthLegend, .aipanel__chips {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  /* Tables fit the width instead of scrolling: tighter gutters, smaller numerals,
+     and a first column allowed to shrink. Nothing is hidden — it is all narrower. */
+  .tablewrap { overflow-x: visible; }
+  .table, .gtable { width: 100%; table-layout: fixed; }
+  .table th, .table td, .gtable th, .gtable td {
+    padding: var(--s-2) var(--s-1);
+    font-size: var(--t-caption);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .table th:first-child, .gtable th:first-child,
+  .table td:first-child, .gtable td:first-child { width: 34%; }
+  .table td:not(:first-child), .gtable td:not(:first-child) { text-align: right; }
+
+  /* Charts already fit; make sure nothing inside one can push the page. */
+  .chart, .chart canvas { max-width: 100%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ASSISTANT — brought up to the same standard as the rest of the app.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  .aipanel {
+    background: var(--surface-grad);
+    border: var(--hairline) solid var(--line);
+    box-shadow: var(--depth-2), inset 0 1px 0 var(--edge-light);
+    border-radius: var(--r-card);
+    overflow: hidden;
+  }
+
+  /* Header reads as a titled surface, with a live dot rather than a bare label. */
+  .aipanel__head, .ai-head {
+    background: var(--surface-2-grad);
+    border-bottom: var(--hairline) solid var(--line);
+    padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4);
+  }
+  .ai-title, .aipanel__head .card__title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-size: var(--t-body);
+    font-weight: var(--w-bold);
+    letter-spacing: 0;
+  }
+  .ai-title::before, .aipanel__head .card__title::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: var(--r-pill);
+    background: var(--gain);
+    box-shadow: var(--glow-gain);
+    flex-shrink: 0;
+  }
+
+  .aipanel__msgs { background: var(--canvas); padding: var(--s-4); gap: var(--s-3); }
+
+  /* Bubbles: the assistant sits on a raised surface, you sit on brand tint. One
+     squared corner is the tail — a drawn pointer is fussy at this size. */
+  .ai-bub {
+    padding: var(--s-3) var(--s-4);
+    border-radius: 18px;
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+    box-shadow: var(--depth-1);
+  }
+  .ai-msg.ai .ai-bub {
+    background: var(--surface-2-grad);
+    border: var(--hairline) solid var(--line);
+    border-bottom-left-radius: var(--s-1);
+  }
+  .ai-msg.me .ai-bub {
+    background: linear-gradient(180deg, var(--primary-fill) 0%, var(--primary-edge) 100%);
+    color: var(--on-primary);
+    border-bottom-right-radius: var(--s-1);
+    box-shadow: var(--glow-primary);
+  }
+  .ai-msg.me .ai-bub b { color: var(--on-primary); }
+
+  /* Suggestion chips read as tappable pills, and wrap rather than scroll. */
+  .aipanel__chips { padding: 0 var(--s-4) var(--s-3); background: var(--canvas); gap: var(--s-2); }
+  .aipanel__chips .chip {
+    background: var(--surface-2-grad);
+    border: var(--hairline) solid var(--line);
+    color: var(--primary);
+    box-shadow: inset 0 1px 0 var(--edge-light);
+    height: 30px;
+  }
+
+  /* Composer: a pill input with a circular send button, clearing the home bar. */
+  .aipanel__inputrow, .ai-inputrow {
+    background: var(--surface-2-grad);
+    border-top: var(--hairline) solid var(--line);
+    padding: var(--s-3);
+    padding-bottom: max(var(--s-3), env(safe-area-inset-bottom));
+    gap: var(--s-2);
+  }
+  .aipanel__inputrow .input, .ai-inputrow input {
+    height: 42px;
+    border-radius: var(--r-pill);
+    background: var(--canvas);
+    border: var(--hairline) solid var(--border-control);
+    padding: 0 var(--s-4);
+  }
+  #aiSend {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--r-pill);
+    background: linear-gradient(180deg, var(--primary-fill) 0%, var(--primary-edge) 100%);
+    color: var(--on-primary);
+    box-shadow: var(--glow-primary);
+    flex-shrink: 0;
+  }
+  #aiSend:active { box-shadow: none; transform: scale(var(--press-scale)); }
+
+  /* The FAB matches the send button, so the entry point and the action rhyme. */
+  .fab { background: linear-gradient(180deg, var(--primary-fill) 0%, var(--primary-edge) 100%); }
 }
