@@ -36,8 +36,10 @@ function renderHeader(){
   if($('miniBar').classList.contains('show') && typeof paintMiniBar==='function') paintMiniBar();
 }
 function renderChips(){
-  $('accChips').innerHTML = ['all','main','brok'].map(a=>
-    `<button data-a="${a}" class="${state.view.acc===a?'on':''}">${a==='all'?'All':esc(ACCOUNTS[a]||a)}</button>`).join('');
+  const keys = ['all', ...Object.keys(ACCOUNTS).filter(a=> state.holdings.some(h=>h.acc===a) || (state.cash[a]>0))];
+  const list = [...new Set(keys)];
+  $('accChips').innerHTML = list.map(a=>
+    `<button data-a="${a}" class="${state.view.acc===a?'on':''}">${a==='all'?'All Accounts':esc(ACCOUNTS[a]||a)}</button>`).join('');
   $('accChips').querySelectorAll('button').forEach(b=> b.onclick = ()=>{ state.view.acc=b.dataset.a; renderAll(); });
 }
 const lastShownPx = {};
@@ -165,7 +167,11 @@ function planDeposit(rs, tot){ // split a deposit so it closes the target-mix ga
     allocs=need.map(x=>({sym:x.sym, amt:D*x.gap/needSum}));
   }
   allocs=allocs.filter(x=>x.amt>=1).sort((a,b)=>b.amt-a.amt);
-  out.innerHTML=allocs.map(x=>`<div class="inc-row"><span>${esc(x.sym.replace('-','.'))}</span><span><b>${fmt(x.amt)}</b></span></div>`).join('')
+  out.innerHTML=allocs.map(x=>{
+    const px = priceOf(x.sym);
+    const shStr = px>0 ? ` · ${(x.amt/px).toFixed(2)} sh @ ${fmtPx(px)}` : '';
+    return `<div class="inc-row"><span>${esc(x.sym.replace('-','.'))} ${shStr}</span><span><b>${fmt(x.amt)}</b></span></div>`;
+  }).join('')
     +`<div class="inc-note">Buying in these amounts lands the mix closest to your targets — estimates, not advice.</div>`;
 }
 function openTargetEditor(rs, tot){

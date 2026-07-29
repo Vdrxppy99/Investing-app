@@ -6,7 +6,7 @@
 	<integer>12</integer>
 	<key>logs</key>
 	<dict>
-		<key>2D4ABBF9-4F64-4467-B5B3-186EFB343277</key>
+		<key>6399403D-13D4-4AFE-934B-791A900AD05E</key>
 		<dict>
 			<key>className</key>
 			<string>IDECommandLineBuildLog</string>
@@ -15,7 +15,7 @@
 			<key>domainType</key>
 			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
 			<key>fileName</key>
-			<string>2D4ABBF9-4F64-4467-B5B3-186EFB343277.xcactivitylog</string>
+			<string>6399403D-13D4-4AFE-934B-791A900AD05E.xcactivitylog</string>
 			<key>hasPrimaryLog</key>
 			<true/>
 			<key>primaryObservable</key>
@@ -40,15 +40,15 @@
 			<key>signature</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>timeStartedRecording</key>
-			<real>806981089.96675205</real>
+			<real>807019099.27699006</real>
 			<key>timeStoppedRecording</key>
-			<real>806981091.834584</real>
+			<real>807019131.84955299</real>
 			<key>title</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>uniqueIdentifier</key>
-			<string>2D4ABBF9-4F64-4467-B5B3-186EFB343277</string>
+			<string>6399403D-13D4-4AFE-934B-791A900AD05E</string>
 		</dict>
-		<key>9CDEFC11-D5E2-400C-9E27-DD843F60F322</key>
+		<key>63C6CEE4-E7D0-4915-AA90-E33E205270C8</key>
 		<dict>
 			<key>className</key>
 			<string>IDECommandLineBuildLog</string>
@@ -57,13 +57,13 @@
 			<key>domainType</key>
 			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
 			<key>fileName</key>
-			<string>9CDEFC11-D5E2-400C-9E27-DD843F60F322.xcactivitylog</string>
+			<string>63C6CEE4-E7D0-4915-AA90-E33E205270C8.xcactivitylog</string>
 			<key>hasPrimaryLog</key>
 			<true/>
 			<key>primaryObservable</key>
 			<dict>
 				<key>highLevelStatus</key>
-				<string>W</string>
+				<string>S</string>
 				<key>totalNumberOfAnalyzerIssues</key>
 				<integer>0</integer>
 				<key>totalNumberOfErrors</key>
@@ -71,7 +71,7 @@
 				<key>totalNumberOfTestFailures</key>
 				<integer>0</integer>
 				<key>totalNumberOfWarnings</key>
-				<integer>1</integer>
+				<integer>0</integer>
 			</dict>
 			<key>schemeIdentifier-containerName</key>
 			<string>Portfolio project</string>
@@ -82,13 +82,13 @@
 			<key>signature</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>timeStartedRecording</key>
-			<real>806981801.29322004</real>
+			<real>807019398.63618398</real>
 			<key>timeStoppedRecording</key>
-			<real>806981806.05098295</real>
+			<real>807019414.00777304</real>
 			<key>title</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>uniqueIdentifier</key>
-			<string>9CDEFC11-D5E2-400C-9E27-DD843F60F322</string>
+			<string>63C6CEE4-E7D0-4915-AA90-E33E205270C8</string>
 		</dict>
 	</dict>
 </dict>

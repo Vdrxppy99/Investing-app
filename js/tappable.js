@@ -28,7 +28,23 @@
     return m ? m[0].replace(".", "-") : null;
   }
 
+  window.triggerHaptic = function (style) {
+    style = style || 'light';
+    try {
+      if (window.BasisNative && typeof window.BasisNative.haptic === 'function') {
+        window.BasisNative.haptic(style);
+      } else if (navigator.vibrate) {
+        navigator.vibrate(style === 'heavy' ? 25 : (style === 'medium' ? 15 : 8));
+      }
+    } catch (_) {}
+  };
+
   document.addEventListener("click", function (e) {
+    const btn = e.target.closest("button, .tabbar__item, .rail-nav__item, .hrow, .mrow, .chip");
+    if (btn) {
+      window.triggerHaptic(btn.classList.contains("tabbar__item") ? "medium" : "light");
+    }
+
     // ── Allocation legend: tapping a slice should open that holding, the same as
     //    tapping its row in the list. It reads as a list of your funds, so not
     //    responding felt broken.

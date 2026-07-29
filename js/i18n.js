@@ -258,17 +258,55 @@
      ever touched; a reload is instant, exact, and cannot leave a half-translated
      screen behind. */
   const LANG_KEY = "pt_lang";
+  const SUPPORTED = ["en", "de", "es"];
   const lang = () => {
-    try { return localStorage.getItem(LANG_KEY) || "de"; } catch (_) { return "de"; }
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      return saved && SUPPORTED.includes(saved) ? saved : "en";
+    } catch (_) { return "en"; }
   };
   window.appLang = lang;
   window.setAppLang = (l) => {
-    try { localStorage.setItem(LANG_KEY, l === "en" ? "en" : "de"); } catch (_) {}
+    try { localStorage.setItem(LANG_KEY, SUPPORTED.includes(l) ? l : "en"); } catch (_) {}
     location.reload();
   };
 
-  /* The toggle is injected here rather than written into index.html, so the
-     switch ships with the layer it controls and cannot be orphaned. */
+  /* Spanish translation dictionary */
+  const ES = {
+    "Portfolio": "Portafolio",
+    "Explore": "Explorar",
+    "Insights": "Análisis",
+    "My Portfolio": "Mi Portafolio",
+    "Example data": "Datos de ejemplo",
+    "Settings": "Ajustes",
+    "Holdings": "Posiciones",
+    "Value": "Valor",
+    "Today": "Hoy",
+    "Profit": "Ganancia",
+    "Allocation": "Asignación",
+    "Goal": "Meta",
+    "Dividends": "Dividendos",
+    "Total profit": "Ganancia total",
+    "Deposited": "Depositado",
+    "Cash": "Efectivo",
+    "LIVE": "EN VIVO",
+    "Performance": "Rendimiento",
+    "Risk": "Riesgo",
+    "Tax lots": "Lotes fiscales",
+    "Search any stock or ETF": "Buscar acción o ETF",
+    "Watchlist": "Lista de seguimiento",
+    "Close": "Cerrar",
+    "Save": "Guardar",
+    "Done": "Hecho"
+  };
+
+  function getDict() {
+    const cur = lang();
+    if (cur === "de") return DE;
+    if (cur === "es") return ES;
+    return null;
+  }
+
   function mountToggle() {
     const bar = document.querySelector("#page-portfolio .appbar__actions");
     if (!bar || document.getElementById("langBtn")) return;
@@ -277,29 +315,61 @@
     b.className = "iconbtn langbtn";
     b.type = "button";
     b.setAttribute("data-no-i18n", "");
-    const other = lang() === "de" ? "EN" : "DE";
-    b.textContent = other;
-    b.setAttribute("aria-label", lang() === "de" ? "Switch to English" : "Auf Deutsch umstellen");
-    b.onclick = () => window.setAppLang(lang() === "de" ? "en" : "de");
+    const cur = lang();
+    b.textContent = cur.toUpperCase();
+    b.setAttribute("aria-label", "Switch language (" + cur.toUpperCase() + ")");
+    b.onclick = () => {
+      const idx = SUPPORTED.indexOf(cur);
+      const next = SUPPORTED[(idx + 1) % SUPPORTED.length];
+      window.setAppLang(next);
+    };
     bar.insertBefore(b, bar.firstChild);
   }
 
   function start() {
     mountToggle();
-    // Re-mount if the engine ever rebuilds the app bar.
     new MutationObserver(mountToggle).observe(document.body, { childList: true, subtree: true });
 
-    if (lang() !== "de") { document.documentElement.lang = "en"; return; }  // layer off
-    document.documentElement.lang = "de";
-    walk(document.body);
-    // The engine re-renders constantly (every price tick), so translation has to
-    // be continuous rather than a one-off pass at load.
+    const cur = lang();
+    document.documentElement.lang = cur;
+    if (cur === "en") return; // Layer off for English: 0ms overhead
+
+    const dict = getDict();
+    if (!dict) return;
+
+    function translateStr(text) {
+      const trimmed = text.trim();
+      if (!trimmed || trimmed.length > 220 || /\d/.test(trimmed)) return null;
+      const hit = dict[trimmed];
+      return (hit && hit !== trimmed) ? text.replace(trimmed, hit) : null;
+    }
+
+    function walkLocal(root) {
+      if (!root) return;
+      const it = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode(n) {
+          const p = n.parentNode;
+          if (!p || p.nodeName === "SCRIPT" || p.nodeName === "STYLE" || p.nodeName === "TEXTAREA") return NodeFilter.FILTER_REJECT;
+          if (p.closest && p.closest("[data-no-i18n]")) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      const jobs = [];
+      let n;
+      while ((n = it.nextNode())) {
+        const out = translateStr(n.nodeValue);
+        if (out !== null) jobs.push([n, out]);
+      }
+      jobs.forEach(([node, val]) => { node.nodeValue = val; });
+    }
+
+    walkLocal(document.body);
     new MutationObserver((records) => {
       for (const r of records) {
         r.addedNodes.forEach((n) => {
-          if (n.nodeType === 1) walk(n);
+          if (n.nodeType === 1) walkLocal(n);
           else if (n.nodeType === 3) {
-            const out = translate(n.nodeValue);
+            const out = translateStr(n.nodeValue);
             if (out !== null) n.nodeValue = out;
           }
         });
@@ -312,3 +382,4 @@
 
   window.i18nDE = DE;
 })();
+

@@ -96,11 +96,19 @@ async function openStockSheet(sym, name){
     detailChart=drawChart('detailChart', labels, closes, $('detailMsg'));
     wireDetailScrub(detailChart, labels, closes, 'detailRO');
     const hi=Math.max(...closes), lo=Math.min(...closes);
+    const nCloses = closes.length;
+    const sma50 = nCloses>=50 ? closes.slice(-50).reduce((a,b)=>a+b,0)/50 : null;
+    const sma200 = nCloses>=200 ? closes.slice(-200).reduce((a,b)=>a+b,0)/200 : null;
+    const signal = sma50 ? (d.price > sma50 ? 'Bullish (Above 50d SMA)' : 'Bearish (Below 50d SMA)') : 'Neutral';
+    const sigClass = d.price > (sma50||d.price) ? 'pos' : 'neg';
+
     $('ssStats').innerHTML=`
       <div class="stat"><div class="k">52w high</div><div class="v">${fmtP(hi)}</div></div>
       <div class="stat"><div class="k">52w low</div><div class="v">${fmtP(lo)}</div></div>
+      <div class="stat"><div class="k">50-Day SMA</div><div class="v">${sma50?fmtP(sma50):'—'}</div></div>
+      <div class="stat"><div class="k">200-Day SMA</div><div class="v">${sma200?fmtP(sma200):'—'}</div></div>
       <div class="stat"><div class="k">1Y change</div><div class="v ${cls(d.price-closes[0])}">${fmtPct(closes[0]>0?(d.price/closes[0]-1)*100:0)}</div></div>
-      <div class="stat"><div class="k">vs 52w high</div><div class="v ${cls(d.price-hi)}">${fmtPct(hi>0?(d.price/hi-1)*100:0)}</div></div>`;
+      <div class="stat"><div class="k">Trend Signal</div><div class="v ${sigClass}" style="font-size:12px">${signal}</div></div>`;
   }catch(e){ if($('detailMsg')) $('detailMsg').textContent='Couldn’t load the chart — check your connection.'; }
 }
 function openTaxSheet(){

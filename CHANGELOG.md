@@ -24,3 +24,4 @@ History condensed to version notes on 2026-07-10 (repository history was rewritt
 - **2026-07-10** · **v8.4**: live search prices, 52-week range bar, tappable performance rows, cumulative contributions line
 - **2026-07-10** · **v8.5**: privacy mode (eye toggle) + per-holding news feeds
 - **2026-07-10** · **v9.0**: vault — passcode + Face ID lock, AES-256 encryption, personal data removed from public source
+- **2026-07-29** · **v9.1.0**: institutional upgrade — multi-language engine (EN default, DE, ES), dynamic multi-account filtering (Taxable, Roth IRA, 401k, Crypto, Cash), rebalance calculator with share counts, technical indicators (SMA 50/200 & trend signals), native iOS haptic bridge.

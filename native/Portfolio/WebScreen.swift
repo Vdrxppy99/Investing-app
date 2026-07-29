@@ -72,7 +72,8 @@ struct WebScreen: UIViewRepresentable {
             bioEnrolled:  function (user) { return call('enrolled', { user: String(user || '') }); },
             bioSave:      function (user, secret) { return call('save', { user: String(user || ''), secret: String(secret) }); },
             bioLoad:      function (user) { return call('load', { user: String(user || '') }); },
-            bioClear:     function (user) { return call('clear', { user: String(user || '') }); }
+            bioClear:     function (user) { return call('clear', { user: String(user || '') }); },
+            haptic:       function (style) { return call('haptic', { style: String(style || 'light') }); }
           };
         })();
         """
@@ -85,6 +86,18 @@ struct WebScreen: UIViewRepresentable {
             let user = body["user"] as? String ?? ""
 
             switch action {
+            case "haptic":
+                let style = body["style"] as? String ?? "light"
+                DispatchQueue.main.async {
+                    if style == "success" {
+                        let gen = UINotificationFeedbackGenerator()
+                        gen.notificationOccurred(.success)
+                    } else {
+                        let gen = UIImpactFeedbackGenerator(style: style == "heavy" ? .heavy : (style == "medium" ? .medium : .light))
+                        gen.impactOccurred()
+                    }
+                }
+                reply(id, ok: true, value: true)
             case "available":
                 reply(id, ok: true, value: Biometrics.available())
             case "enrolled":

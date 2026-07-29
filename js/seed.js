@@ -1,6 +1,6 @@
 'use strict';
 /* ============ SEED DATA (from Vanguard, 07/01/2026 04:15 PM ET) ============ */
-const ACCOUNTS = { main:'Main Account', brok:'Brokerage' };
+const ACCOUNTS = { main:'Taxable Brokerage', brok:'Roth IRA', ira:'Traditional IRA', k401:'401(k)', crypto:'Crypto Vault', cash:'High-Yield Cash' };
 const NAMES = {
   'VOO':'Vanguard S&P 500 ETF', 'VTI':'Vanguard Total Stock Market ETF',
   'VXF':'Vanguard Extended Market ETF', 'VXUS':'Vanguard Total Intl Stock ETF',
