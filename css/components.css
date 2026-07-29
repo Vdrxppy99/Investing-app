@@ -1778,3 +1778,28 @@
   /* Assistant FAB hides while its panel is open. */
   .fab.hidden { display: none !important; }
 }
+
+@layer components {
+  /* The engine draws sparklines at a fixed 102x26 via sparkArr(). Without
+     constraining the SVG it overflowed its 56px slot and drew straight across the
+     ticker name and share count. */
+  .hspark, .mspark { overflow: hidden; }
+  .hspark svg, .mspark svg, .hspark canvas, .mspark canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Holding names were truncating to "S&P 5…" because the sparkline and the value
+     column squeezed the middle. Give the name room and let the sparkline be the
+     thing that yields — it is decoration, the name is not. */
+  .hmid { flex: 1 1 auto; min-width: 0; }
+  .hspark { flex: 0 1 56px; min-width: 0; }
+  .hright { flex: 0 0 auto; max-width: 45%; }
+  .hval, .hpl { white-space: nowrap; }
+
+  /* On a narrow screen drop the sparkline entirely rather than starve the name. */
+  @media (max-width: 400px) {
+    .hspark { display: none; }
+  }
+}
