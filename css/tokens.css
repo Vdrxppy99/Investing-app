@@ -261,7 +261,7 @@
     --glow-primary: 0 4px 16px rgba(76, 130, 247, 0.28);
     --glow-gain: 0 0 24px rgba(47, 190, 122, 0.16);
     --glow-loss: 0 0 24px rgba(242, 107, 117, 0.16);
-    --hero-sheen: linear-gradient(180deg, #ffffff 0%, #b8c4d6 100%);
+    --hero-sheen: linear-gradient(176deg, #ffffff 0%, #ffffff 58%, #dde4ef 100%);
   }
   :root[data-theme="light"] {
     --surface-grad: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
@@ -272,6 +272,6 @@
     --glow-primary: 0 4px 14px rgba(31, 95, 224, 0.22);
     --glow-gain: none;
     --glow-loss: none;
-    --hero-sheen: linear-gradient(180deg, #10151d 0%, #3a4453 100%);
+    --hero-sheen: linear-gradient(176deg, #10151d 0%, #10151d 58%, #2b3442 100%);
   }
 }

@@ -1906,3 +1906,28 @@
   /* ── Divided rows: hairlines only between, never a heavy grid ───────────── */
   .hrow, .mrow, .nrow { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 }
+
+@layer components {
+  /* The engine injects its own sheet bodies (recap, info, holding detail) straight
+     into #detailSheet, so they never picked up .sheet__body padding and ran to the
+     screen edges. Pad the sheet itself and let the grip and head sit flush. */
+  #detailSheet, #editSheet { padding: 0 var(--s-5) var(--s-5); }
+  #detailSheet > .sheet-head, #editSheet > .sheet-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding-top: var(--s-4);
+    background: var(--surface-2);
+  }
+  #detailSheet { overflow-y: auto; overscroll-behavior: contain; max-height: 88dvh; }
+  /* Give the sheet a grab handle even though the engine does not emit one. */
+  #detailSheet::before, #editSheet::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: var(--s-3) auto var(--s-2);
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+  }
+}
