@@ -48,7 +48,7 @@
 			<key>uniqueIdentifier</key>
 			<string>46FF7158-F8B1-4AFF-A91B-7B11097FC5A0</string>
 		</dict>
-		<key>A9D7A135-CF41-4980-881E-F67258F86C3E</key>
+		<key>B9F5CB68-C412-4162-9D84-5AA8FD855C74</key>
 		<dict>
 			<key>className</key>
 			<string>IDECommandLineBuildLog</string>
@@ -57,7 +57,7 @@
 			<key>domainType</key>
 			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
 			<key>fileName</key>
-			<string>A9D7A135-CF41-4980-881E-F67258F86C3E.xcactivitylog</string>
+			<string>B9F5CB68-C412-4162-9D84-5AA8FD855C74.xcactivitylog</string>
 			<key>hasPrimaryLog</key>
 			<true/>
 			<key>primaryObservable</key>
@@ -82,13 +82,13 @@
 			<key>signature</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>timeStartedRecording</key>
-			<real>806960475.17171705</real>
+			<real>806980165.97548604</real>
 			<key>timeStoppedRecording</key>
-			<real>806960479.62222302</real>
+			<real>806980170.39942503</real>
 			<key>title</key>
 			<string>Building project Portfolio with scheme Portfolio and configuration Debug</string>
 			<key>uniqueIdentifier</key>
-			<string>A9D7A135-CF41-4980-881E-F67258F86C3E</string>
+			<string>B9F5CB68-C412-4162-9D84-5AA8FD855C74</string>
 		</dict>
 	</dict>
 </dict>

@@ -1,12 +1,12 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v5.0.1'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v5.1.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
   // The stylesheet is now four layered files (app.css was deleted in the redesign).
   './css/tokens.css', './css/base.css', './css/components.css', './css/layout.css',
-  './js/icons.js', './js/ui.js',
+  './js/icons.js', './js/ui.js', './js/tappable.js',
   './js/vault.js', './js/boot.js', './js/seed.js', './js/demo.js', './js/core.js', './js/portfolio.js', './js/api.js',
   './js/explore.js', './js/insights.js', './js/sheets.js', './js/app.js',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png',
