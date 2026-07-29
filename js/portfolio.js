@@ -68,8 +68,8 @@ function renderList(){
         <div class="hval">${fmt(val)}</div>
         <div class="hpl ${cls(pl)}">${fmtSign(pl)} · ${fmtPct(plp)}</div>
       </div><div class="wbar"><i style="width:${(val/wtot*100).toFixed(1)}%"></i></div></div>`;
-  }).join('') || `<div class="empty"><div class="ei"><svg aria-hidden="true"><use href="#i-layers"/></svg></div><div class="et">No holdings yet</div>
-    <div class="eb">Add your first position with Settings above, or restore everything from a backup file.</div>
+  }).join('') || `<div class="empty"><div class="ei">📄</div><div class="et">No holdings yet</div>
+    <div class="eb">Add your first position with ⚙︎ above, or restore everything from a backup file.</div>
     <button class="btn pri" id="emptyAdd" style="margin-top:12px">Open settings</button></div>`;
   const ea=$('emptyAdd'); if(ea) ea.onclick=openEdit;
   $('holdList').querySelectorAll('.hrow').forEach(el=> el.onclick = ()=>openDetail(el.dataset.sym));
@@ -135,7 +135,7 @@ function renderTargetMix(rs, tot){
   }).join('');
   const tip = (worst && worst.d<-1)
     ? `<div class="tgtnext">Next deposit → <b>${esc(worst.sym.replace('-','.'))}</b> (${Math.abs(worst.d).toFixed(1)}% under target). Buying the laggard rebalances without selling — no taxes.</div>`
-    : `<div class="tgtnext">Everything is within reach of its target.</div>`;
+    : `<div class="tgtnext">✓ Everything is within reach of its target.</div>`;
   const plan=`<div class="tgtplan"><input id="tgtDep" type="number" inputmode="decimal" placeholder="Adding money? e.g. 500" aria-label="Deposit amount to plan">
     <button class="btn pri" id="tgtDepGo" style="min-height:38px;padding:8px 14px">Plan it</button></div><div id="tgtDepOut"></div>`;
   box.innerHTML=`<div class="tgthead">Target mix · bar = now, notch = target <a href="#" id="tgtEditLnk">edit</a></div>${rowsH}${tip}${plan}`;
@@ -309,7 +309,7 @@ function renderStale(){
   el.innerHTML = `<span class="ic">⚠︎</span>
     <span class="tx">Holdings last confirmed <b>${when}</b> (${days} days ago). Buy anything since? Send your latest Vanguard statement to refresh, or log it here.</span>
     <button class="act" id="staleAct">Update</button>
-    <button class="x" id="staleX" title="Dismiss" aria-label="Dismiss reminder"><svg aria-hidden="true"><use href="#i-x"/></svg></button>`;
+    <button class="x" id="staleX" title="Dismiss" aria-label="Dismiss reminder">✕</button>`;
   el.classList.remove('hidden');
   $('staleAct').onclick = openEdit;
   $('staleX').onclick = ()=>{ staleDismissed=true; el.classList.add('hidden'); };
@@ -332,7 +332,7 @@ function setStatus(){
   const st=$('status');
   if(window.vaultSaveError || window.storageFull){ // data at risk beats everything else on this line
     st.className='status err';
-    $('statusTx').textContent='⚠ Couldn’t save your changes on this device — export a backup now (Settings).';
+    $('statusTx').textContent='⚠ Couldn’t save your changes on this device — export a backup now (⚙︎).';
     return;
   }
   const newest = Math.max(...uniqSyms().map(s=>state.quotes[s]?state.quotes[s].ts:0), SEED_TS);
@@ -481,40 +481,14 @@ function attachScrubAny(c, onMove){ // onMove(i) with index, onMove(null) when r
     return Math.round(t*(n-1));
   };
   const move=e=>{ const i=idx(e); if(i===c._scrub) return; c._scrub=i; c.update('none'); onMove(i); };
-
-  // DIRECTIONAL LOCK. touch-action:pan-y lets the browser claim the gesture the
-  // instant a finger drifts vertically, which fires pointercancel and drops the
-  // scrub — so reading the chart felt hair-trigger and deselected constantly.
-  //
-  // Now the first few pixels decide: mostly-horizontal locks INTO scrubbing and
-  // stays locked however much the finger wanders after that; mostly-vertical
-  // hands the gesture to the page so the chart never traps a scroll.
-  const LOCK = 6;   // px of travel before committing either way
   el.onpointerdown=e=>{
+    try{ el.setPointerCapture(e.pointerId); }catch(x){}
     if(c.chartArea && !(c.chartArea.right-c.chartArea.left>2)){ try{ c.resize(); }catch(x){} } // throttled layouts
-    c._start = { x: e.clientX, y: e.clientY, id: e.pointerId };
-    c._axis = null;          // 'x' = scrubbing, 'y' = page scroll, null = undecided
-    c._scrubbing = false;
-  };
-  el.onpointermove=e=>{
-    if(c._axis === 'y') return;                       // page owns this gesture
-    if(c._axis === 'x'){ move(e); return; }
-    if(!c._start) return;
-    const dx = Math.abs(e.clientX - c._start.x), dy = Math.abs(e.clientY - c._start.y);
-    if(dx < LOCK && dy < LOCK) return;                // not enough travel to decide
-    if(dy > dx){ c._axis = 'y'; return; }             // a scroll, leave it alone
-    c._axis = 'x';
-    // Capture only AFTER committing, so an abandoned gesture is never stolen from
-    // the scroller, and pin touch-action so vertical drift cannot cancel the scrub.
-    try{ el.setPointerCapture(c._start.id); }catch(x){}
-    el.style.touchAction = 'none';
     if(c.options.plugins.tooltip){ c._ttWas=c.options.plugins.tooltip.enabled!==false; c.options.plugins.tooltip.enabled=false; }
-    c._scrubbing = true;
-    move(e);
+    c._scrubbing=true; move(e);
   };
+  el.onpointermove=e=>{ if(c._scrubbing) move(e); };
   el.onpointerup=el.onpointercancel=()=>{
-    c._start = null; c._axis = null;
-    el.style.touchAction = 'pan-y';   // hand vertical scrolling back to the page
     if(!c._scrubbing) return;
     c._scrubbing=false; c._scrub=null;
     if(c.options.plugins.tooltip && c._ttWas!==undefined) c.options.plugins.tooltip.enabled=c._ttWas;
@@ -557,11 +531,8 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
   const orphan = Chart.getChart(el); if(orphan) orphan.destroy();
   if(labels.length<2) return null;
   const up = data.length>1 ? data[data.length-1]>=data[0] : true;
-  // DESIGN.md §9: the main series is interaction-coloured, NOT P&L-coloured —
-  // the delta readout above the chart carries the gain/loss meaning. Sparklines
-  // stay direction-coloured, which is what `hero` distinguishes.
-  const rgb = hero ? cvar('--brand-rgb') : (up?cvar('--green-rgb'):cvar('--red-rgb'));
-  const solid = hero ? cvar('--brand') : (up?cvar('--green'):cvar('--red'));
+  const rgb = up?cvar('--green-rgb'):cvar('--red-rgb');
+  const solid = up?cvar('--green'):cvar('--red');
   const ctx=el.getContext('2d');
   // three-stop fill: present under the line, gone by mid-chart — the Apple Stocks look
   const g=ctx.createLinearGradient(0,0,0,(el.parentNode.clientHeight||220));
@@ -701,7 +672,7 @@ function openDetail(sym){
       <div class="hsym" style="font-size:18px">${esc(sym.replace('-','.'))}</div>
       <div style="color:var(--mut);font-size:13px;margin-top:2px">${esc(NAMES[sym]||'')}</div>
       <div style="font-size:26px;font-weight:700;margin-top:8px">${fmtPx(p)} <span style="font-size:14px" class="${cls(dp)}">${fmtPct(dp)} today</span></div>
-    </div><button class="xbtn" id="detailX"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    </div><button class="xbtn" id="detailX">✕</button></div>
     <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px"></div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats">
@@ -735,11 +706,11 @@ function openDetail(sym){
   $('detailX').onclick = closeDetail;
   $('detailX').focus({preventScroll:true});
   const ab=$('alertBtn');
-  if(ab) ab.onclick=async ()=>{
+  if(ab) ab.onclick=()=>{
     const list=lsGet('pt_alerts')||[];
     const i=list.findIndex(a=>a.sym===sym);
     if(i>-1){ list.splice(i,1); lsSet('pt_alerts',list); toast('Price alert removed.'); if(typeof pushSyncNow==='function') pushSyncNow(); openDetail(sym); return; }
-    const v=await askValue({title:'Price alert', label:`Notify me when ${sym.replace('-','.')} reaches`, numeric:true, ok:'Set alert'}); if(v==null) return;
+    const v=prompt(`Push me when ${sym.replace('-','.')} reaches $`); if(v==null) return;
     const at=parseFloat(String(v).replace(',','.'));
     if(!(at>0)){ toast('Enter a price like 700 or 89.50', true); return; }
     const dir=at>=priceOf(sym)?'up':'down';
@@ -776,9 +747,9 @@ function openEdit(){
     <td><input data-i="${i}" data-f="sym" value="${esc(h.sym)}"></td>
     <td><input data-i="${i}" data-f="qty" type="number" step="any" value="${h.qty}"></td>
     <td><input data-i="${i}" data-f="cost" type="number" step="any" value="${h.cost}"></td>
-    <td><button class="del" data-i="${i}"><svg aria-hidden="true"><use href="#i-x"/></svg></button></td></tr>`).join('');
+    <td><button class="del" data-i="${i}">✕</button></td></tr>`).join('');
   $('editSheet').innerHTML = `
-    <div class="sheet-head"><div class="hsym" style="font-size:17px">Edit holdings</div><button class="xbtn" id="editX"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="sheet-head"><div class="hsym" style="font-size:17px">Edit holdings</div><button class="xbtn" id="editX">✕</button></div>
     <div class="buybox">
       <div class="buytitle">Record a purchase</div>
       <div class="buyrow">
@@ -813,7 +784,7 @@ function openEdit(){
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">You're exploring a fictional example portfolio. Nothing here is saved and it can't see, read, or touch any real account. Exit to return to the lock screen.</div>
     ` : `
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Security</div>
-    <div class="ebtns"><button class="btn sec" id="lockNow"><svg aria-hidden="true"><use href="#i-lock"/></svg> Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button><button class="btn sec" id="cloudTgl"></button></div>
+    <div class="ebtns"><button class="btn sec" id="lockNow">🔒 Lock now</button><button class="btn sec" id="faceTgl"></button><button class="btn sec" id="chgPass">Change passcode</button><button class="btn sec" id="cloudTgl"></button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Your holdings are AES-256 encrypted on this device. The passcode always unlocks; Face ID is a convenience on top of it. Cloud backup keeps an encrypted copy on your own server — unreadable without your passcode, so a lost phone loses nothing.</div>
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Daily reports</div>
     <div class="ebtns"><button class="btn sec" id="pushTgl"></button><button class="btn sec" id="pushTest" style="display:none">Send test now</button></div>
@@ -852,11 +823,11 @@ function openEdit(){
     paintFt();
   };
   $('chgPass').onclick=async()=>{
-    const o=await askValue({title:'Change passcode', label:'Current passcode', password:true, ok:'Next'}); if(o==null) return;
-    const n=await askValue({title:'Change passcode', label:'New passcode, at least 6 characters', password:true, ok:'Change'}); if(n==null) return;
-    if(n.length<6){ toast('Use at least 6 characters.', true); return; }
-    try{ await vaultChangePass(o,n); toast('Passcode changed.'); }
-    catch(e){ toast('That passcode was wrong.', true); }
+    const o=prompt('Current passcode'); if(o==null) return;
+    const n=prompt('New passcode (min 6 characters)'); if(n==null) return;
+    if(n.length<6){ alert('Too short — use at least 6 characters.'); return; }
+    try{ await vaultChangePass(o,n); alert('Passcode changed.'); }
+    catch(e){ alert('Current passcode was wrong.'); }
   };
   const paintCloud=()=>{ const b=lsGet('pt_bk'); $('cloudTgl').textContent = (b&&b.k) ? '☁️ Cloud backup: on' : '☁️ Cloud backup: off'; };
   paintCloud();
@@ -867,7 +838,7 @@ function openEdit(){
         async()=>{ await cloudDisable(); paintCloud(); toast('Cloud backup off.'); });
     } else {
       (async()=>{
-        const p=await askValue({title:'Enable cloud backup', label:'Confirm your passcode', password:true, ok:'Enable'}); if(p==null) return;
+        const p=prompt('Confirm your passcode to enable encrypted cloud backup'); if(p==null) return;
         $('cloudTgl').textContent='Encrypting…';
         try{
           const ok=await cloudEnable(p);

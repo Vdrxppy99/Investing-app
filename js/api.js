@@ -137,17 +137,8 @@ async function refreshAll(force){
   // even after days away, instead of waiting behind 10-year history downloads
   const qres = await Promise.allSettled(syms.map(fetchQuote));
   const quotesOk = qres.some(r=>r.status==='fulfilled' && r.value===true);
-  // Phase 1 used to render only five light surfaces, leaving the chart, allocation,
-  // goal and dividends blank until phase 2 finished — which is behind EVERY history
-  // download. Unlocking with Face ID gets you to the screen fast enough to sit in
-  // that half-painted state, which is what "Portfolio doesn't load fully" was.
-  //
-  // Those sections do not need the download: state.history is restored from the
-  // pt_history cache at boot (core.js), so they can draw from it immediately and be
-  // refreshed by the phase 2 render below. This changes only the ORDER things
-  // render in — no calculation, no API call, no storage key.
-  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); }
-  try { renderAll(); } catch(_) { /* a section that cannot draw yet must not stop the rest */ }
+  // phase 1 renders only the light surfaces — the heavy charts rebuild once, in phase 2
+  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); renderHeader(); renderList(); renderMover(); renderStale(); setStatus(); }
   // PHASE 2 — heavy history + FX refresh quietly behind the already-live screen
   const hjobs = syms.filter(s=>{
     const h=state.history[s];
@@ -285,18 +276,18 @@ async function swReady(ms){
 async function pushEnable(){
   if(window.DEMO_MODE){ toast('Notifications aren’t part of the example portfolio.', true); return false; }
   if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
-    toast('This browser can’t do notifications. Open My Portfolio from your Home Screen icon (needs iOS 16.4+).', true); return false;
+    alert('This browser can’t do notifications. Open My Portfolio from your Home Screen icon (needs iOS 16.4+).'); return false;
   }
   // iOS only grants web push to Home-Screen apps — a Safari tab silently does nothing
   const standalone = navigator.standalone===true || matchMedia('(display-mode: standalone)').matches;
   if(!standalone && /iPhone|iPad/.test(navigator.userAgent)){
-    toast('Open My Portfolio from your Home Screen icon — not Safari — then turn on reports. (iOS only allows notifications for the installed app.)', true); return false;
+    alert('Open My Portfolio from your Home Screen icon — not Safari — then turn on reports. (iOS only allows notifications for the installed app.)'); return false;
   }
   // check the current state first; iOS only shows a prompt from 'default' — from 'denied' it silently returns denied
   let perm = Notification.permission;
   if(perm==='default'){ try{ perm = await Notification.requestPermission(); }catch(e){} }
   if(perm==='denied'){
-    toast('iOS is blocking notifications for this app, so it can’t ask again.\n\nFix it here:\niPhone Settings → Notifications → My Portfolio → turn ON “Allow Notifications”.\n(If it’s not listed there, look under Settings → Apps → My Portfolio → Notifications.)\n\nThen come back and tap “Turn on reports” again.', true);
+    alert('iOS is blocking notifications for this app, so it can’t ask again.\n\nFix it here:\niPhone Settings → Notifications → My Portfolio → turn ON “Allow Notifications”.\n(If it’s not listed there, look under Settings → Apps → My Portfolio → Notifications.)\n\nThen come back and tap “Turn on reports” again.');
     return false;
   }
   if(perm!=='granted'){ toast('Tap “Turn on reports” again and choose Allow.', true); return false; }
@@ -312,7 +303,7 @@ async function pushEnable(){
     toast('Daily reports on — sending you a test now…');
     setTimeout(()=>{ pushTest(); }, 1200); // auto-fire a test so you immediately see it working
     return true;
-  }catch(e){ toast('Couldn’t finish turning on reports.\n\nReason: '+((e&&e.message)||e)+'\n\n(Screenshot this and send it to me.)', true); return false; }
+  }catch(e){ alert('Couldn’t finish turning on reports.\n\nReason: '+((e&&e.message)||e)+'\n\n(Screenshot this and send it to me.)'); return false; }
 }
 async function pushDisable(){
   try{ const reg=await swReady(4000); const sub=await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}
@@ -338,7 +329,7 @@ async function pushReconcile(){
     if(r.ok){ pushSyncLast=Date.now(); paintPushIfOpen(); }
   }catch(e){ /* subscribe blocked (e.g. not installed) — leave as-is; user can re-toggle */ }
 }
-function paintPushIfOpen(){ // self-contained (openEdit's paintPush is a closure) — keeps the Settings toggle honest
+function paintPushIfOpen(){ // self-contained (openEdit's paintPush is a closure) — keeps the ⚙︎ toggle honest
   const el=document.getElementById('pushTgl'); if(!el) return;
   const on=!!(lsGet('pt_push')||{}).on;
   el.textContent = on ? 'Turn off reports' : '🔔 Turn on reports';

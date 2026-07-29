@@ -9,7 +9,7 @@ const EXPLAIN = {
   'Invested':['Invested','Your cost basis: the total you paid for the shares you still hold in this account.']
 };
 function openInfoSheet(title, html){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="infobody">${html}</div>`;
+  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div><div class="infobody">${html}</div>`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
@@ -46,31 +46,9 @@ function showConfirm(title, msg, yesLabel, onYes){
   $('cfYes').onclick=()=>{ closeDetail(); onYes(); };
   $('cfNo').onclick=closeDetail;
 }
-
-/* Designed replacement for native prompt(). WKWebView silently no-ops prompt()
-   and hands back null, so every one of these was already a dead control inside
-   the iOS wrapper — the same class of bug that made vault restore a dead button.
-   Returns a Promise so call sites read the same as before. */
-function askValue(opts){
-  return new Promise(resolve => {
-    const id = 'ask-' + Math.random().toString(36).slice(2, 8);
-    openInfoSheet(opts.title, `
-      <label class="field" for="${id}"><span class="field__label">${opts.label || opts.title}</span>
-      <input class="input${opts.numeric ? ' input--num' : ''}" id="${id}" type="${opts.password ? 'password' : 'text'}"${opts.numeric ? ' inputmode="decimal"' : ''}${opts.value != null ? ` value="${opts.value}"` : ''}></label>
-      <div class="modal__actions"><button class="btn btn--secondary" id="${id}-no">Cancel</button>
-      <button class="btn btn--primary" id="${id}-ok">${opts.ok || 'Save'}</button></div>`);
-    const input = $(id);
-    input.focus({ preventScroll: true });
-    const done = v => { closeDetail(); resolve(v); };
-    $(id + '-ok').onclick = () => done(input.value);
-    $(id + '-no').onclick = () => done(null);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') done(input.value); });
-  });
-}
-
 function explainStat(key){ const e=EXPLAIN[key]; if(e) openInfoSheet(e[0], `<p>${e[1]}</p>`); }
 function openListSheet(title, bodyHtml, note){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>
     ${bodyHtml}${note?`<div class="inc-note">${note}</div>`:''}`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
@@ -86,7 +64,7 @@ async function openStockSheet(sym, name){
       <div class="hsym" style="font-size:18px">${esc(sym.replace('-','.'))}</div>
       <div style="color:var(--mut);font-size:13px;margin-top:2px">${esc(name||'')}</div>
       <div id="ssPrice" style="font-size:26px;font-weight:700;margin-top:8px">${q?fmtP(q.price):'…'}</div>
-    </div><div style="display:flex;gap:8px;align-items:flex-start"><button class="xbtn" id="watchBtn" style="font-size:17px"></button><button class="xbtn" id="detailX"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div></div>
+    </div><div style="display:flex;gap:8px;align-items:flex-start"><button class="xbtn" id="watchBtn" style="font-size:17px"></button><button class="xbtn" id="detailX">✕</button></div></div>
     <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px">Loading chart…</div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats" id="ssStats"></div>`;

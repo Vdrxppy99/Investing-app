@@ -42,7 +42,7 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) clearBa
 function showPage(p){
   if(p!=='explore' && $('searchResults')){ $('searchResults').style.display='none'; if($('mktSearch')) $('mktSearch').value=''; if($('mktSearchX')) $('mktSearchX').style.display='none'; }
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('hidden', el.id!=='page-'+p));
-  document.querySelectorAll('[data-page]').forEach(b=>{ b.classList.toggle('on', b.dataset.page===p); if(b.dataset.page===p) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on', b.dataset.page===p));
   window.scrollTo(0,0);
   // entrance animation plays once per page per session, not on every revisit
   const pg=$('page-'+p); if(pg && !pg.classList.contains('seen')) setTimeout(()=>pg.classList.add('seen'), 450);
@@ -55,7 +55,7 @@ function showPage(p){
   if(p==='explore') refreshMarkets(false);
   if(p==='insights') renderInsights();
 }
-document.querySelectorAll('[data-page]').forEach(b=> b.onclick=()=>{ haptic(); showPage(b.dataset.page); });
+document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{ haptic(); showPage(b.dataset.page); });
 /* one delegated tap handler for every symbol row/card on Explore — survives any re-render */
 $('page-explore').addEventListener('click', e=>{
   const el=e.target.closest('.mrow, .idx-card');
@@ -101,7 +101,7 @@ function ringSvg(pct, color, r){
 }
 function renderGoalForm(prefill){ // shared by first-time setup and "Change goal" (prefilled — never lose the number)
   const card=$('goalCard');
-  const gt1 = card.querySelector('.card__title, .group2__label'); if (gt1) gt1.hidden = false;
+  card.querySelector('.card-title').style.display='';
   $('goalBody').innerHTML=`<div class="goalset">
     <div style="color:var(--mut);font-size:12.5px;line-height:1.5;margin-bottom:10px;font-weight:500">Set a target and track your progress with a projected finish date based on your real return.</div>
     <input id="goalInput" type="number" inputmode="decimal" placeholder="Target amount, e.g. 100000" aria-label="Goal amount"${prefill>0?` value="${prefill}"`:''}>
@@ -124,7 +124,7 @@ function renderGoal(){
     const yr=new Date(); yr.setMonth(yr.getMonth()+m);
     eta = (m<720 && t.value>0) ? `Today's money alone gets there <span class="eta">${yr.toLocaleDateString([],{month:'short',year:'numeric'})}</span> at ~${(r*100).toFixed(0)}%/yr — every new buy pulls that date closer.` : `Today's balance alone won't compound to this within 60 years — new deposits will do the heavy lifting.`;
   } else { eta=`<span class="eta">Goal reached</span> — ${fmt(-remain)} past target. Time for a bigger one?`; }
-  const gt2 = card.querySelector('.card__title, .group2__label'); if (gt2) gt2.hidden = true;
+  card.querySelector('.card-title').style.display='none';
   $('goalBody').innerHTML=`<div class="goalwrap">
     <div class="ring">${ringSvg(pct, remain>0?'var(--brand)':'var(--green)')}<div class="rt"><b>${(pct*100).toFixed(0)}%</b><span>of goal</span></div></div>
     <div class="goalinfo"><div class="gt">${fmt(t.value)} of ${fmt(goal)}</div>
@@ -193,26 +193,9 @@ function renderMover(){ // day-change attribution: which holdings drove today's 
   $('moverBody').querySelectorAll('.drow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
 }
 function renderAll(){
-  // Each section renders independently. This used to be one straight sequence, so
-  // the first section to throw silently blanked every section after it — the same
-  // defect renderInsights() had, and the reason Portfolio came up empty after a
-  // Face ID unlock: unlocking with a glance beats the data, one early section
-  // throws on missing history, and the rest never run.
-  const sections = [renderMover, renderGoal, renderHomePr, renderStale, renderHeader,
-    renderChips, renderList, renderChart, renderAlloc, renderIncome, setStatus];
-  const failed = [];
-  for(const fn of sections){
-    try { fn(); } catch(e){ failed.push((fn.name||'section') + ': ' + (e && e.message)); }
-  }
-  if(failed.length) console.warn('[portfolio] sections deferred:', failed);
-  window.__portfolioFailed = failed;
+  renderMover(); renderGoal(); renderHomePr(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-explore').classList.contains('hidden')) renderMarkets();
-  // Heal any canvas that got stamped width:0 while the page was mid-transition.
-  // This only ever ran from renderInsights(), which is why Portfolio's chart and
-  // allocation donut stayed blank until you opened Insights and came back.
-  if(typeof ensureChartsSized === 'function') setTimeout(ensureChartsSized, 150);
-  return failed.length;
 }
 $('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → Nasdaq 100 → off
   const next = state.view.bench==='off' ? 'VOO' : state.view.bench==='VOO' ? 'VT' : state.view.bench==='VT' ? 'QQQ' : 'off';
@@ -289,11 +272,7 @@ $('miniBar').onclick=()=>{
 
 (function(){ const h=new Date().getHours();
   const g = h<5?'Good night':h<12?'Good morning':h<18?'Good afternoon':'Good evening';
-  // The greeting used to go into the appbar h1, next to five icon buttons, where
-  // it truncated to "Good nig…" on a 390px screen. It gets its own line above the
-  // hero now, which is where a greeting belongs anyway.
-  const gl = document.getElementById('greetLine');
-  if (gl) gl.innerHTML = g+`<span class="bdate"> · ${new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</span>`;
+  document.querySelector('.brand').innerHTML = g+`<span class="bdate"> · ${new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</span>`;
 })();
 renderAll();
 animateTotal();
@@ -429,122 +408,3 @@ function maybeShowRecap(){
   const off=$('recapOff'); if(off) off.onclick=e=>{ e.preventDefault(); lsSet('pt_recap_off',true); closeDetail(); };
   lsSet('pt_recap_last', key);
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Redesign wiring — controls the rebuilt markup introduced, and the per-tab
-   scroll restoration the native-feel checklist requires.
-   No calculation, storage key or API call is touched here.
-   ═══════════════════════════════════════════════════════════════════════════ */
-(function () {
-  /* Explore: the three stacked screener cards became one card with a segmented
-     control, so the panels need switching. The lists themselves are still
-     rendered by the same code into the same three element ids. */
-  const seg = document.getElementById('screenSeg');
-  if (seg) {
-    seg.addEventListener('click', e => {
-      const b = e.target.closest('.seg__item'); if (!b) return;
-      const want = b.dataset.screen;
-      seg.querySelectorAll('.seg__item').forEach(i => i.setAttribute('aria-selected', String(i === b)));
-      document.querySelectorAll('[data-screen-panel]').forEach(pnl => {
-        pnl.hidden = pnl.getAttribute('data-screen-panel') !== want;
-      });
-    });
-  }
-
-  /* Search: the clear button only exists when there is something to clear, so it
-     is never a dead control. */
-  document.querySelectorAll('[data-search]').forEach(box => {
-    const input = box.querySelector('input');
-    const sync = () => box.classList.toggle('search--filled', !!input.value);
-    input.addEventListener('input', sync);
-    sync();
-  });
-
-  /* Scroll position per tab. Without this, switching away from a long Insights
-     scroll and back dumps you at the top, which no native app does. */
-  const pos = {};
-  let current = 'portfolio';
-  const origShow = window.showPage;
-  if (typeof origShow === 'function') {
-    window.showPage = function (p) {
-      pos[current] = window.scrollY;
-      origShow(p);
-      current = p;
-      // After the page-in animation commits, not before, or the restore is lost.
-      requestAnimationFrame(() => window.scrollTo(0, pos[p] || 0));
-
-      // Late data. Risk, P/E and the crash test need 1-year price history, which
-      // arrives asynchronously after boot. renderAll() re-renders the visible page
-      // when a refresh lands, but the history load does not itself trigger one — so
-      // the FIRST visit to Insights could paint empty containers and stay that way
-      // until you switched tabs and came back. Face ID made it reliable rather than
-      // rare, because getting in fast enough beats the history request.
-      //
-      // Two catch-up renders rather than one: the second covers a slow network.
-      // renderInsights/renderMarkets are idempotent, so re-running them is safe.
-      {
-        clearTimeout(window.__catchUp);
-        // Self-correcting rather than two fixed timers. renderInsights() now
-        // reports which sections could not render, so this keeps retrying only
-        // while something is still failing, and stops the moment everything is
-        // there. Fixed delays were a guess at how long the data takes; this
-        // measures it instead.
-        let tries = 0;
-        const again = () => {
-          if (current !== p) return;                    // user moved on; leave it alone
-          tries++;
-          let failed = 0;
-          if (p === 'portfolio' && typeof renderAll === 'function') failed = renderAll() || 0;
-          if (p === 'insights' && typeof renderInsights === 'function') failed = renderInsights() || 0;
-          if (p === 'explore' && typeof renderMarkets === 'function') renderMarkets();
-          // Back off, and give up after ~12s rather than polling forever.
-          if (failed > 0 && tries < 8) window.__catchUp = setTimeout(again, 400 * tries);
-        };
-        window.__catchUp = setTimeout(again, 600);
-      }
-    };
-  }
-
-  /* THE INITIAL PAINT.
-     The retry above only runs when showPage() is called. After unlocking you land
-     on Portfolio without any tab being tapped, so nothing kicked it off — which is
-     precisely why Portfolio came up empty after a Face ID unlock and filled in the
-     moment you switched tabs and came back. Kick the same self-correcting retry
-     once at boot. */
-  (function initialPaint(){
-    // UNCONDITIONAL, deliberately. Two earlier attempts gated this on sections
-    // throwing, and both failed for the same reason: the sections do NOT throw.
-    // They render successfully against data that has not arrived yet, report zero
-    // failures, and the retry stops — leaving the screen blank exactly as before.
-    //
-    // refreshAll() does call renderAll() when it finishes, but that is at the END
-    // of phase 2, behind every history download. On a cold start after a Face ID
-    // unlock that can be many seconds of empty screen.
-    //
-    // renderAll() is idempotent and cheap, so re-running it on a fixed schedule
-    // for the first ~12 seconds costs nothing and cannot miss. This is a backstop,
-    // not a diagnosis — see redesign/STATUS.md.
-    const at = [400, 1000, 2000, 3500, 6000, 9000, 12000];
-    at.forEach(ms => setTimeout(() => {
-      try { if (typeof renderAll === 'function') renderAll(); } catch (_) {}
-    }, ms));
-
-    // And repaint the moment the tab is shown again, which is what made switching
-    // tabs "fix" it in the first place.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        try { if (typeof renderAll === 'function') renderAll(); } catch (_) {}
-      }
-    });
-  })();
-
-  /* theme-color must track the theme or the iOS status bar clashes with the app. */
-  const meta = document.querySelector('meta[name=theme-color]');
-  const syncTheme = () => {
-    if (!meta) return;
-    const c = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
-    if (c) meta.setAttribute('content', c);
-  };
-  syncTheme();
-  new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-})();

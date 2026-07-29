@@ -1741,3 +1741,40 @@
     padding: var(--s-4);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE ENGINE'S CLASS CONTRACT — complete
+
+   The original, proven engine JS was restored wholesale rather than edited to
+   suit the new markup: editing it is what produced every glitch in this rebuild.
+   So the CSS honours ITS vocabulary instead. These are the twelve classes it
+   toggles, enumerated from the source rather than discovered one bug at a time:
+
+     armed closing demo hidden loading locked mbfix on seen show spinning unlocking
+
+   If a new one ever appears, it belongs here — not in a JS edit.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Mini balance bar — pinned on tabs without the hero. */
+  .minibar.show { display: flex; }
+  body.mbfix .minibar { display: flex; }
+
+  /* Pull-to-refresh: .armed when past the threshold, .loading while fetching. */
+  .ptr { display: block; height: 0; overflow: hidden; transition: height var(--dur-micro) var(--ease-out); }
+  .ptr.armed { color: var(--primary); }
+  .ptr.loading { color: var(--primary); }
+
+  /* Refresh button spins while a fetch is in flight. */
+  .iconbtn.spinning svg { animation: spin var(--dur-spin) linear infinite; }
+
+  /* Lock screen dissolve. */
+  body.locked .shell, body.locked .tabbar, body.locked .fab { display: none; }
+  body.unlocking .lock { opacity: 0; }
+
+  /* Entrance plays once per page per session, never on every revisit. */
+  .page.seen { animation: none; }
+
+  /* Assistant FAB hides while its panel is open. */
+  .fab.hidden { display: none !important; }
+}

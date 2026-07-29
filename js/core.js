@@ -112,14 +112,7 @@ function badge(sym){ return esc(sym.split('-')[0].slice(0,4)); }
 function badgeHtml(sym, small){ // colored letter tile; a real company logo crossfades over it once loaded
   const direct=(typeof TICKER_LOGOS!=='undefined')&&TICKER_LOGOS[sym];
   const d=!direct&&(typeof TICKER_DOMAINS!=='undefined')&&TICKER_DOMAINS[sym];
-  // Universal fallback. TICKER_DOMAINS covers 38 symbols; anything outside it used
-  // to fall back to a bare letter tile, which is why some holdings had a real logo
-  // and others did not. The same service already used for BRK-B resolves by ticker,
-  // so every symbol gets a shot at a real mark — and onerror still removes the img
-  // and leaves the coloured monogram underneath, so a miss degrades cleanly.
-  const src = direct
-    || (d ? `https://www.google.com/s2/favicons?domain=${d}&sz=128` : null)
-    || `https://assets.parqet.com/logos/symbol/${encodeURIComponent(sym)}?format=png&size=128`;
+  const src=direct||(d?`https://www.google.com/s2/favicons?domain=${d}&sz=128`:null);
   const logo=src?`<img class="blogo" src="${src}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('on')" onerror="this.remove()">`:'';
   return `<div class="badge${small?' sm':''}" style="${bstyle(colorOf(sym))}">${badge(sym)}${logo}</div>`;
 }
