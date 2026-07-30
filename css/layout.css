@@ -11,6 +11,7 @@
   .shell {
     min-height: 100dvh;
     padding-top: env(safe-area-inset-top);
+    padding-bottom: var(--safe-bottom);
   }
   /* The demo badge is fixed at the top centre, where it collided with the appbar
      icon buttons. Give the shell room rather than moving the badge — it belongs
@@ -20,8 +21,10 @@
   .wrap {
     padding-inline: var(--s-5);
     padding-inline: max(var(--s-5), env(safe-area-inset-left)) max(var(--s-5), env(safe-area-inset-right));
-    /* Clear the fixed tab bar plus the home indicator. */
-    padding-bottom: calc(var(--s-9) + var(--s-8) + env(safe-area-inset-bottom));
+    /* Clear the fixed tab bar, the FAB above it, and the home indicator. This
+       reserved less than the FAB actually occupies, so a ~32px band of the last
+       card and of every chart's x-axis sat underneath it. One token now. */
+    padding-bottom: var(--bottom-clear);
   }
 
   .appbar {

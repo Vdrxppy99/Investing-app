@@ -8,8 +8,12 @@ Welcome Claude! This document maintains project context and state so both **Clau
 - **Tech Stack**: Pure Vanilla HTML5, CSS3, JavaScript (ES6+), Service Worker (PWA), Chart.js. No build step or transpilation.
 
 ## Core Architecture & File Structure
-- `index.html` — Page markup shell (4 tabs: Portfolio, News, Explore, Insights + overlay sheets).
-- `css/app.css` — Modern design system (Emerald-on-black, Dark/Light modes, micro-animations).
+- `index.html` — Page markup shell (3 tabs: Portfolio, Explore, Insights + overlay sheets). The News tab was removed by the owner; do not reintroduce it.
+- `css/` — Layered stylesheet, four files, `@layer` order is **tokens, base, components, layout** and must be preserved:
+  1. `tokens.css` — The ONLY file permitted to contain a literal hex, px or ms value. Dark/Light ramps, type & space scales, structural dimensions.
+  2. `base.css` — Reset, typography defaults, focus, motion policy, numeral hardening.
+  3. `components.css` — Every component (cards, rows, sheets, tabbar, FAB, tables, heatmap).
+  4. `layout.css` — Shell, wrap, responsive breakpoints, desktop rail.
 - `sw.js` — Service worker for offline PWA functionality (Network-first HTML, cached core assets).
 - `js/` modules (Global scope script loading order):
   1. `boot.js` — Theme bootstrap, Chart.js defaults.
@@ -20,7 +24,7 @@ Welcome Claude! This document maintains project context and state so both **Clau
   6. `explore.js` — Explore tab, stock search, watchlist, market screeners.
   7. `insights.js` — Insights tab, health score, tax lots, risk analysis.
   8. `sheets.js` — Bottom sheets, holding detail, stock view modals.
-  9. `news.js` — News tab & RSS/headline feed per ticker.
+  9. `i18n.js` — German translation layer (dictionary + pattern pass over rendered text).
   10. `app.js` — Global app initialization, event handlers, tab navigation.
 
 ## Critical Developer Instructions
@@ -29,8 +33,12 @@ Welcome Claude! This document maintains project context and state so both **Clau
 3. **No Build Step**: Keep all JS compatible directly in modern browsers without Babel/Webpack/Vite unless requested.
 
 ## Current Project Status
-- **Latest Version**: v9.1.0 (Institutional grade upgrade: Multi-language EN/DE/ES engine, multi-account classification, rebalance calculator with share counts, SMA 50/200 & Trend Signals, native iOS Haptic bridge).
-- **Active Task / Goal**: Core institutional upgrades completed and verified on iOS Simulator.
+- **Latest Version**: v9.2.0 (UI/UX refactor: canvas ramp retarget, bottom keep-out unification, holdings-row grid, monthly-returns heatmap, localization pattern pass, chart standardisation).
+- **Languages**: **EN/DE only.** There is no Spanish dictionary in `js/i18n.js`; the earlier ES claim was wrong and is corrected here.
+- **Scope decisions by the owner — do NOT "restore" these:**
+  - **News tab: removed.** Unused and not worth keeping. `js/news.js` no longer exists.
+  - **`ACCOUNTS` is two entries** (`Main Account`, `Brokerage`) in `js/seed.js`. The six types added in v9.1.0 (Roth IRA, 401(k), Crypto Vault, …) are US-specific and the owner holds neither, so they were reverted. This is deliberate, not a regression.
+- **Active Task / Goal**: v9.2.0 refactor complete. Financial figures are byte-identical to v9.1.0 — no math, state, encryption or API code was touched.
 
 ## Dual Assistant Sync Log
 - **2026-07-29**: Set up `.agents/AGENTS.md` and `CLAUDE.md` to establish a synchronized development workflow between Antigravity and Claude.
@@ -40,4 +48,8 @@ Welcome Claude! This document maintains project context and state so both **Clau
   - `js/portfolio.js`: Upgraded rebalance calculator (`planDeposit`) to compute exact share quantities `@` current market price.
   - `js/sheets.js`: Enhanced `openStockSheet` to compute and display 50-day SMA, 200-day SMA, and trend signals.
   - `native/Portfolio/WebScreen.swift` & `js/tappable.js`: Integrated native iOS Swift Haptic Engine (`UIImpactFeedbackGenerator` & `UINotificationFeedbackGenerator`) via `window.BasisNative.haptic()`.
-
+- **2026-07-30**: Upgraded to **v9.2.0** — a four-phase UI/UX refactor. No logic changes: `js/core.js`, `js/vault.js`, `js/api.js`, `js/seed.js` and `js/app.js` are untouched.
+  - **Phase 1 — foundation** (`css/tokens.css`, `css/base.css`, `index.html`): retargeted the dark canvas/surface ramp to `#0B0F17`/`#161B22` and re-derived `--surface-grad`; added `--fab-size`, `--fab-gap`, `--tabbar-h`, `--safe-bottom`, `--bottom-clear` and `--heat-cell-min`; re-asserted `tabular-nums lining` on every numeric surface so digits cannot reflow during the Inter font swap.
+  - **Phase 2 — primitives** (`css/components.css`, `css/layout.css`): stopped table headers breaking mid-word ("DIVIDE-NDEN") by confining `overflow-wrap: anywhere` to `td`; converted `.hrow` from flex to an explicit grid and clipped `.hinfo`, ending the holdings-row overlap; unified every fixed bottom element and scroll container on `--bottom-clear` / `--safe-bottom`, closing the ~32px band the FAB was covering.
+  - **Phase 3 — macro views** (`js/insights.js`, `js/i18n.js`, `css/components.css`): the compressed monthly-returns heatmap was a class-name collision — `<table class="hm">` inherited the holding-row meta-text rule — so it was renamed to `.heatmap` and given real CSS; replaced the i18n digit guard (which silently refused every sentence containing a number) with a numeric-only guard plus a capture-group pattern pass, so coach items no longer render English under German titles.
+  - **Phase 4 — charting** (`js/portfolio.js`, `js/insights.js`): standardised curve tension (0.35 observed, 0.2 modelled) and added `cubicInterpolationMode: 'monotone'` so the bezier can no longer overshoot below a local minimum and draw a loss that never happened; extracted one shared `CHART_TOOLTIP` (colour keys are accessors, so the live theme toggle still repaints).

@@ -68,7 +68,6 @@
     "Profit": "Gewinn",
     "Allocation": "Aufteilung",
     "Goal": "Ziel",
-    "Dividends": "Dividenden",
     "Total profit": "Gesamtgewinn",
     "Deposited": "Eingezahlt",
     "Return / yr": "Rendite / Jahr",
@@ -85,6 +84,8 @@
     "Goal amount": "Zielbetrag",
     "No holdings yet": "Noch keine Positionen",
     "Open settings": "Einstellungen öffnen",
+    "Add your first position with ⚙︎ above, or restore everything from a backup file.":
+      "Füge oben mit ⚙︎ deine erste Position hinzu oder stelle alles aus einer Backup-Datei wieder her.",
 
     /* ── status line ─────────────────────────────────────────────────────── */
     "LIVE": "LIVE",
@@ -151,9 +152,41 @@
     "Total": "Gesamt",
     "Asset": "Wert",
     "Owned": "Anzahl",
-    "Unrealized": "Unrealisiert",
     "Realized": "Realisiert",
     "What this means": "Was das bedeutet",
+    /* Not "J" — the heatmap's month headers are single letters and three of them
+       are already J, so the year-total column has to stay distinguishable. */
+    "Yr": "Jahr",
+
+    /* ── coach items (js/insights.js coachItems) ─────────────────────────────
+       These were never in the dictionary, so they rendered English under German
+       card titles ("Nächste Schritte" above "Know your risk"). Bodies that carry
+       a figure are handled by DE_PATTERNS below. */
+    "Deploy idle cash": "Bargeld investieren",
+    "Put idle cash to work": "Ungenutztes Bargeld arbeiten lassen",
+    "Feed the laggard": "Nachzügler aufstocken",
+    "Rebalance with new money": "Mit neuem Geld ausbalancieren",
+    "Trim a big bet": "Große Einzelwette stutzen",
+    "Know your risk": "Kenne dein Risiko",
+    "100% stocks — know the ride": "100% Aktien — kenne die Fahrt",
+    "Tax timing": "Steuerlicher Zeitpunkt",
+    "Keep investing": "Weiter investieren",
+    "Keep the contribution streak": "Einzahlungsserie fortsetzen",
+    "Set a goal": "Ziel festlegen",
+    "No target set yet": "Noch kein Ziel gesetzt",
+    "Beating the bank": "Besser als die Bank",
+    "Your money vs a savings account": "Dein Geld ggü. einem Sparkonto",
+    "Give the money a number. A target unlocks the progress ring and a projected finish date on the Portfolio tab.":
+      "Gib dem Geld eine Zahl. Ein Ziel schaltet den Fortschrittsring und ein voraussichtliches Enddatum im Portfolio-Tab frei.",
+    "Add holdings to run the stress test.": "Positionen hinzufügen, um den Stresstest zu starten.",
+    "Needs price history.": "Benötigt Kurshistorie.",
+
+    /* ── table headers, deliberately short ───────────────────────────────────
+       Long headers are what forced "DIVIDE-NDEN" / "UNREAL-ISIERT" to break
+       mid-word in the fixed-layout gains table. This is the localisation half of
+       the fix; the CSS half lives in components.css. No soft hyphens. */
+    "Dividends": "Dividende",
+    "Unrealized": "Nicht real.",
 
     /* ── sheets & recap ──────────────────────────────────────────────────── */
     "Market close": "Börsenschluss",
@@ -199,6 +232,85 @@
   };
 
   Object.assign(DE, SENTENCES);
+
+  /* ── PATTERN PASS ─────────────────────────────────────────────────────────
+     The exact-match table can only ever cover strings the engine emits verbatim.
+     Every coach-item body interpolates a figure, so none of them could match a
+     key — which is the second half of why German titles sat above English text.
+
+     Every regex here captures the numeric parts and the replacement re-inserts
+     them with $1/$2/… verbatim. Nothing computes, reformats or rounds a figure:
+     a captured group is copied through byte-for-byte. Currency symbols, percent
+     signs, tickers and dates all ride inside the capture groups.
+
+     Anchored to the full trimmed string, and written against ENGLISH source, so
+     an already-translated node can never match a second time. No /g flag — a
+     stateful lastIndex on a shared regex would translate every other node. */
+  const DE_PATTERNS = [
+    /* Deploy idle cash */
+    [/^(.+?) · ([\d.,]+)% uninvested$/,
+      "$1 · $2% nicht investiert"],
+    [/^(.+?) \(([\d.,]+)% of the portfolio\) is uninvested\. At your ~([\d.,]+)%\/yr pace that's ≈(.+?) of growth per year sitting out\.$/,
+      "$1 ($2% des Portfolios) sind nicht investiert. Bei deinem Tempo von ~$3%/Jahr entgehen dir dadurch ≈$4 Wachstum pro Jahr."],
+
+    /* Feed the laggard */
+    [/^(.+?) is ([\d.,]+)% under target$/,
+      "$1 liegt $2% unter Ziel"],
+    [/^(.+?) sits ([\d.,]+)% below the target mix you set\. Pointing the next deposit at it restores your chosen balance — no selling, no taxes\.$/,
+      "$1 liegt $2% unter der von dir gesetzten Zielmischung. Die nächste Einzahlung dorthin zu lenken stellt deine gewählte Balance wieder her — kein Verkauf, keine Steuern."],
+
+    /* Trim a big bet */
+    [/^(.+?) is ([\d.,]+)% of everything$/,
+      "$1 macht $2% des Ganzen aus"],
+    [/^(.+?) is a big single bet$/,
+      "$1 ist eine große Einzelwette"],
+    [/^([\d.,]+)% of everything rides on one company\. Steering new contributions to your index funds dilutes that gradually — no selling, no taxes\.$/,
+      "$1% des Gesamtvermögens hängen an einem einzigen Unternehmen. Neue Einzahlungen in deine Indexfonds zu lenken verwässert das allmählich — kein Verkauf, keine Steuern."],
+
+    /* Know your risk */
+    [/^100% stocks · worst dip (.+?)%$/,
+      "100% Aktien · schlimmster Rückgang $1%"],
+    [/^Maximum long-run growth, but your worst drop so far was (.+?)%\. Fine for a long horizon; if a big goal is under ~5 years away, a slice of bonds \(BND\) softens the swings\.$/,
+      "Maximales langfristiges Wachstum, aber dein bisher schlimmster Rückgang lag bei $1%. Für einen langen Horizont in Ordnung; steht ein großes Ziel in weniger als ~5 Jahren an, dämpft ein Anteil Anleihen (BND) die Schwankungen."],
+
+    /* Tax timing */
+    [/^(.+?) turns long-term in ([\d]+)d$/,
+      "$1 wird in $2 Tagen langfristig"],
+    [/^Selling (.+?)\? Wait until (.+)$/,
+      "$1 verkaufen? Warte bis $2"],
+    [/^A lot with (.+?) of gain turns long-term on (.+?) — before that, the gain would be taxed at the higher short-term rate\.$/,
+      "Eine Position mit $1 Gewinn wird am $2 langfristig — davor würde der Gewinn zum höheren kurzfristigen Satz besteuert."],
+
+    /* Keep investing */
+    [/^([\d]+) days since your last buy$/,
+      "Letzter Kauf vor $1 Tagen"],
+    [/^Last buy was ([\d]+) days ago\. Your pace so far has been ~(.+?)\/mo\. The projection below shows what today's money does on its own — every new buy lifts the whole fan\.$/,
+      "Letzter Kauf vor $1 Tagen. Dein bisheriges Tempo lag bei ~$2/Mon. Die Projektion unten zeigt, was das heutige Geld allein bewirkt — jeder neue Kauf hebt den ganzen Fächer."],
+
+    /* Beating the bank. This body contains <b> elements, so the DOM splits it
+       into several text nodes; each fragment is matched on its own. */
+    [/^(.+?) vs a savings account$/,
+      "$1 ggü. einem Sparkonto"],
+    [/^If every deposit had gone into a ([\d.,]+)%\/yr savings account instead, you'd have$/,
+      "Wäre jede Einzahlung stattdessen auf ein Sparkonto mit $1%/Jahr gegangen, hättest du heute"],
+    [/^today\. You have$/,
+      "· Du hast"],
+    [/^ahead for taking the market ride\. Over decades this gap is where wealth actually comes from\.$/,
+      "voraus dafür, dass du den Markt mitgefahren bist. Über Jahrzehnte ist genau diese Lücke der Ort, an dem Vermögen entsteht."],
+    [/^behind for taking the market ride\. Over decades this gap is where wealth actually comes from\.$/,
+      "zurück dafür, dass du den Markt mitgefahren bist. Über Jahrzehnte ist genau diese Lücke der Ort, an dem Vermögen entsteht."],
+
+    /* Crash test rows */
+    [/^healed in (.+)$/, "geheilt in $1"],
+  ];
+
+  /* A string that is ONLY punctuation and digits is never a translatable phrase,
+     and is exactly what must never be touched: currency amounts, percentages,
+     tickers, dates, table figures. The old guard rejected any string CONTAINING
+     a digit, which silently refused every sentence with a number in it — i.e.
+     every coach body and every stat caption. This narrows it to what it was
+     actually protecting. */
+  const NUMERIC_ONLY = /^[\s\d.,%+\-–—$€£/·:()]*$/;
 
   /* A string is only translated on an EXACT trimmed match. Anything containing a
      digit is skipped outright as a second line of defence, so no figure can ever
@@ -258,54 +370,17 @@
      ever touched; a reload is instant, exact, and cannot leave a half-translated
      screen behind. */
   const LANG_KEY = "pt_lang";
-  const SUPPORTED = ["en", "de", "es"];
   const lang = () => {
     try {
       const saved = localStorage.getItem(LANG_KEY);
-      return saved && SUPPORTED.includes(saved) ? saved : "en";
+      return (saved === "en" || saved === "de") ? saved : "en";
     } catch (_) { return "en"; }
   };
   window.appLang = lang;
   window.setAppLang = (l) => {
-    try { localStorage.setItem(LANG_KEY, SUPPORTED.includes(l) ? l : "en"); } catch (_) {}
+    try { localStorage.setItem(LANG_KEY, l === "de" ? "de" : "en"); } catch (_) {}
     location.reload();
   };
-
-  /* Spanish translation dictionary */
-  const ES = {
-    "Portfolio": "Portafolio",
-    "Explore": "Explorar",
-    "Insights": "Análisis",
-    "My Portfolio": "Mi Portafolio",
-    "Example data": "Datos de ejemplo",
-    "Settings": "Ajustes",
-    "Holdings": "Posiciones",
-    "Value": "Valor",
-    "Today": "Hoy",
-    "Profit": "Ganancia",
-    "Allocation": "Asignación",
-    "Goal": "Meta",
-    "Dividends": "Dividendos",
-    "Total profit": "Ganancia total",
-    "Deposited": "Depositado",
-    "Cash": "Efectivo",
-    "LIVE": "EN VIVO",
-    "Performance": "Rendimiento",
-    "Risk": "Riesgo",
-    "Tax lots": "Lotes fiscales",
-    "Search any stock or ETF": "Buscar acción o ETF",
-    "Watchlist": "Lista de seguimiento",
-    "Close": "Cerrar",
-    "Save": "Guardar",
-    "Done": "Hecho"
-  };
-
-  function getDict() {
-    const cur = lang();
-    if (cur === "de") return DE;
-    if (cur === "es") return ES;
-    return null;
-  }
 
   function mountToggle() {
     const bar = document.querySelector("#page-portfolio .appbar__actions");
@@ -315,14 +390,10 @@
     b.className = "iconbtn langbtn";
     b.type = "button";
     b.setAttribute("data-no-i18n", "");
-    const cur = lang();
-    b.textContent = cur.toUpperCase();
-    b.setAttribute("aria-label", "Switch language (" + cur.toUpperCase() + ")");
-    b.onclick = () => {
-      const idx = SUPPORTED.indexOf(cur);
-      const next = SUPPORTED[(idx + 1) % SUPPORTED.length];
-      window.setAppLang(next);
-    };
+    const other = lang() === "de" ? "EN" : "DE";
+    b.textContent = other;
+    b.setAttribute("aria-label", lang() === "de" ? "Switch to English" : "Auf Deutsch umstellen");
+    b.onclick = () => window.setAppLang(lang() === "de" ? "en" : "de");
     bar.insertBefore(b, bar.firstChild);
   }
 
@@ -334,14 +405,25 @@
     document.documentElement.lang = cur;
     if (cur === "en") return; // Layer off for English: 0ms overhead
 
-    const dict = getDict();
-    if (!dict) return;
+    const dict = DE;
 
     function translateStr(text) {
       const trimmed = text.trim();
-      if (!trimmed || trimmed.length > 220 || /\d/.test(trimmed)) return null;
+      if (!trimmed || trimmed.length > 220 || NUMERIC_ONLY.test(trimmed)) return null;
+
       const hit = dict[trimmed];
-      return (hit && hit !== trimmed) ? text.replace(trimmed, hit) : null;
+      if (hit && hit !== trimmed) return text.replace(trimmed, () => hit);
+
+      // Second pass, only once the exact table has missed.
+      for (let i = 0; i < DE_PATTERNS.length; i++) {
+        const re = DE_PATTERNS[i][0];
+        if (!re.test(trimmed)) continue;
+        const out = trimmed.replace(re, DE_PATTERNS[i][1]);
+        // Replacement is passed as a function so a captured "$" from a currency
+        // amount can never be re-read as a substitution token.
+        if (out !== trimmed) return text.replace(trimmed, () => out);
+      }
+      return null;
     }
 
     function walkLocal(root) {

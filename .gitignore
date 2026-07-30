@@ -6,3 +6,6 @@ portfolio-backup-*.json
 worker/.dev.vars
 worker/.wrangler/
 .wrangler/
+
+# generated repo dumps — never commit (2.6MB, and it mirrors seed data)
+repomix-output.xml

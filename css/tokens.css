@@ -79,6 +79,17 @@
     --ring: 2px;            /* focus ring width and offset */
     --press-scale: 0.97;
     --edge: 2px;            /* filled-button bottom edge */
+
+    /* ── Bottom chrome geometry ──────────────────────────────────────────── */
+    --fab-size: var(--s-9);
+    --fab-gap: var(--s-4);
+    --tabbar-h: var(--s-9);
+    /* Total bottom keep-out: tab bar + FAB + gaps + home indicator.
+       Every fixed bottom element and every scroll container derives its
+       offset from this ONE value so they can never drift apart again. */
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --bottom-clear: calc(var(--tabbar-h) + var(--fab-size) + var(--fab-gap) + var(--s-5) + var(--safe-bottom));
+    --heat-cell-min: 20px;
   }
 
   /* ═══ DARK — the default and the design target (DESIGN.md §1) ════════════
@@ -88,8 +99,8 @@
   :root[data-theme="dark"] {
     color-scheme: dark;
 
-    --canvas: #0f1217;
-    --surface: #171b22;
+    --canvas: #0B0F17;
+    --surface: #161B22;
     --surface-2: #1f242d;
     --surface-3: #262c36;
 
@@ -250,7 +261,7 @@
 @layer tokens {
   :root, :root[data-theme="dark"] {
     /* Card surfaces become a subtle top-lit gradient rather than one flat fill. */
-    --surface-grad: linear-gradient(180deg, #1b2029 0%, #171b22 100%);
+    --surface-grad: linear-gradient(180deg, #1A2029 0%, #161B22 100%);
     --surface-2-grad: linear-gradient(180deg, #232833 0%, #1f242d 100%);
     /* The line that catches the light along a card's top edge. */
     --edge-light: rgba(255, 255, 255, 0.055);

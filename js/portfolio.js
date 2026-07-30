@@ -1,4 +1,28 @@
 'use strict';
+
+/* One tooltip shape for every chart in the app. Previously each of the eight
+   charts inlined its own literal and they had drifted: some carried titleColor,
+   some didn't; none carried padding, radius or caret size.
+
+   The colour properties are ACCESSORS, not values. Spreading (`{...CHART_TOOLTIP}`)
+   invokes them, so each chart still resolves the theme tokens at construction
+   time — the theme toggle in app.js:225 repaints without a reload, and a frozen
+   snapshot taken when this file loaded would strand every chart on dark colours.
+   Loaded before insights.js, so its charts can reference it too. */
+const CHART_TOOLTIP = {
+  get backgroundColor() { return cvar('--card2'); },
+  get borderColor() { return cvar('--line'); },
+  borderWidth: 1,
+  get titleColor() { return cvar('--mut'); },
+  get bodyColor() { return cvar('--tx'); },
+  displayColors: false,
+  padding: 10,
+  cornerRadius: 8,
+  caretSize: 5,
+  titleFont: { weight: 600 },
+  bodyFont: { weight: 500 }
+};
+
 /* ============ RENDER: HEADER + LIST ============ */
 function renderHeader(){
   if(scrubbing) return;
@@ -36,10 +60,8 @@ function renderHeader(){
   if($('miniBar').classList.contains('show') && typeof paintMiniBar==='function') paintMiniBar();
 }
 function renderChips(){
-  const keys = ['all', ...Object.keys(ACCOUNTS).filter(a=> state.holdings.some(h=>h.acc===a) || (state.cash[a]>0))];
-  const list = [...new Set(keys)];
-  $('accChips').innerHTML = list.map(a=>
-    `<button data-a="${a}" class="${state.view.acc===a?'on':''}">${a==='all'?'All Accounts':esc(ACCOUNTS[a]||a)}</button>`).join('');
+  $('accChips').innerHTML = ['all','main','brok'].map(a=>
+    `<button data-a="${a}" class="${state.view.acc===a?'on':''}">${a==='all'?'All':esc(ACCOUNTS[a]||a)}</button>`).join('');
   $('accChips').querySelectorAll('button').forEach(b=> b.onclick = ()=>{ state.view.acc=b.dataset.a; renderAll(); });
 }
 const lastShownPx = {};
@@ -99,7 +121,7 @@ function renderAlloc(){
   allocChart = new Chart(el,{type:'doughnut',
     data:{labels:rs.map(r=>r.sym.replace('-','.')), datasets:[{data:rs.map(r=>r.qty*priceOf(r.sym)), backgroundColor:rs.map(r=>colorOf(r.sym)), borderWidth:2, borderColor:cvar('--card'), hoverOffset:5}]},
     options:{responsive:true, maintainAspectRatio:false, cutout:'72%',
-      plugins:{legend:{display:false},centerTxt:centerOpt, tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,bodyColor:cvar('--tx'),displayColors:false,
+      plugins:{legend:{display:false},centerTxt:centerOpt, tooltip:{...CHART_TOOLTIP,
         callbacks:{label:c=>c.label+': '+fmt(c.parsed)+' ('+(c.parsed/tot*100).toFixed(1)+'%)'}}}}});
   $('allocLegend').innerHTML = rs.map(r=>{
     const v=r.qty*priceOf(r.sym);
@@ -263,7 +285,7 @@ function renderIncome(){
     }
     const calChart=new Chart(cal,{type:'bar',data:{labels,datasets:[{data,backgroundColor:cvar('--brand'),borderRadius:3}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
-        tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,bodyColor:cvar('--tx'),displayColors:false,callbacks:{label:c=>'~'+fmt(c.parsed.y)}}},
+        tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>'~'+fmt(c.parsed.y)}}},
         scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),font:{size:9},maxRotation:0,autoSkip:false}},
                 y:{display:false}}}});
     attachScrubAny(calChart, i=>{ const ro=$('divRO'); if(!ro) return;
@@ -546,8 +568,8 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
   let stroke=solid;
   if(hero){ stroke=ctx.createLinearGradient(0,0,(el.parentNode.clientWidth||340),0);
     stroke.addColorStop(0,`rgba(${rgb},.45)`); stroke.addColorStop(1,solid); }
-  const datasets=[{label:'Portfolio', data, borderColor:stroke, backgroundColor:g, fill:true, borderWidth:hero?2.5:1.9, pointRadius:0, pointHoverRadius:hero?0:4, pointHoverBackgroundColor:solid, tension:.28}];
-  if(bench) datasets.push({label:benchName(), data:bench, borderColor:cvar('--mut'), borderDash:[4,4], borderWidth:1.4, pointRadius:0, pointHoverRadius:hero?0:3, fill:false, tension:.28});
+  const datasets=[{label:'Portfolio', data, borderColor:stroke, backgroundColor:g, fill:true, borderWidth:hero?2.5:1.9, pointRadius:0, pointHoverRadius:hero?0:4, pointHoverBackgroundColor:solid, tension:0.35, cubicInterpolationMode:'monotone'}];
+  if(bench) datasets.push({label:benchName(), data:bench, borderColor:cvar('--mut'), borderDash:[4,4], borderWidth:1.4, pointRadius:0, pointHoverRadius:hero?0:3, fill:false, tension:0.35, cubicInterpolationMode:'monotone'});
   if(markers) datasets.push({label:'Buys', data:markers.data, showLine:false, pointRadius:3.4, pointHoverRadius:5, pointBackgroundColor:cvar('--brand'), pointBorderColor:cvar('--card'), pointBorderWidth:1.5, fill:false});
   const cfg={type:'line', data:{labels, datasets},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:600,easing:'easeOutQuart'},
@@ -555,7 +577,7 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
       layout: hero ? {padding:{top:24,bottom:10,left:8,right:8}} : {},
       plugins:{legend:{display:false},
         tooltip: hero ? {enabled:false} : {
-          backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,titleColor:cvar('--mut'),bodyColor:cvar('--tx'),displayColors:false,
+          ...CHART_TOOLTIP,
           callbacks:{
             title:items=>{ const d=items[0].label; return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d+'T12:00:00').toLocaleDateString([], {weekday:'short',month:'short',day:'numeric',year:'numeric'}) : d; },
             label:c=>{ if(c.dataset.label==='Buys') return 'Bought: '+fmt(markers.amt[c.dataIndex]);

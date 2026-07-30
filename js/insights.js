@@ -14,7 +14,7 @@ function drawDonut(id, labels, data, colors, center){
   const o=Chart.getChart(el); if(o) o.destroy();
   return new Chart(el,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:cvar('--card')}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false},centerTxt:center||false,
-      tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,bodyColor:cvar('--tx'),displayColors:false,callbacks:{label:c=>c.label+': '+fmt(c.parsed)}}}}});
+      tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>c.label+': '+fmt(c.parsed)}}}}});
 }
 function donutLegend(el, items, total){
   $(el).innerHTML = items.map(i=>`<div class="alg"><span class="dot" style="background:${i.color}"></span>${esc(i.label)}<span class="alp">${(i.v/total*100).toFixed(1)}%</span></div>`).join('');
@@ -106,9 +106,9 @@ function renderDrawdown(){
   const ddBase=`Worst this year <b class="neg">${worst.toFixed(1)}%</b> · now <b class="${cur<-0.05?'neg':'pos'}">${cur<-0.05?cur.toFixed(1)+'%':'at the peak'}</b>`;
   $('ddStat').innerHTML=ddBase;
   const ddChart=new Chart(el,{type:'line',data:{labels,datasets:[{data:dd,borderColor:cvar('--red'),
-      backgroundColor:`rgba(${cvar('--red-rgb')},.11)`,fill:true,pointRadius:0,borderWidth:1.8,tension:.25}]},
+      backgroundColor:`rgba(${cvar('--red-rgb')},.11)`,fill:true,pointRadius:0,borderWidth:1.8,tension:0.35,cubicInterpolationMode:'monotone'}]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,titleColor:cvar('--mut'),bodyColor:cvar('--tx'),displayColors:false,
+      plugins:{legend:{display:false},tooltip:{...CHART_TOOLTIP,
         callbacks:{label:c=>c.parsed.y<-0.05?c.parsed.y.toFixed(1)+'% below peak':'At the peak'}}},
       scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,maxRotation:0,font:{size:10},callback:function(v){return this.getLabelForValue(v).slice(5);}}},
               y:{max:0,grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:4,font:{size:10},callback:v=>v+'%'}}}}});
@@ -182,7 +182,7 @@ function renderWorthChart(){
     for(let i=0;i<h.t.length;i++){ if(h.c[i]!=null){ const d=dayStr(h.t[i]); if(d>=cut){ daySet.add(d); maps[r.sym][d]=h.c[i]; } } } }
   const days=[...daySet].sort(); if(days.length<2) return;
   const colors={'US stocks':CAT[0],'International':CAT[1],'Dividend':CAT[2],'Berkshire':CAT[4]};
-  const ds=Object.keys(ASSET_CLASSES).map(k=>({label:k, data:[], borderColor:colors[k], borderWidth:1.8, pointRadius:0, pointHoverRadius:3, tension:.25, fill:false}));
+  const ds=Object.keys(ASSET_CLASSES).map(k=>({label:k, data:[], borderColor:colors[k], borderWidth:1.8, pointRadius:0, pointHoverRadius:3, tension:0.35, cubicInterpolationMode:'monotone', fill:false}));
   const last={};
   for(const d of days){
     const ls=lotState('all',d);
@@ -195,7 +195,7 @@ function renderWorthChart(){
   const shown=ds.filter(d=>d.data.some(v=>v>0));
   const worthChart=new Chart(el,{type:'line',data:{labels:days,datasets:shown},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,titleColor:cvar('--mut'),bodyColor:cvar('--tx'),displayColors:false,callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
+      plugins:{legend:{display:false},tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,maxRotation:0,font:{size:10},callback:function(v){return this.getLabelForValue(v).slice(5);}}},
               y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},callback:v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}}}});
   $('worthLegend').innerHTML=shown.map(d=>`<div class="alg"><span class="dot" style="background:${d.borderColor}"></span>${d.label}</div>`).join('');
@@ -621,20 +621,24 @@ function renderHeatmap(){
   const ret=md.ret;
   const years=new Set(Object.keys(ret).map(m=>m.slice(0,4)));
   const MN=['J','F','M','A','M','J','J','A','S','O','N','D'];
-  let html='<table class="hm"><tr><th></th>'+MN.map(m=>`<th>${m}</th>`).join('')+'<th>Yr</th></tr>';
+  // 14 columns cannot show a signed decimal on a 390px viewport, and the owner's
+  // standing rule is that everything fits the width — so drop the decimal, not
+  // the column. The year total keeps its decimal; it has a wider track.
+  const dp=window.matchMedia('(max-width: 480px)').matches?0:1;
+  let html='<div class="heatmap-wrap"><table class="heatmap"><thead><tr><th></th>'+MN.map(m=>`<th scope="col">${m}</th>`).join('')+'<th scope="col">Yr</th></tr></thead><tbody>';
   for(const y of [...years].sort().reverse()){
     let yr=1, any=false;
-    html+=`<tr><td class="y">${y}</td>`;
+    html+=`<tr><td class="y" scope="row">${y}</td>`;
     for(let m=1;m<=12;m++){
       const k=y+'-'+String(m).padStart(2,'0');
       if(ret[k]==null){ html+='<td></td>'; continue; }
       any=true; yr*=1+ret[k]/100;
       const a=Math.min(.45,Math.abs(ret[k])/14);
-      html+=`<td style="background:${ret[k]>=0?`rgba(${cvar('--green-rgb')},${a})`:`rgba(${cvar('--red-rgb')},${a})`}">${ret[k].toFixed(1)}</td>`;
+      html+=`<td style="background:${ret[k]>=0?`rgba(${cvar('--green-rgb')},${a})`:`rgba(${cvar('--red-rgb')},${a})`}">${ret[k].toFixed(dp)}</td>`;
     }
     html+=any?`<td class="${cls(yr-1)}" style="font-weight:700">${((yr-1)*100).toFixed(1)}</td></tr>`:'<td></td></tr>';
   }
-  $('hmBody').innerHTML=html+'</table>';
+  $('hmBody').innerHTML=html+'</tbody></table></div>';
 }
 function renderContribChart(){
   const el=$('contribChart'); if(!window.Chart) return;
@@ -653,9 +657,9 @@ function renderContribChart(){
   const compact=v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
   const contribChart=new Chart(el,{data:{labels:show,datasets:[
       {type:'bar',label:'That month',data:sdata,backgroundColor:cvar('--brand'),borderRadius:3,yAxisID:'y'},
-      {type:'line',label:'Total deposited',data:scum,borderColor:CAT[3],borderWidth:1.8,pointRadius:0,pointHoverRadius:3,tension:.25,yAxisID:'y1'}]},
+      {type:'line',label:'Total deposited',data:scum,borderColor:CAT[3],borderWidth:1.8,pointRadius:0,pointHoverRadius:3,tension:0.35,cubicInterpolationMode:'monotone',yAxisID:'y1'}]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{backgroundColor:cvar('--card2'),borderColor:cvar('--line'),borderWidth:1,titleColor:cvar('--mut'),bodyColor:cvar('--tx'),displayColors:false,callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
+      plugins:{legend:{display:false},tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:6,maxRotation:0,font:{size:9},callback:function(v){const l=this.getLabelForValue(v);return l.slice(5)==='01'?l.slice(0,4):l.slice(5);}}},
               y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:4,font:{size:9},callback:compact}},
               y1:{position:'right',grid:{display:false},border:{display:false},ticks:{color:CAT[3],maxTicksLimit:4,font:{size:9},callback:compact}}}}});
@@ -767,10 +771,10 @@ function renderProjection(){
   }
   const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
   const ds=[
-    {label:scen[0][0], data:data[0], borderColor:cvar('--faint'), borderDash:[4,4], borderWidth:1.3, pointRadius:0, fill:false, tension:.15},
+    {label:scen[0][0], data:data[0], borderColor:cvar('--faint'), borderDash:[4,4], borderWidth:1.3, pointRadius:0, fill:false, tension:0.2, cubicInterpolationMode:'monotone'},
     {label:scen[2][0], data:data[2], borderColor:cvar('--faint'), borderDash:[4,4], borderWidth:1.3, pointRadius:0,
-     fill:{target:0}, backgroundColor:`rgba(${cvar('--green-rgb')},.07)`, tension:.15},
-    {label:scen[1][0], data:data[1], borderColor:cvar('--brand'), borderWidth:2.2, pointRadius:0, fill:false, tension:.15}
+     fill:{target:0}, backgroundColor:`rgba(${cvar('--green-rgb')},.07)`, tension:0.2, cubicInterpolationMode:'monotone'},
+    {label:scen[1][0], data:data[1], borderColor:cvar('--brand'), borderWidth:2.2, pointRadius:0, fill:false, tension:0.2, cubicInterpolationMode:'monotone'}
   ];
   if(goal && goal<data[2][N]*1.4) ds.push({label:'Goal', data:labels.map(()=>goal), borderColor:cvar('--warn'), borderDash:[6,5], borderWidth:1.2, pointRadius:0, fill:false});
   const projChart=new Chart(el,{type:'line',data:{labels,datasets:ds},
