@@ -9,3 +9,6 @@ worker/.wrangler/
 
 # generated repo dumps — never commit (2.6MB, and it mirrors seed data)
 repomix-output.xml
+
+# xcode derivedata — build intermediates, object files, dylibs, module caches
+native/build/
