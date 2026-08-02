@@ -451,7 +451,7 @@ function buildIntradaySeries(acc){ // 1D view: portfolio value per 5-min bar, cu
   const fmtT = ms=>new Date(ms).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   const useLots = hasLots(acc);
   const inv = useLots ? lotState(acc, dayStr(Date.now())).cost : rs.reduce((a,r)=>a+r.cost,0);
-  const labels=[], value=[], profit=[];
+  const labels=[], value=[], profit=[], times=[];
   const last={};
   for(const t of ts){
     let v=cash, ok=true;
@@ -462,21 +462,22 @@ function buildIntradaySeries(acc){ // 1D view: portfolio value per 5-min bar, cu
       v += r.qty*px;
     }
     if(!ok) continue;
-    labels.push(fmtT(t)); value.push(v); profit.push(v-cash-inv);
+    labels.push(fmtT(t)); value.push(v); profit.push(v-cash-inv); times.push(t);
   }
   if(!labels.length) return null;
   if(marketOpen()){ // live point
-    const tt=totals(acc);
-    labels.push(fmtT(Date.now())); value.push(tt.value); profit.push(tt.value-cash-inv);
+    const tt=totals(acc), now=Date.now();
+    labels.push(fmtT(now)); value.push(tt.value); profit.push(tt.value-cash-inv); times.push(now);
   }
-  return {labels,value,profit};
+  // `times`: raw ms epoch per point, parallel to `labels` — the hero chart (Lightweight
+  // Charts) needs real UTCTimestamp seconds, not the pre-formatted "2:30 PM" label strings.
+  return {labels,value,profit,times};
 }
-let mainChart=null, chartBaseV=0; // portfolio value at range start — % base for the profit metric
+let chartBaseV=0; // portfolio value at range start — % base for the profit metric
 /* --- universal scrubbing: drag ANY chart to read exact values at a point in time --- */
 const scrubLine = { id:'scrubLine',
   afterDatasetsDraw(c){
     if(c._scrub==null) return;
-    if(c.config.plugins && c.config.plugins.length) return; // the hero chart draws its own scrub
     if(!c.chartArea) return;
     const g=c.ctx, i=c._scrub;
     let x=null; const dots=[];
@@ -533,26 +534,7 @@ function wireDetailScrub(c, labels, closes, roId){ // price readout for holding/
     ro.textContent=`${niceLbl(labels[i])} · ${fmtPx(v)}${d0>0?` · ${fmtPct((v/d0-1)*100)} over range`:''}`;
   });
 }
-const heroFx = { id:'heroFx',
-  beforeDatasetsDraw(c){ const g=c.ctx; g.save();
-    g.shadowColor=`rgba(${c._up!==false?cvar('--green-rgb'):cvar('--red-rgb')},.34)`; g.shadowBlur=20; g.shadowOffsetY=8; },
-  afterDatasetsDraw(c){ const g=c.ctx; g.restore();
-    const ds=c.data.datasets[0].data; if(!ds||ds.length<2) return;
-    const meta=c.getDatasetMeta(0);
-    let mi=0,ma=0; ds.forEach((v,i)=>{ if(v!=null){ if(v<ds[mi])mi=i; if(v>ds[ma])ma=i; } });
-    const lab=(i,above)=>{ const p=meta.data[i]; if(!p) return;
-      g.font="600 10px Inter,-apple-system,sans-serif"; g.fillStyle=cvar('--mut');
-      g.textAlign = p.x<64?'left' : p.x>c.chartArea.right-64?'right' : 'center';
-      g.fillText(fmt(ds[i]), p.x, above?p.y-9:p.y+17); };
-    if(ma!==mi && !state.view.priv){ lab(ma,true); lab(mi,false); }
-    if(c._scrub!=null){ const p=meta.data[c._scrub]; if(p){
-      g.strokeStyle=cvar('--faint'); g.lineWidth=1; g.setLineDash([3,3]);
-      g.beginPath(); g.moveTo(p.x,c.chartArea.top); g.lineTo(p.x,c.chartArea.bottom); g.stroke(); g.setLineDash([]);
-      g.fillStyle=c._up!==false?cvar('--green'):cvar('--red');
-      g.beginPath(); g.arc(p.x,p.y,4.5,0,7); g.fill();
-      g.strokeStyle=cvar('--card'); g.lineWidth=2; g.stroke(); } }
-  }};
-function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
+function drawChart(canvasId, labels, data, msgEl, bench, markers){
   if(!window.Chart){ if(msgEl) msgEl.textContent='Connect to the internet once to load the chart library.'; return null; }
   if(msgEl) msgEl.textContent = labels.length<2 ? 'Chart appears after the first online price update.' : '';
   const el=$(canvasId);
@@ -565,18 +547,15 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
   // three-stop fill: present under the line, gone by mid-chart — the Apple Stocks look
   const g=ctx.createLinearGradient(0,0,0,(el.parentNode.clientHeight||220));
   g.addColorStop(0, `rgba(${rgb},.26)`); g.addColorStop(.55, `rgba(${rgb},.07)`); g.addColorStop(1,'rgba(0,0,0,0)');
-  let stroke=solid;
-  if(hero){ stroke=ctx.createLinearGradient(0,0,(el.parentNode.clientWidth||340),0);
-    stroke.addColorStop(0,`rgba(${rgb},.45)`); stroke.addColorStop(1,solid); }
-  const datasets=[{label:'Portfolio', data, borderColor:stroke, backgroundColor:g, fill:true, borderWidth:hero?2.5:1.9, pointRadius:0, pointHoverRadius:hero?0:4, pointHoverBackgroundColor:solid, tension:0.35, cubicInterpolationMode:'monotone'}];
-  if(bench) datasets.push({label:benchName(), data:bench, borderColor:cvar('--mut'), borderDash:[4,4], borderWidth:1.4, pointRadius:0, pointHoverRadius:hero?0:3, fill:false, tension:0.35, cubicInterpolationMode:'monotone'});
+  const datasets=[{label:'Portfolio', data, borderColor:solid, backgroundColor:g, fill:true, borderWidth:1.9, pointRadius:0, pointHoverRadius:4, pointHoverBackgroundColor:solid, tension:0.35, cubicInterpolationMode:'monotone'}];
+  if(bench) datasets.push({label:benchName(), data:bench, borderColor:cvar('--mut'), borderDash:[4,4], borderWidth:1.4, pointRadius:0, pointHoverRadius:3, fill:false, tension:0.35, cubicInterpolationMode:'monotone'});
   if(markers) datasets.push({label:'Buys', data:markers.data, showLine:false, pointRadius:3.4, pointHoverRadius:5, pointBackgroundColor:cvar('--brand'), pointBorderColor:cvar('--card'), pointBorderWidth:1.5, fill:false});
   const cfg={type:'line', data:{labels, datasets},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:600,easing:'easeOutQuart'},
       interaction:{mode:'index',intersect:false},
-      layout: hero ? {padding:{top:24,bottom:10,left:8,right:8}} : {},
+      layout: {},
       plugins:{legend:{display:false},
-        tooltip: hero ? {enabled:false} : {
+        tooltip: {
           ...CHART_TOOLTIP,
           callbacks:{
             title:items=>{ const d=items[0].label; return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d+'T12:00:00').toLocaleDateString([], {weekday:'short',month:'short',day:'numeric',year:'numeric'}) : d; },
@@ -586,24 +565,109 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers, hero){
               const diff=c.parsed.y-d0; let s=fmtSign(diff);
               if(d0>0) s+=` (${fmtPct((c.parsed.y/d0-1)*100)})`;
               return s+' since range start'; }}}},
-      scales: hero ? {x:{display:false},
-        y:{display:true,position:'right',grid:{color:cvar('--grid')},border:{display:false},
-           ticks:{color:cvar('--mut'),maxTicksLimit:4,font:{size:9.5},padding:2,
-           callback:v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}} : {
+      scales: {
         x:{display:true,grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,maxRotation:0,font:{size:10},
            callback:function(v){ const l=this.getLabelForValue(v); return /^\d{4}-/.test(l)?l.slice(5):l; }}},
         y:{display:true,grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},
            callback:v=>new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}}},
-    plugins: hero ? [heroFx] : []};
+    plugins: []};
   const c=new Chart(el,cfg); c._up=up; return c;
 }
+
+/* ============ HERO CHART (Lightweight Charts) ============
+   Portfolio tab's big glanceable chart only — every OTHER chart in the app
+   (holding detail, drawdown, worth, contributions, dividend calendar) stays on
+   Chart.js via drawChart() above. Design constraints (UPGRADE_PLAN.md Phase 2):
+   one accent colour for the series regardless of up/down (gain/loss reads from
+   the sign/pill next to the chart, not line colour alone — a red/green-only
+   encoding is invisible to ~8% of men); one muted neutral for the benchmark
+   overlay, which is reference, not a competing series; every colour read from
+   css/tokens.css via cvar(), never a literal hex, so the theme toggle repaints
+   it exactly like every other chart (renderAll() already destroys and rebuilds
+   this chart on every call, theme change included). */
+let heroChart=null, heroSeries=null, heroBenchSeries=null, heroMarkersApi=null, heroData=null; // heroData: {times,labels,data} — index-aligned, used by updateChartLive() + scrub
+function drawHeroChart(times, labels, data, msgEl, bench, markers){
+  const LC = window.LightweightCharts;
+  if(!LC){ if(msgEl) msgEl.textContent='Connect to the internet once to load the chart library.'; return null; }
+  if(msgEl) msgEl.textContent = labels.length<2 ? 'Chart appears after the first online price update.' : '';
+  const el=$('mainChart');
+  if(heroChart){ heroChart.remove(); heroChart=null; heroSeries=null; heroBenchSeries=null; heroMarkersApi=null; }
+  el.innerHTML='';
+  if(labels.length<2) return null;
+  const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid'),
+        card=cvar('--card'), faint=cvar('--faint');
+  const priceFormatter = v => state.view.priv ? '' :
+    new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
+  const chart=LC.createChart(el, {
+    autoSize:true,
+    layout:{ background:{type:LC.ColorType.Solid,color:'transparent'}, textColor:mut,
+             fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif", fontSize:10 },
+    grid:{ vertLines:{visible:false}, horzLines:{color:grid} },
+    rightPriceScale:{ visible:true, borderVisible:false, scaleMargins:{top:0.16,bottom:0.06} },
+    leftPriceScale:{ visible:false },
+    // fixLeftEdge/fixRightEdge/rightOffset:0 — without them, a sparse series (a 2-point
+    // weekly-baked range, or any short window) pads itself with empty logical bars on the
+    // left to preserve a default ~6px bar spacing, instead of stretching to fill the width
+    // (confirmed by isolated reproduction: identical setData + setVisibleLogicalRange({from:0,
+    // to:n-1}) alone still yielded a padded range; only fixing both edges at creation made
+    // the range come out correct immediately). This was a real bug in every sparse range
+    // since Phase 2 — found while capturing this phase's "before" screenshots.
+    timeScale:{ visible:false, borderVisible:false, fixLeftEdge:true, fixRightEdge:true, rightOffset:0 },
+    crosshair:{ mode:LC.CrosshairMode.Normal,
+      vertLine:{ color:faint, width:1, style:LC.LineStyle.Dashed, labelVisible:false },
+      horzLine:{ visible:false, labelVisible:false } },
+    handleScroll:false, handleScale:false,
+    localization:{ priceFormatter },
+  });
+  el.style.touchAction='pan-y'; // horizontal drag scrubs, vertical swipe still scrolls the page
+
+  const series = chart.addSeries(LC.AreaSeries, {
+    lineColor:brand, lineWidth:2, topColor:`rgba(${brandRgb},.26)`, bottomColor:`rgba(${brandRgb},0)`,
+    crosshairMarkerVisible:true, crosshairMarkerRadius:4.5,
+    crosshairMarkerBackgroundColor:brand, crosshairMarkerBorderColor:card, crosshairMarkerBorderWidth:1.5,
+    priceLineVisible:false, lastValueVisible:false, priceFormat:{type:'custom', formatter:priceFormatter, minMove:0.01},
+  });
+  series.setData(times.map((t,i)=>({time:t, value:data[i]})));
+
+  let benchSer=null;
+  if(bench){
+    benchSer = chart.addSeries(LC.LineSeries, {
+      color:mut, lineWidth:1.4, lineStyle:LC.LineStyle.Dashed, crosshairMarkerVisible:false,
+      priceLineVisible:false, lastValueVisible:false,
+    });
+    benchSer.setData(times.map((t,i)=> bench[i]==null ? {time:t} : {time:t, value:bench[i]}));
+  }
+
+  let markersApi=null;
+  if(markers){
+    const pts = [];
+    for(let i=0;i<times.length;i++) if(markers.data[i]!=null) pts.push({time:times[i], position:'inBar', shape:'circle', color:brand, size:1});
+    if(pts.length) markersApi = LC.createSeriesMarkers(series, pts);
+  }
+
+  // NOT fitContent(): for sparse data (e.g. a 22-point month, or 2 weekly-baked points)
+  // fitContent() keeps bar spacing near its ~6px default and pads the REMAINDER of the
+  // width with empty space on the left, rather than stretching the line edge-to-edge —
+  // correct for a "load more history by scrolling" trading chart, wrong for a hero chart
+  // that must always fill its box like every prior Chart.js range did. Forcing the exact
+  // logical range stretches the existing points across the full width instead.
+  chart.timeScale().setVisibleLogicalRange({ from:0, to: times.length-1 });
+  heroChart=chart; heroSeries=series; heroBenchSeries=benchSer; heroMarkersApi=markersApi;
+  heroData = {times, labels, data};
+  return chart;
+}
 let scrubbing=false;
-function attachScrub(c, labels, data){
-  const el=c.canvas; let deltaSave=null;
-  const idx=e=>{ const r=el.getBoundingClientRect(); const x=e.clientX-r.left;
-    const {left,right}=c.chartArea; const t=Math.min(1,Math.max(0,(x-left)/(right-left)));
-    return Math.round(t*(data.length-1)); };
-  const move=e=>{ const i=idx(e); if(i===c._scrub) return; c._scrub=i; c.update('none');
+function attachHeroScrub(chart, series, times, labels, data){
+  const el=$('mainChart');
+  const idx=e=>{
+    const r=el.getBoundingClientRect(), x=e.clientX-r.left;
+    const logical=chart.timeScale().coordinateToLogical(x);
+    if(logical==null) return null;
+    return Math.max(0, Math.min(times.length-1, Math.round(logical)));
+  };
+  let deltaSave=null, scrubI=null;
+  const move=e=>{ const i=idx(e); if(i==null||i===scrubI) return; scrubI=i;
+    chart.setCrosshairPosition(data[i], times[i], series);
     if($('tvNum')) $('tvNum').textContent=fmt(data[i]);
     const lb=labels[i];
     const nice=/^\d{4}-\d{2}-\d{2}$/.test(lb) ? new Date(lb+'T12:00:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : lb;
@@ -612,23 +676,22 @@ function attachScrub(c, labels, data){
     $('chartDelta').innerHTML=`<span class="${cls(diff)}">${fmtSign(diff)}${pct}</span> <span class="rng">· ${nice}</span>`; };
   el.onpointerdown=e=>{ try{el.setPointerCapture(e.pointerId);}catch(x){} scrubbing=true; deltaSave=$('chartDelta').innerHTML; move(e); };
   el.onpointermove=e=>{ if(scrubbing) move(e); };
-  el.onpointerup=el.onpointercancel=()=>{ if(!scrubbing) return; scrubbing=false; c._scrub=null; c.update('none'); renderHeader(); if(deltaSave!=null) $('chartDelta').innerHTML=deltaSave; };
+  el.onpointerup=el.onpointercancel=()=>{ if(!scrubbing) return; scrubbing=false; scrubI=null; chart.clearCrosshairPosition(); renderHeader(); if(deltaSave!=null) $('chartDelta').innerHTML=deltaSave; };
 }
 function renderChart(){
-  if(mainChart){ mainChart.destroy(); mainChart=null; }
   const dEl=$('chartDelta');
   let s;
   if(state.view.range==='1D'){
     s = buildIntradaySeries(state.view.acc);
     if(!s){
-      mainChart = drawChart('mainChart',[],[], $('chartMsg'));
+      drawHeroChart([],[],[], $('chartMsg'));
       $('chartMsg').textContent='Loading today’s prices…';
       dEl.textContent=''; ensureIntraday(); return;
     }
     ensureIntraday(); // keep it fresh in the background
   } else {
     const full = buildSeries(state.view.acc);
-    if(!full){ mainChart = drawChart('mainChart',[],[], $('chartMsg')); dEl.textContent=''; return; }
+    if(!full){ drawHeroChart([],[],[], $('chartMsg')); dEl.textContent=''; return; }
     s = sliceRange(full, state.view.range);
     // all-time-high marker under the chart — the number a wealth manager quotes first
     const ath=Math.max(...full.value), cur=full.value[full.value.length-1];
@@ -638,6 +701,11 @@ function renderChart(){
       : `All-time high ${fmt(ath)} · <span class="${off<-5?'neg':''}">${off.toFixed(1)}%</span> below it`;
   }
   const data = state.view.metric==='profit' ? s.profit : s.value;
+  // non-1D ranges: labels ARE 'YYYY-MM-DD' strings already, a valid Lightweight Charts
+  // BusinessDay Time as-is. 1D: labels are pre-formatted "2:30 PM" strings for the OLD
+  // Chart.js category axis — Lightweight Charts needs real UTCTimestamp SECONDS instead
+  // (foot-gun: UTCTimestamp is seconds, not ms — s.times here is ms from buildIntradaySeries).
+  const times = state.view.range==='1D' ? s.times.map(ms=>Math.floor(ms/1000)) : s.labels;
   const benchOK = state.view.metric==='value' && state.view.range!=='1D';
   const bench = (state.view.bench!=='off' && benchOK) ? benchSeries(s.labels, s.value) : null;
   $('benchBtn').classList.toggle('on', state.view.bench!=='off' && benchOK);
@@ -655,8 +723,8 @@ function renderChart(){
     const md=s.labels.map((d,i)=>buyByDay[d]!=null?data[i]:null);
     if(md.some(v=>v!=null)) markers={data:md, amt:s.labels.map(d=>buyByDay[d]||0)};
   }
-  mainChart = drawChart('mainChart', s.labels, data, $('chartMsg'), bench, markers, true);
-  if(mainChart) attachScrub(mainChart, s.labels, data);
+  const hc = drawHeroChart(times, s.labels, data, $('chartMsg'), bench, markers);
+  if(hc) attachHeroScrub(hc, heroSeries, times, s.labels, data);
   chartBaseV = s.value[0]||0;
   if(data.length>1){
     const d0=data[0], d1=data[data.length-1], diff=d1-d0;

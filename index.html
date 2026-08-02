@@ -17,6 +17,12 @@
      all offline, which contradicts the offline requirement. 200 KB, cached by
      the service worker like everything else. -->
 <script src="vendor/chart.umd.min.js" defer></script>
+<!-- Portfolio hero chart only (js/portfolio.js) — first-class range/scrub/marker
+     primitives Chart.js has no equivalent for. Every other chart in the app
+     (holding detail, drawdown, worth, contributions, dividends) still uses
+     Chart.js above; this is additive, not a replacement. Vendored for the same
+     offline reason as chart.umd.min.js. ~192KB, cached by the service worker. -->
+<script src="vendor/lightweight-charts.standalone.production.js" defer></script>
 <!-- Layered stylesheet. Load order IS the cascade order; @layer makes
      specificity structural rather than a race. See DESIGN.md. -->
 <link rel="stylesheet" href="css/tokens.css">
@@ -184,7 +190,7 @@
 
       <section class="card">
         <div class="chart__readout" id="chartDelta"></div>
-        <div class="chart"><canvas id="mainChart"></canvas><div id="chartMsg" class="chart__msg"></div></div>
+        <div class="chart"><div id="mainChart"></div><div id="chartMsg" class="chart__msg"></div></div>
         <div class="chartctl">
           <div class="seg" id="metricSeg" role="tablist" aria-label="Metric">
             <button class="seg__item" data-m="value" role="tab" aria-selected="false">Value</button>

@@ -615,6 +615,11 @@
   }
   .chart--short { max-height: 170px; }
   .chart canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+  /* Lightweight Charts owns #mainChart's own internal canvas sizing (autoSize);
+     this only gives the plain div it's mounted in a sized, positioned box to
+     read via ResizeObserver — it must NOT force width/height like the rule
+     above, or it fights the library's own pixel-exact canvas dimensions. */
+  .chart #mainChart { position: absolute; inset: 0; }
   .chart__readout {
     display: flex;
     align-items: baseline;

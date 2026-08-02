@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.2.2'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.3.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
@@ -12,7 +12,9 @@ const CORE = ['./', './index.html', './manifest.webmanifest',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png',
   // Chart.js is vendored now rather than fetched from a CDN. Loading it remotely
   // meant the app could not chart at all offline, however well the SW behaved.
-  './vendor/chart.umd.min.js'];
+  './vendor/chart.umd.min.js',
+  // Lightweight Charts — Portfolio hero chart only (js/portfolio.js), same offline reasoning.
+  './vendor/lightweight-charts.standalone.production.js'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();

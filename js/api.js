@@ -187,13 +187,16 @@ async function refreshQuotesOnly(){
   setStatus();
   if(state.view.range==='1D') ensureIntraday(); // refresh the 5-min bars too (throttled inside)
 }
-/* update only the chart's last point on each tick (no full redraw).
+/* update only the hero chart's last point on each tick (Lightweight Charts series.update(),
+   not a full setData rebuild) — see js/portfolio.js drawHeroChart(). No more up/down redraw
+   branch: the series is one accent colour regardless of direction (Phase 2 design constraint),
+   so there's no colour to flip and nothing forces a full re-render anymore.
    Known trade-off: the dashed benchmark's last point stays at its last full render
    within a session — recomputing it per tick isn't worth the churn. */
 function updateChartLive(){
   if(scrubbing) return;
-  if(!mainChart){ renderChart(); return; }
-  const ds = mainChart.data.datasets[0]; const data = ds.data;
+  if(!heroSeries || !heroData){ renderChart(); return; }
+  const data = heroData.data;
   if(!data || data.length<1){ renderChart(); return; }
   const t = totals(state.view.acc);
   // profit MUST use the same lots-based formula as buildSeries, or the live point jumps off the line
@@ -201,10 +204,7 @@ function updateChartLive(){
   const pNow = hasLots(state.view.acc) ? t.value-cash-lotState(state.view.acc, dayStr(Date.now())).cost : t.profit;
   const v = state.view.metric==='profit' ? pNow : t.value;
   data[data.length-1] = v;
-  const upNow = data[data.length-1] >= data[0];
-  const isGreen = mainChart._up !== false;
-  if(upNow !== isGreen){ renderChart(); return; } // trend flipped: redraw with new color
-  mainChart.update('none');
+  heroSeries.update({ time: heroData.times[heroData.times.length-1], value: v });
   if(data.length>1){
     const d0=data[0], diff=v-d0;
     let pct='';
