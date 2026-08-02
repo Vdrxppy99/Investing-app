@@ -1,0 +1,13 @@
+{
+  "name": "investing-app-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright smoke suite + golden-master fixture for the Investing app (test tooling only — the app itself ships with no build step and no dependencies).",
+  "scripts": {
+    "test": "playwright test",
+    "test:golden:capture": "node test/golden/capture.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}
