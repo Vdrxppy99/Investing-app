@@ -128,6 +128,15 @@ function lotState(acc, d){ // shares held + total invested on day d ('YYYY-MM-DD
   }
   return out;
 }
+// Money-weighted annualized return (equivalent to Excel/Google Sheets XIRR).
+// Day-count basis: Actual/365.25 (YR = 365.25 days in ms) — the same "periods per year"
+// convention used by riskStats()'s annualization and the modified-Dietz windows in
+// js/insights.js, so a return quoted here is comparable to one quoted there.
+// Solves NPV(r) = Σ v_i · (1+r)^(-(t_i−t0)/YR) = 0 for r by bisection over r ∈ [-0.95, 9]
+// (i.e. -95%…+900%/yr) — geometric (compounding) return, not arithmetic. Requires a sign
+// change in NPV across that bracket (a genuine gain/loss); returns null otherwise, same as
+// Excel's XIRR #NUM! for a bracket with no root. Verified against an independent scipy
+// root-find and closed-form single-cashflow cases in test/phase1/math.spec.js.
 function xirr(flows){ // money-weighted annualized return; flows: [{t:ms, v}] negative = money in
   if(flows.length<2) return null;
   const t0=flows[0].t, YR=31557600000;

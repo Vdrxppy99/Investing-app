@@ -141,20 +141,39 @@ function riskStats(){
     voo.push(va&&vb?vb/va-1:null);
   }
   if(rets.length<30) return null;
+  // Annualization factor: derive periods/year from the ACTUAL observed spacing of `days`,
+  // rather than hardcoding a 252-trading-day count. state.history is daily for live-fetched
+  // symbols but only WEEKLY for the offline/demo baked SEED_HISTORY (js/seed.js) — a hardcoded
+  // 252 silently overstated weekly-sampled volatility by ~sqrt(252/52)≈2.2x and annualized
+  // return by ~252/52≈4.8x (Phase 0 finding: demo Insights showed vol≈29%, annRet≈87%).
+  // Day-count basis: Actual/365.25 (mean Gregorian year), matching xirr()'s YR constant in
+  // js/core.js and the modified-Dietz windows in periodReturns()/monthlyDietzReturns() below —
+  // one convention for "how many periods in a year" across the whole app.
+  const spanDays=(new Date(days[days.length-1]).getTime()-new Date(days[0]).getTime())/86400000;
+  const periodsPerYear = spanDays>0 ? 365.25/(spanDays/(days.length-1)) : 252;
   const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
   const mu=mean(rets);
-  const vol=Math.sqrt(mean(rets.map(r=>(r-mu)**2)))*Math.sqrt(252)*100;
+  // Population standard deviation (divide by n, not n-1/Bessel-corrected "sample" stdev):
+  // every return in the lookback window is used directly, not a sample estimating a larger
+  // unseen population, so no correction is applied.
+  const vol=Math.sqrt(mean(rets.map(r=>(r-mu)**2)))*Math.sqrt(periodsPerYear)*100;
   const pairs=rets.map((r,i)=>[r,voo[i]]).filter(p=>p[1]!=null);
   const mx=mean(pairs.map(p=>p[1])), my=mean(pairs.map(p=>p[0]));
   const cov=mean(pairs.map(p=>(p[0]-my)*(p[1]-mx))), vx=mean(pairs.map(p=>(p[1]-mx)**2));
+  // Beta = cov/var of simple (arithmetic, not log) period returns. It is a RATIO, so it is
+  // unaffected both by population-vs-sample normalization (the n or n-1 divisor is identical
+  // top and bottom and cancels) and by the periods-per-year annualization above (neither cov
+  // nor var is annualized here) — verified against an independent Python beta() (test/phase1).
   const beta=vx>0?cov/vx:1;
+  // Max drawdown reads directly off the cumulative portfolio-value series (buildSeries): a
+  // peak-to-trough ratio with no time dimension, so it is also unaffected by sampling frequency.
   let peak=0, mdd=0; const s=buildSeries('all');
   if(s) for(const v of s.value){ if(v>peak) peak=v; if(peak>0){ const dd=(v-peak)/peak; if(dd<mdd) mdd=dd; } }
   // your actual daily extremes over the last year — the swing size to expect on big news days
   let bi=0, wi=0;
   for(let i=1;i<rets.length;i++){ if(rets[i]>rets[bi]) bi=i; if(rets[i]<rets[wi]) wi=i; }
   // Sharpe = reward per unit of risk: (annualized return − 4% cash rate) ÷ annualized volatility
-  const annRet=mu*252*100, RF=4;
+  const annRet=mu*periodsPerYear*100, RF=4;
   const sharpe=vol>0?(annRet-RF)/vol:0;
   return {vol, beta, mdd:mdd*100, best:{d:retDays[bi], p:rets[bi]*100}, worst:{d:retDays[wi], p:rets[wi]*100}, sharpe, annRet};
 }
@@ -229,6 +248,16 @@ function openHealthSheet(){
     + `<p style="margin-top:6px;color:var(--faint);font-size:11px">Score = average of the four checks. Guidance, not financial advice.</p>`;
   openInfoSheet('Portfolio Health · '+score+'/100', body);
 }
+// Modified Dietz: R = (V1 − V0 − D) / (V0 + D·w), a deposit-adjusted (money-weighted-ish but
+// non-iterative) return over one window. This app's D is pre-aggregated to one total per
+// window (monthly here, per named window in periodReturns() below), so the exact date of each
+// flow within the window isn't tracked — the textbook per-flow time-weight (days remaining /
+// total days) collapses to a single flat w=0.5 (mid-window) for the whole deposit total. This
+// is a deliberate simplification of true Modified Dietz given the monthly-bucketed data model,
+// not a bug: exact for a single flow landing exactly mid-window, an approximation otherwise.
+// Geometric vs arithmetic: Dietz returns for different windows are NOT chain-linked/compounded
+// here — each window's % is independent, consistent with periodReturns() below re-deriving
+// every window from V0/D directly rather than compounding monthly figures.
 function monthlyDietzReturns(){ // 'YYYY-MM' -> deposit-adjusted % return — shared by heatmap + Monte Carlo
   const s=buildSeries('all'); if(!s||s.labels.length<3) return null;
   const eom={}; for(let i=0;i<s.labels.length;i++) eom[s.labels[i].slice(0,7)]=s.value[i];
@@ -240,6 +269,7 @@ function monthlyDietzReturns(){ // 'YYYY-MM' -> deposit-adjusted % return — sh
 }
 function periodReturns(){ // deposit-adjusted returns — ONE modified-Dietz formula for every window
   // (the old month-chaining for 6M/YTD/1Y/All silently dropped the first partial month of history)
+  // Same flat mid-window weight (D/2) as monthlyDietzReturns() above, same reason.
   const s=buildSeries('all'); if(!s||s.labels.length<3) return [];
   const n=s.labels.length, out=[];
   for(const [k,cut] of [['1W',rangeCutoff('1W')],['1M',rangeCutoff('1M')],['6M',rangeCutoff('6M')],['YTD',rangeCutoff('YTD')],['1Y',rangeCutoff('1Y')],['All','0000-00-00']]){
@@ -260,6 +290,13 @@ function wirePrPills(el){
   });
 }
 function renderHomePr(){ const el=$('homePr'); if(!el) return; el.innerHTML=prPills(periodReturns()); wirePrPills(el); }
+// "Same buys in VOO" benchmark: replays every real lot's cost as if it had bought `sym` at that
+// symbol's closing price on-or-before the lot's purchase date (binary search over sorted daily
+// closes), share-accumulating — a true buy-and-hold replay, not a single lump-sum comparison.
+// Price-only: VOO/benchmark dividends are not reinvested here (documented to the user in
+// renderPerf()'s footnote — "excluding its dividends"), so this understates the benchmark
+// slightly versus a total-return index; deliberate, since the app doesn't track VOO's own
+// distribution history the way it does the user's actual dividends.
 function pathValue(sym){ // what your exact purchases would be worth if every dollar had bought `sym` instead
   const voo=state.history[sym]; if(!voo||!voo.t||voo.t.length<10) return null;
   const px={}; for(let i=0;i<voo.t.length;i++) if(voo.c[i]!=null) px[dayStr(voo.t[i])]=voo.c[i];
@@ -572,6 +609,16 @@ function askContext(){
 }
 
 /* ============ TAX LOTS / SECTORS / HEATMAP / CONTRIB / PROJECTOR (Insights) ============ */
+// Per-lot US short/long-term split (IRS rule: long-term requires MORE than one year held —
+// day 366, or day 367 across a leap day). YR = 365.25 days is a fixed Actual/365.25 average-year
+// offset, not a true calendar anniversary (new Date(y+1,m,d)) — so a lot bought on a leap day, or
+// whose 1-year mark spans a leap year, can turn long-term up to ~18 hours early or late. This is
+// a deliberate simplification (the same day-count basis as xirr()/riskStats() elsewhere in the
+// app) for a "when does this become long-term" nudge, not a filed tax position — the edge-case
+// drift is well under a day per lot and never changes which TAX YEAR a lot falls into.
+// "Matching" here is trivial: every lot carries its own cost basis already (no FIFO/specific-lot
+// selection), since the app has no sell/disposal feature — each lot is classified against its
+// own purchase date, independent of any other lot.
 function renderTaxCard(){
   const now=Date.now(), YR=31557600000;
   let st=0, lt=0; const turning=[];

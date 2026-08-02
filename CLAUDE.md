@@ -38,7 +38,7 @@ Welcome Claude! This document maintains project context and state so both **Clau
 - **Scope decisions by the owner — do NOT "restore" these:**
   - **News tab: removed.** Unused and not worth keeping. `js/news.js` no longer exists.
   - **`ACCOUNTS` is two entries** (`Main Account`, `Brokerage`) in `js/seed.js`. The six types added in v9.1.0 (Roth IRA, 401(k), Crypto Vault, …) are US-specific and the owner holds neither, so they were reverted. This is deliberate, not a regression.
-- **Active Task / Goal**: v9.2.0 refactor complete. Financial figures are byte-identical to v9.1.0 — no math, state, encryption or API code was touched.
+- **Active Task / Goal**: v9.2.0 refactor complete. Every pure financial function (XIRR, modified Dietz, volatility/beta/max drawdown, tax-lot short/long-term split, same-buys-in-VOO benchmark) is verified against independently-derived expected values in [test/phase1/math.spec.js](test/phase1/math.spec.js), cross-checked with the `backtesting` skill's Python oracle where applicable — see that file's header comment for the exact derivations. The one disagreement found (`riskStats()` annualizing with a hardcoded 252 regardless of actual sampling interval) is fixed in `js/insights.js`; see the comments there and above `xirr()` in `js/core.js` for the day-count/annualization/stdev conventions used throughout.
 
 ## Dual Assistant Sync Log
 - **2026-07-29**: Set up `.agents/AGENTS.md` and `CLAUDE.md` to establish a synchronized development workflow between Antigravity and Claude.
