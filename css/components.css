@@ -336,6 +336,17 @@
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
+  /* overflow-y:auto on .sheet is not sufficient on its own. .sheet is a flex
+     column, so its children are flex items. A flex item normally cannot shrink
+     below its content height because min-height defaults to auto — but that only
+     holds while the item's overflow is visible. .tablewrap sets overflow-x:auto,
+     which computes overflow-y to auto too, so its automatic minimum size becomes
+     0 and it collapses instead of overflowing. The holdings table squashes, the
+     content then fits inside max-height, scrollHeight === clientHeight, and the
+     sheet has nothing to scroll. Pinning every direct child at its natural height
+     is what actually creates the overflow. */
+  .sheet > * { flex-shrink: 0; }
+
   .sheet[data-open="true"] { transform: translateY(0); }
   /* Set by the drag handler; must not be eased or the finger feels laggy. */
   .sheet[data-dragging="true"] { transition: none; }
@@ -1467,8 +1478,15 @@
   .btn.pri:active { border-bottom-width: 0; transform: translateY(var(--edge)) scale(var(--press-scale)); }
   .btn.sec { background: var(--surface-2); color: var(--text); border: var(--hairline) solid var(--line); }
   .btn.warn { background: var(--surface-2); color: var(--loss); }
-  .ebtns { display: flex; gap: var(--s-2); }
-  .ebtns .btn { flex: 1; }
+  /* .btn forces white-space:nowrap, so each button's minimum width is its full text
+     width. A 4-button row (Export/Import/CSV/Erase in js/portfolio.js openEdit()) can't
+     shrink below the sum of those minimums on a phone-width sheet — flex:1 alone just
+     overflows the row past the sheet's right edge instead of shrinking, which is what
+     actually made #resetSeed unreachable (confirmed by measurement: it rendered at
+     x≈426 in a 390px viewport, regardless of vertical scroll position). Wrapping lets
+     the buttons that don't fit drop to their own line instead of running off-screen. */
+  .ebtns { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  .ebtns .btn { flex: 1 1 auto; }
 
   /* Sheet chrome emitted by sheets.js. */
   .sheet-head {
