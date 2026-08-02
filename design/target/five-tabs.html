@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Five tabs — your own identity</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#EDEFF3;color:#0a0c10;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;padding:30px 20px 70px}
+.head{max-width:2200px;margin:0 auto 24px}
+.head h1{font-size:23px;font-weight:650;letter-spacing:-.02em}
+.head p{color:#5f6773;margin-top:6px;max-width:82ch;font-size:14px}
+.rail{display:flex;gap:24px;max-width:2200px;margin:0 auto;overflow-x:auto;padding-bottom:16px;align-items:flex-start}
+.col{flex:0 0 auto;width:378px}
+.tag{margin-bottom:9px}
+.tag b{font-size:15.5px;font-weight:650}
+.tag span{font-size:12px;color:#5f6773;display:block;margin-top:1px}
+.why{font-size:12px;color:#5f6773;margin-top:11px;line-height:1.55}
+.phone{width:378px;height:790px;border-radius:38px;overflow:hidden;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.07),0 24px 60px rgba(0,0,0,.17)}
+
+/* ============ IDENTITY ============
+   canvas  #0B0F17   (already your token)
+   brand   #7C6CFF   indigo — NOT Delta green
+   gain    #2FD08A   loss #FF5D6B   (convention only, never chrome)
+   tiles   squircle r=13 on 40px   (Delta uses circles)
+   cards   hairline border + 4% fill (Delta uses solid raised)
+==================================== */
+.s{position:absolute;inset:0;background:#0B0F17;color:#F2F4F8;display:flex;flex-direction:column;overflow:hidden}
+.sb{height:40px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 22px 0 28px;font-size:12px;font-weight:650}
+.bd{flex:1;overflow:hidden;position:relative}
+.tb{height:62px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-around;padding:0 4px 8px;background:#0B0F17;border-top:1px solid #171C26}
+.tb i{font-style:normal;font-size:9px;font-weight:650;color:#525A6A;display:flex;flex-direction:column;align-items:center;gap:4px;letter-spacing:.02em}
+.tb i::before{content:"";width:17px;height:17px;border-radius:5px;background:currentColor}
+.tb i.on{color:#7C6CFF}
+.n{font-variant-numeric:tabular-nums lining;letter-spacing:-.02em}
+.up{color:#2FD08A}.dn{color:#FF5D6B}
+svg{display:block}
+.c{background:rgba(255,255,255,.035);border:1px solid #1B212C;border-radius:16px}
+.lg{width:40px;height:40px;border-radius:13px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;letter-spacing:-.03em;color:#fff}
+.lg.sm{width:32px;height:32px;border-radius:10px;font-size:9px}
+/* section label with accent rule */
+.sec{display:flex;align-items:center;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:.09em;color:#6E7789;margin:0 0 10px}
+.sec::before{content:"";width:3px;height:11px;border-radius:2px;background:#7C6CFF;flex:0 0 auto}
+.sec em{font-style:normal;margin-left:auto;color:#F2F4F8;font-weight:650;font-size:12px;letter-spacing:-.01em}
+.pad{padding:0 20px}
+.row{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid #151A23}
+.row:last-child{border-bottom:0}
+.row .m{flex:1;min-width:0}
+.row .m b{font-size:14px;font-weight:640;display:block}
+.row .m span{font-size:11px;color:#6E7789;display:block;margin-top:2px;font-variant-numeric:tabular-nums}
+.row .r{text-align:right;flex:0 0 auto}
+.row .r b{font-size:14px;font-weight:640;display:block}
+.row .r span{font-size:11px;font-weight:650;display:block;margin-top:2px}
+.bar{display:flex;height:7px;border-radius:4px;overflow:hidden;gap:2px}
+.bar i{display:block;height:100%;border-radius:2px}
+.seg{display:flex;gap:2px;background:rgba(255,255,255,.045);border-radius:11px;padding:3px}
+.seg b{flex:1;text-align:center;font-size:11.5px;font-weight:650;color:#6E7789;padding:6px 0;border-radius:8px}
+.seg b.on{color:#0B0F17;background:#7C6CFF}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:650;padding:4px 9px;border-radius:16px;background:rgba(124,108,255,.14);color:#A79BFF}
+</style></head><body>
+<div class="head">
+  <h1>Five tabs — Delta's structure, your identity</h1>
+  <p>Home · Markets · Portfolio · Insights · Following. Every number is one your app already computes or
+     already stores. The visual language is deliberately <em>not</em> Delta's: indigo accent rather than green
+     chrome, squircle tiles rather than circles, hairline cards rather than solid raised ones, and a hero
+     that folds allocation in rather than stacking it below.</p>
+</div>
+<div class="rail">
+
+<!-- ========== HOME ========== -->
+<div class="col"><div class="tag"><b>1 · Home</b><span>the glance screen — new</span></div>
+<div class="phone"><div class="s">
+  <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+  <div class="bd">
+    <div class="pad" style="padding-top:6px">
+      <div style="font-size:12px;color:#6E7789;font-weight:600">Good morning, Isaac</div>
+      <div style="font-size:11.5px;color:#525A6A;margin-top:2px">Markets open in 3h 19m</div>
+    </div>
+    <div class="c" style="margin:14px 20px 0;padding:16px 18px">
+      <div style="font-size:11px;color:#6E7789;font-weight:650;letter-spacing:.06em">PORTFOLIO</div>
+      <div class="n" style="font-size:33px;font-weight:660;margin-top:5px;line-height:1">$148,041.36</div>
+      <div style="display:flex;gap:9px;align-items:baseline;margin-top:7px;font-size:13px;font-weight:650">
+        <span class="up n">▲ $491.30 · 0.33%</span><span style="color:#6E7789;font-weight:550;font-size:11.5px">today</span></div>
+      <svg width="304" height="62" viewBox="0 0 304 62" id="h1" style="margin-top:12px"></svg>
+      <div class="bar" style="margin-top:14px">
+        <i style="width:28.7%;background:#7C6CFF"></i><i style="width:23.7%;background:#5B8DEF"></i>
+        <i style="width:12.8%;background:#F0A24A"></i><i style="width:12.8%;background:#2FD08A"></i>
+        <i style="width:12.0%;background:#3ABEC7"></i><i style="width:9.9%;background:#E36A9A"></i></div>
+    </div>
+    <div class="pad" style="margin-top:20px">
+      <div class="sec"><span>TODAY'S MOVERS</span><em>+$491</em></div>
+      <div class="row"><div class="lg sm" style="background:#3ABEC7">VXUS</div>
+        <div class="m"><b>Total International</b><span>drove 41% of today's move</span></div>
+        <div class="r"><b class="up n">+1.15%</b><span class="n" style="color:#6E7789">+$204</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#E36A9A">VXF</div>
+        <div class="m"><b>Extended Market</b><span>drove 16% of today's move</span></div>
+        <div class="r"><b class="up n">+0.55%</b><span class="n" style="color:#6E7789">+$80</span></div></div>
+    </div>
+    <div class="pad" style="margin-top:18px">
+      <div class="sec"><span>COMING UP</span></div>
+      <div class="row"><div class="lg sm" style="background:#F0A24A">VYM</div>
+        <div class="m"><b>Dividend · ex-div 18 Sep</b><span>estimated $186.40</span></div>
+        <div class="r"><span class="chip">6d</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#7C6CFF">VOO</div>
+        <div class="m"><b>Dividend · ex-div 24 Sep</b><span>estimated $241.10</span></div>
+        <div class="r"><span class="chip">12d</span></div></div>
+    </div>
+    <div class="pad" style="margin-top:18px">
+      <div class="sec"><span>GOAL</span><em>68%</em></div>
+      <div class="c" style="padding:14px 16px">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="color:#6E7789">$148,041 of $218,000</span><span class="n" style="font-weight:650">Nov 2028</span></div>
+        <div style="height:6px;border-radius:3px;background:#1B212C;margin-top:10px;overflow:hidden"><i style="display:block;width:68%;height:100%;background:#7C6CFF;border-radius:3px"></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="tb"><i class="on">Home</i><i>Markets</i><i>Portfolio</i><i>Insights</i><i>Following</i></div>
+</div></div>
+<p class="why"><b>New screen.</b> Delta's Home is the "one glance before work" view. Yours can be better
+than theirs because it knows your goal and your dividend calendar — Delta knows neither.</p></div>
+
+<!-- ========== MARKETS ========== -->
+<div class="col"><div class="tag"><b>2 · Markets</b><span>half of today's Explore tab</span></div>
+<div class="phone"><div class="s">
+  <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+  <div class="bd">
+    <div class="pad" style="padding-top:4px">
+      <div style="font-size:25px;font-weight:660;letter-spacing:-.025em">Markets</div>
+      <div class="c" style="margin-top:12px;padding:10px 13px;display:flex;gap:9px;align-items:center;color:#6E7789;font-size:13.5px">
+        <span style="width:14px;height:14px;border-radius:7px;border:1.6px solid #6E7789;display:inline-block"></span>Search stocks and ETFs</div>
+    </div>
+    <div class="pad" style="margin-top:18px">
+      <div class="sec"><span>INDICES</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div class="c" style="padding:12px 13px"><div style="font-size:11.5px;color:#6E7789;font-weight:650">S&P 500</div>
+          <div class="n" style="font-size:17px;font-weight:650;margin-top:4px">6,418.2</div><div class="up n" style="font-size:11.5px;font-weight:650;margin-top:2px">+0.41%</div></div>
+        <div class="c" style="padding:12px 13px"><div style="font-size:11.5px;color:#6E7789;font-weight:650">Nasdaq</div>
+          <div class="n" style="font-size:17px;font-weight:650;margin-top:4px">21,904.7</div><div class="up n" style="font-size:11.5px;font-weight:650;margin-top:2px">+0.63%</div></div>
+        <div class="c" style="padding:12px 13px"><div style="font-size:11.5px;color:#6E7789;font-weight:650">Dow</div>
+          <div class="n" style="font-size:17px;font-weight:650;margin-top:4px">46,112.9</div><div class="dn n" style="font-size:11.5px;font-weight:650;margin-top:2px">−0.08%</div></div>
+        <div class="c" style="padding:12px 13px"><div style="font-size:11.5px;color:#6E7789;font-weight:650">EUR / USD</div>
+          <div class="n" style="font-size:17px;font-weight:650;margin-top:4px">1.0842</div><div class="dn n" style="font-size:11.5px;font-weight:650;margin-top:2px">−0.12%</div></div>
+      </div>
+    </div>
+    <div class="pad" style="margin-top:18px">
+      <div class="sec"><span>SCREENERS</span></div>
+      <div class="seg"><b class="on">Most active</b><b>Gainers</b><b>Losers</b></div>
+      <div class="row" style="margin-top:4px"><div class="lg sm" style="background:#2F6BE0">NVDA</div>
+        <div class="m"><b>NVIDIA</b><span>184.2M shares</span></div><div class="r"><b class="n">$212.40</b><span class="up n">+2.1%</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#4B5563">TSLA</div>
+        <div class="m"><b>Tesla</b><span>141.8M shares</span></div><div class="r"><b class="n">$389.11</b><span class="dn n">−1.4%</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#0B7A5E">AAPL</div>
+        <div class="m"><b>Apple</b><span>96.4M shares</span></div><div class="r"><b class="n">$261.77</b><span class="up n">+0.6%</span></div></div>
+    </div>
+    <div class="pad" style="margin-top:16px">
+      <div class="sec"><span>SECTORS TODAY</span></div>
+      <div class="row"><div class="m"><b>Technology</b></div><div class="r"><b class="up n">+1.24%</b></div></div>
+      <div class="row"><div class="m"><b>Financials</b></div><div class="r"><b class="up n">+0.38%</b></div></div>
+      <div class="row"><div class="m"><b>Energy</b></div><div class="r"><b class="dn n">−0.71%</b></div></div>
+    </div>
+  </div>
+  <div class="tb"><i>Home</i><i class="on">Markets</i><i>Portfolio</i><i>Insights</i><i>Following</i></div>
+</div></div>
+<p class="why">Your three screener lists collapse into one card with a segmented control — the exact fix
+your own <code>REDESIGN_PROMPT.md</code> phase 5 specifies and never got.</p></div>
+
+<!-- ========== PORTFOLIO ========== -->
+<div class="col"><div class="tag"><b>3 · Portfolio</b><span>hero folds allocation in</span></div>
+<div class="phone"><div class="s">
+  <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+  <div class="bd">
+    <div class="pad" style="padding-top:4px">
+      <div style="font-size:11px;color:#6E7789;font-weight:650;letter-spacing:.06em">TOTAL PORTFOLIO</div>
+      <div class="n" style="font-size:37px;font-weight:660;margin-top:4px;line-height:1">$148,041.36</div>
+      <div style="display:flex;gap:14px;align-items:baseline;margin-top:8px;font-size:13px;font-weight:650">
+        <span class="up n">▲ $491.30 · 0.33%</span>
+        <span style="color:#6E7789;font-weight:550;font-size:12px">all time <b class="up n" style="font-weight:650">+30.6%</b></span></div>
+    </div>
+    <svg width="378" height="132" viewBox="0 0 378 132" id="h3" style="margin-top:8px"></svg>
+    <div class="pad" style="margin-top:2px"><div class="seg"><b>1D</b><b>1W</b><b>1M</b><b>3M</b><b class="on">1Y</b><b>ALL</b></div></div>
+    <div class="pad" style="margin-top:16px">
+      <div class="bar"><i style="width:28.7%;background:#7C6CFF"></i><i style="width:23.7%;background:#5B8DEF"></i>
+        <i style="width:12.8%;background:#F0A24A"></i><i style="width:12.8%;background:#2FD08A"></i>
+        <i style="width:12.0%;background:#3ABEC7"></i><i style="width:9.9%;background:#E36A9A"></i></div>
+    </div>
+    <div class="pad" style="margin-top:18px">
+      <div class="sec"><span>ETFs · 5</span><em class="n">$129,051.24</em></div>
+      <div class="row"><div class="lg" style="background:#7C6CFF">VOO</div>
+        <div class="m"><b>Vanguard S&P 500</b><span>62.057 sh · avg $512.30</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k1" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$42,537.69</b><span class="up n">+33.8%</span></div></div>
+      <div class="row"><div class="lg" style="background:#5B8DEF">VTI</div>
+        <div class="m"><b>Total Stock Market</b><span>95 sh · avg $278.40</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k2" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$35,080.65</b><span class="up n">+32.6%</span></div></div>
+      <div class="row"><div class="lg" style="background:#F0A24A">VYM</div>
+        <div class="m"><b>High Dividend Yield</b><span>120 sh · avg $129.60</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k3" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$18,988.80</b><span class="up n">+22.1%</span></div></div>
+      <div class="row"><div class="lg" style="background:#3ABEC7">VXUS</div>
+        <div class="m"><b>Total International</b><span>210 sh · avg $61.20</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k4" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$17,751.30</b><span class="up n">+38.1%</span></div></div>
+      <div class="row"><div class="lg" style="background:#E36A9A">VXF</div>
+        <div class="m"><b>Extended Market</b><span>60 sh · avg $190.45</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k5" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$14,692.80</b><span class="up n">+28.6%</span></div></div>
+    </div>
+    <div class="pad" style="margin-top:14px">
+      <div class="sec"><span>STOCKS · 1</span><em class="n">$18,990.12</em></div>
+      <div class="row"><div class="lg" style="background:#2FD08A">BRK</div>
+        <div class="m"><b>Berkshire Hathaway B</b><span>38 sh · avg $402.15</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k6" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$18,990.12</b><span class="up n">+24.3%</span></div></div>
+    </div>
+  </div>
+  <div class="tb"><i>Home</i><i>Markets</i><i class="on">Portfolio</i><i>Insights</i><i>Following</i></div>
+</div></div>
+<p class="why">Allocation is a 7px strip directly under the chart instead of a donut card — same
+information, a third of the space, and it reads at a glance.</p></div>
+
+<!-- ========== INSIGHTS ========== -->
+<div class="col"><div class="tag"><b>4 · Insights</b><span>~20 cards → grade + modules</span></div>
+<div class="phone"><div class="s">
+  <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+  <div class="bd">
+    <div class="pad" style="padding-top:4px">
+      <div style="font-size:25px;font-weight:660;letter-spacing:-.025em">Insights</div>
+      <div style="font-size:11.5px;color:#6E7789;margin-top:2px">Deposit-adjusted · updated today</div>
+    </div>
+    <div class="c" style="margin:14px 20px 0;padding:15px 17px;display:flex;gap:15px;align-items:center">
+      <div style="position:relative;width:62px;height:62px;flex:0 0 auto">
+        <svg width="62" height="62" viewBox="0 0 62 62">
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#1B212C" stroke-width="5.5"/>
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#7C6CFF" stroke-width="5.5" stroke-linecap="round"
+            stroke-dasharray="163" stroke-dashoffset="28" transform="rotate(-90 31 31)"/></svg>
+        <em style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:19px;font-weight:700">A−</em></div>
+      <div><b style="font-size:14px;font-weight:650;display:block">Portfolio health</b>
+        <span style="font-size:11.5px;color:#6E7789;display:block;margin-top:3px;line-height:1.45">Cost and diversification are strong. US large-cap concentration is the one thing holding the grade below A.</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 20px 0">
+      <div class="c" style="padding:13px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789">XIRR</div>
+        <div class="n up" style="font-size:21px;font-weight:660;margin-top:6px">18.09%</div>
+        <div style="font-size:11px;color:#6E7789;margin-top:3px">annualised</div></div>
+      <div class="c" style="padding:13px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789">VS VOO</div>
+        <div class="n up" style="font-size:21px;font-weight:660;margin-top:6px">+1.4%</div>
+        <div style="font-size:11px;color:#6E7789;margin-top:3px">same buys in VOO</div></div>
+      <div class="c" style="padding:13px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789">VOLATILITY</div>
+        <div class="n" style="font-size:21px;font-weight:660;margin-top:6px">13.39%</div>
+        <div style="font-size:11px;color:#6E7789;margin-top:3px">Sharpe 1.05</div></div>
+      <div class="c" style="padding:13px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789">BETA</div>
+        <div class="n" style="font-size:21px;font-weight:660;margin-top:6px">0.93</div>
+        <div style="font-size:11px;color:#6E7789;margin-top:3px">vs S&P 500</div></div>
+      <div class="c" style="padding:13px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789">MAX DRAWDOWN</div>
+        <div class="n dn" style="font-size:21px;font-weight:660;margin-top:6px">−9.81%</div>
+        <div style="font-size:11px;color:#6E7789;margin-top:3px">peak to trough</div></div>
+      <div class="c" style="padding:13px"><div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789">PORTFOLIO P/E</div>
+        <div class="n" style="font-size:21px;font-weight:660;margin-top:6px">24.6</div>
+        <div style="font-size:11px;color:#6E7789;margin-top:3px">SPY 26.1</div></div>
+      <div class="c" style="grid-column:1/-1;padding:14px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789;margin-bottom:11px">MONTHLY RETURNS · 2026</div>
+        <div id="heat" style="display:grid;grid-template-columns:repeat(12,1fr);gap:3px"></div></div>
+      <div class="c" style="grid-column:1/-1;padding:14px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;color:#6E7789;margin-bottom:10px">SECTOR EXPOSURE</div>
+        <div class="bar"><i style="width:31%;background:#7C6CFF"></i><i style="width:14%;background:#5B8DEF"></i>
+          <i style="width:12%;background:#3ABEC7"></i><i style="width:11%;background:#F0A24A"></i>
+          <i style="width:32%;background:#333B49"></i></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px 13px;margin-top:10px;font-size:10.5px;color:#8C94A5;font-weight:600">
+          <span>Tech 31%</span><span>Financials 14%</span><span>Health 12%</span><span>Cons 11%</span><span>Other 32%</span></div></div>
+    </div>
+  </div>
+  <div class="tb"><i>Home</i><i>Markets</i><i>Portfolio</i><i class="on">Insights</i><i>Following</i></div>
+</div></div>
+<p class="why"><b>No new maths.</b> Every figure here is already computed by <code>insights.js</code> —
+including the corrected 13.39% volatility from Phase 1.</p></div>
+
+<!-- ========== FOLLOWING ========== -->
+<div class="col"><div class="tag"><b>5 · Following</b><span>watchlist + your look-through</span></div>
+<div class="phone"><div class="s">
+  <div class="sb"><span>9:41</span><span>▮▮▮</span></div>
+  <div class="bd">
+    <div class="pad" style="padding-top:4px">
+      <div style="font-size:25px;font-weight:660;letter-spacing:-.025em">Following</div>
+      <div style="font-size:11.5px;color:#6E7789;margin-top:2px">Not owned · 4 watched</div>
+    </div>
+    <div class="pad" style="margin-top:16px">
+      <div class="sec"><span>WATCHLIST</span></div>
+      <div class="row"><div class="lg sm" style="background:#2F6BE0">MSFT</div>
+        <div class="m"><b>Microsoft</b><span>added 14 Jun</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k7" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$518.20</b><span class="up n">+0.9%</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#0B7A5E">SCHD</div>
+        <div class="m"><b>Schwab US Dividend</b><span>added 02 Jul</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k8" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$29.84</b><span class="dn n">−0.3%</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#B45309">QQQ</div>
+        <div class="m"><b>Invesco QQQ</b><span>added 21 Jul</span></div>
+        <svg width="38" height="20" viewBox="0 0 38 20" id="k9" style="opacity:.8"></svg>
+        <div class="r"><b class="n">$604.11</b><span class="up n">+0.7%</span></div></div>
+    </div>
+    <div class="pad" style="margin-top:20px">
+      <div class="sec"><span>STOCKS YOU ALREADY OWN</span></div>
+      <div style="font-size:11.5px;color:#6E7789;margin:-4px 0 10px;line-height:1.5">
+        Held indirectly through your ETFs. MSFT is already 2.9% of your portfolio.</div>
+      <div class="row"><div class="lg sm" style="background:#2F6BE0">MSFT</div>
+        <div class="m"><b>Microsoft</b><span>via VOO, VTI, VXF</span></div>
+        <div class="r"><b class="n">$4,293</b><span class="n" style="color:#6E7789">2.90%</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#7C6CFF">NVDA</div>
+        <div class="m"><b>NVIDIA</b><span>via VOO, VTI</span></div>
+        <div class="r"><b class="n">$4,145</b><span class="n" style="color:#6E7789">2.80%</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#0B7A5E">AAPL</div>
+        <div class="m"><b>Apple</b><span>via VOO, VTI</span></div>
+        <div class="r"><b class="n">$3,553</b><span class="n" style="color:#6E7789">2.40%</span></div></div>
+      <div class="row"><div class="lg sm" style="background:#4B5563">AMZN</div>
+        <div class="m"><b>Amazon</b><span>via VOO, VTI, VXUS</span></div>
+        <div class="r"><b class="n">$2,368</b><span class="n" style="color:#6E7789">1.60%</span></div></div>
+    </div>
+  </div>
+  <div class="tb"><i>Home</i><i>Markets</i><i>Portfolio</i><i>Insights</i><i class="on">Following</i></div>
+</div></div>
+<p class="why"><b>This tab is your differentiator.</b> Delta has a watchlist. Delta does not have ETF
+look-through — "you already own $4,293 of Microsoft without knowing it". You built that. Giving it a
+whole tab is the single clearest answer to "inspired by, not copied".</p></div>
+
+</div>
+<script>
+const S=[628.41,630.48,626.87,627.56,634.84,628.3,638.31,636.09,633.83,636.22,635.24,626.89,634.02,631.04,618.43,609.09,597.94,582.96,602.99,624.6,652.78,656.42,662.52,678.04,679.44,685.55,695.49,678.0,681.95,688.11,670.26,685.46];
+function P(A,w,h,pt,pb,pl,pr){const lo=Math.min(...A),hi=Math.max(...A),sp=(hi-lo)||1;
+  const X=i=>pl+i*(w-pl-pr)/(A.length-1),Y=v=>pt+(1-(v-lo)/sp)*(h-pt-pb);
+  let d='M'+X(0).toFixed(1)+' '+Y(A[0]).toFixed(1);
+  for(let i=1;i<A.length;i++){const a=X(i-1),b=Y(A[i-1]),c=X(i),e=Y(A[i]),m=(a+c)/2;
+    d+=' C'+m.toFixed(1)+' '+b.toFixed(1)+','+m.toFixed(1)+' '+e.toFixed(1)+','+c.toFixed(1)+' '+e.toFixed(1);}
+  return {d,X,Y};}
+function big(id,w,h){const el=document.getElementById(id);if(!el)return;const p=P(S,w,h,12,8,0,0);
+  el.innerHTML='<defs><linearGradient id="g'+id+'" x1="0" y1="0" x2="0" y2="1">'+
+  '<stop offset="0" stop-color="#7C6CFF" stop-opacity=".26"/><stop offset="1" stop-color="#7C6CFF" stop-opacity="0"/></linearGradient></defs>'+
+  '<path d="'+p.d+' L'+w+' '+h+' L0 '+h+' Z" fill="url(#g'+id+')"/>'+
+  '<path d="'+p.d+'" fill="none" stroke="#7C6CFF" stroke-width="2" stroke-linecap="round"/>'+
+  '<circle cx="'+p.X(S.length-1).toFixed(1)+'" cy="'+p.Y(S[S.length-1]).toFixed(1)+'" r="3.2" fill="#7C6CFF"/>';}
+big('h1',304,62); big('h3',378,132);
+[['k1',0],['k2',3],['k3',7],['k4',11],['k5',5],['k6',9],['k7',2],['k8',13],['k9',6]].forEach(([id,o])=>{
+  const el=document.getElementById(id);if(!el)return;const A=S.slice(o,o+16),p=P(A,38,20,4,4,1,1);
+  const up=A[A.length-1]>=A[0];
+  el.innerHTML='<path d="'+p.d+'" fill="none" stroke="'+(up?'#2FD08A':'#FF5D6B')+'" stroke-width="1.5" stroke-linecap="round"/>';});
+const M=[2.1,-1.4,3.6,1.2,-0.8,4.1,2.7,-2.3,1.9,3.4,0.6,-1.1];
+document.getElementById('heat').innerHTML=M.map(v=>{const a=Math.min(Math.abs(v)/4.2,1);
+  return '<i style="display:block;height:24px;border-radius:4px;background:rgba('+(v>=0?'47,208,138':'255,93,107')+','+(0.13+a*0.8).toFixed(2)+')"></i>';}).join('');
+</script>
+</body></html>
