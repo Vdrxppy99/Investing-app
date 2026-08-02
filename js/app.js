@@ -55,7 +55,25 @@ function showPage(p){
   if(p==='explore') refreshMarkets(false);
   if(p==='insights') renderInsights();
 }
-document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{ haptic(); showPage(b.dataset.page); });
+/* Tab switches use the View Transitions API (UPGRADE_PLAN.md Phase 3) — a directional
+   slide matching the tabbar's left-to-right order, feature-detected so unsupported
+   browsers just get the instant swap they already had. Reduced motion is handled by the
+   ::view-transition-* override in base.css, not duplicated here (the transition still
+   runs — the DOM still updates correctly — it just renders with no visible animation). */
+const TAB_ORDER=['portfolio','explore','insights'];
+function focusPageHeading(p){
+  const id={portfolio:'pfTitle',explore:'exploreTitle',insights:'insightsTitle'}[p];
+  const el=id&&$(id); if(el) el.focus({preventScroll:true});
+}
+document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{
+  haptic();
+  const target=b.dataset.page;
+  const current=document.querySelector('.tabbar button.on')?.dataset.page;
+  if(!document.startViewTransition || current===target){ showPage(target); focusPageHeading(target); return; }
+  const dir = TAB_ORDER.indexOf(target) > TAB_ORDER.indexOf(current) ? 'forward' : 'backward';
+  const vt = document.startViewTransition({ update:()=>showPage(target), types:[dir] });
+  vt.finished.finally(()=>focusPageHeading(target));
+});
 /* one delegated tap handler for every symbol row/card on Explore — survives any re-render */
 $('page-explore').addEventListener('click', e=>{
   const el=e.target.closest('.mrow, .idx-card');
@@ -231,6 +249,7 @@ $('themeBtn').onclick = ()=>{
 };
 function animateTotal(){ // one-time count-up on launch
   if(state.view.priv) return; // nothing to count up behind the mask
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return; // final number is already on screen
   const el=$('tvNum'); if(!el) return;
   const target=totals(state.view.acc).value; if(!(target>0)) return;
   const t0=performance.now(), from=target*0.962;
@@ -238,6 +257,28 @@ function animateTotal(){ // one-time count-up on launch
     const k=Math.min(1,(now-t0)/700), e=1-Math.pow(1-k,3);
     const cur=$('tvNum'); if(!cur) return;
     cur.textContent=fmt(from+(target-from)*e);
+    if(k<1) requestAnimationFrame(tick);
+  })(t0);
+}
+/* Number roll-up on value change (UPGRADE_PLAN.md Phase 3) — renderHeader() calls this
+   every time it renders; it only actually animates when the total moved from what was
+   last shown (a live price tick), never on the very first render (animateTotal() above
+   owns the launch count-up) and never behind the privacy mask or reduced motion. Duration
+   comes from --dur-data (tokens.css) — the token named for exactly this kind of change,
+   not a new one. */
+let _tvLastValue = null;
+function rollUpTvNum(target){
+  const prev = _tvLastValue;
+  _tvLastValue = target;
+  if(prev==null || prev===target) return;
+  if(state.view.priv) return;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const dur = parseFloat(cvar('--dur-data')) || 0; if(!(dur>0)) return;
+  const t0=performance.now();
+  (function tick(now){
+    const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
+    const cur=$('tvNum'); if(!cur) return;
+    cur.textContent=fmt(prev+(target-prev)*e);
     if(k<1) requestAnimationFrame(tick);
   })(t0);
 }

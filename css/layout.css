@@ -311,4 +311,24 @@
     margin-bottom: var(--s-1);
   }
   .greet .bdate { color: var(--text-faint); }
+
+  /* ── Tab-switch view transitions (Phase 3) ────────────────────────────────
+     Directional slide matching the tabbar's left-to-right order (Portfolio <
+     Explore < Insights). Progressive enhancement only — js/app.js feature-detects
+     document.startViewTransition and swaps instantly where it's unsupported, so
+     nothing here is load-bearing. prefers-reduced-motion is handled in base.css
+     alongside every other animation, not duplicated here. */
+  @keyframes tab-slide-to-left { to { transform: translateX(-100%); } }
+  @keyframes tab-slide-from-right { from { transform: translateX(100%); } }
+  @keyframes tab-slide-to-right { to { transform: translateX(100%); } }
+  @keyframes tab-slide-from-left { from { transform: translateX(-100%); } }
+
+  ::view-transition-group(root) {
+    animation-duration: var(--dur-enter);
+    animation-timing-function: var(--ease-out);
+  }
+  html:active-view-transition-type(forward)::view-transition-old(root) { animation-name: tab-slide-to-left; }
+  html:active-view-transition-type(forward)::view-transition-new(root) { animation-name: tab-slide-from-right; }
+  html:active-view-transition-type(backward)::view-transition-old(root) { animation-name: tab-slide-to-right; }
+  html:active-view-transition-type(backward)::view-transition-new(root) { animation-name: tab-slide-from-left; }
 }

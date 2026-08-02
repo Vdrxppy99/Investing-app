@@ -1071,7 +1071,7 @@
   .hrow:active, .mrow:active, .nrow:active { background: var(--surface-2); }
 
   .hmid, .mmid, .row-mid { flex: 1 1 auto; min-width: 0; }
-  .htick { color: var(--text-faint); font-weight: var(--w-semibold); }
+  .htick { color: var(--text-faint); font-weight: var(--w-semibold); flex-shrink: 0; }
   /* nowrap WITHOUT overflow:hidden let the price + delta + share-count line
      escape .hmid and paint across the sparkline and the value column. */
   .hinfo {
@@ -1089,6 +1089,25 @@
     color: var(--text);
     /* One line, truncated. Fund names are long ("Total Stock Market ETF") and
        wrapping them is what made the list unreadable. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* .hsym (holdings row only) wraps name + ticker together; truncating the whole
+     thing let the ellipsis eat the ticker — the one token that reliably identifies
+     the row once the descriptive name is cut. Only .hname (the name) shrinks/ellipses;
+     .htick (flex-shrink:0, above) always stays fully visible. */
+  .hsym {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-1);
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .hname {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1165,6 +1184,16 @@
   }
   .chev { color: var(--text-faint); }
   .del { color: var(--loss); }
+  /* Two standalone inline text links ("edit" in the target-mix header, "Change goal"
+     under the goal ring) had no wrapping button — their real hit area was the glyph
+     height alone, ~13-14px, under WCAG 2.2 AA's 24px minimum (2.5.8). Padding expands
+     the tappable box; matching negative margin keeps the visible text in the same place. */
+  #tgtEditLnk, #goalEdit {
+    display: inline-block;
+    padding: var(--s-2) var(--s-1);
+    margin: calc(-1 * var(--s-2)) calc(-1 * var(--s-1));
+    min-height: var(--tap-sm);
+  }
 
   /* Insight sub-cards and grids the engine renders into. */
   .igrid { display: grid; gap: var(--s-4); }
@@ -1257,7 +1286,12 @@
     color: var(--text-muted);
     font-weight: var(--w-medium);
   }
+  /* Visual badge stays 14px (any bigger looks oversized inline with body text), but its
+     actual hit area was 14x14 too — under WCAG 2.2 AA's 24x24 minimum (2.5.8). The ::before
+     is an invisible tap-area expansion centered on the badge: fixes the target size without
+     changing anything a sighted user sees. */
   .cq {
+    position: relative;
     display: inline-grid;
     place-items: center;
     width: 14px;
@@ -1268,6 +1302,14 @@
     font-size: var(--t-micro);
     font-weight: var(--w-bold);
     line-height: 1;
+  }
+  .cq::before {
+    content: '';
+    position: absolute;
+    inset: 50%;
+    width: var(--tap-sm);
+    height: var(--tap-sm);
+    transform: translate(-50%, -50%);
   }
 }
 

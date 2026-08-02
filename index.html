@@ -161,7 +161,7 @@
 <!-- ═══════════════════ PORTFOLIO ═══════════════════ -->
 <div id="page-portfolio" class="page">
   <div class="appbar">
-    <h1 class="t-title" id="pfTitle">Portfolio</h1>
+    <h1 class="t-title" id="pfTitle" tabindex="-1">Portfolio</h1>
     <div class="appbar__actions">
       <button id="privBtn" class="iconbtn" aria-label="Hide amounts"><svg aria-hidden="true"><use href="#i-eye"/></svg></button>
       <button id="themeBtn" class="iconbtn" aria-label="Toggle theme"><svg aria-hidden="true"><use href="#i-moon"/></svg></button>
@@ -262,7 +262,7 @@
 
 <!-- ═══════════════════ EXPLORE ═══════════════════ -->
 <div id="page-explore" class="page hidden">
-  <div class="appbar"><h1 class="t-title">Explore</h1></div>
+  <div class="appbar"><h1 class="t-title" id="exploreTitle" tabindex="-1">Explore</h1></div>
 
   <!-- Search is the hero of this screen and sticks: it must never scroll away. -->
   <div class="searchsticky">
@@ -324,7 +324,7 @@
      original metric is preserved inside — none deleted, and every element ID the
      frozen JS writes into is unchanged. -->
 <div id="page-insights" class="page hidden">
-  <div class="appbar"><h1 class="t-title">Insights</h1></div>
+  <div class="appbar"><h1 class="t-title" id="insightsTitle" tabindex="-1">Insights</h1></div>
 
   <section class="card" id="healthCard"><div id="healthBody"></div></section>
 

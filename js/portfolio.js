@@ -29,6 +29,7 @@ function renderHeader(){
   const t = totals(state.view.acc);
   const dayPct = (t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
   $('totalVal').innerHTML = `<span id="tvNum">${fmt(t.value)}</span>` + ` <span class="daypill ${t.day>=0?'up':'down'}">${fmtSign(t.day)} · ${fmtPct(dayPct)}</span>`;
+  if(typeof rollUpTvNum==='function') rollUpTvNum(t.value);
   const plPct = t.invested>0 ? t.profit/t.invested*100 : 0;
   const dep = +state.deposits || 0;
   const chips = [];
@@ -84,7 +85,7 @@ function renderList(){
     return `<div class="hrow${tick}" data-sym="${esc(r.sym)}">
       ${badgeHtml(r.sym)}
       <div class="hmid">
-        <div class="hsym">${esc((NAMES[r.sym]||r.sym.replace('-','.')).replace(/^Vanguard /,''))} <span class="htick">${esc(r.sym.replace('-','.'))}</span></div>
+        <div class="hsym"><span class="hname">${esc((NAMES[r.sym]||r.sym.replace('-','.')).replace(/^Vanguard /,''))}</span> <span class="htick">${esc(r.sym.replace('-','.'))}</span></div>
         <div class="hinfo">${fmtPx(p)} <span class="${cls(dp)}">${fmtPct(dp)}</span> · ${r.qty.toFixed(3).replace(/\.?0+$/,'')} sh</div>
       </div>
       <div class="hspark">${spark(r.sym)}</div>

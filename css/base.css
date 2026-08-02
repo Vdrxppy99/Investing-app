@@ -213,5 +213,13 @@
       scroll-behavior: auto !important;
     }
     .press:active { transform: none; }
+    /* ::view-transition-* pseudo-elements are a distinct pseudo-element family, not
+       matched by *::before/*::after above — the tab-switch slide (css/layout.css)
+       needs its own override or it would keep sliding under reduced motion. */
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none !important;
+    }
   }
 }
