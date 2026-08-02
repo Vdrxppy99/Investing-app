@@ -321,6 +321,20 @@
     transform: translateY(100%);
     transition: transform var(--dur-sheet) var(--ease-sheet);
     z-index: 50;
+    /* Every dynamically-built sheet (#detailSheet, #editSheet, and anything future
+       sharing class="sheet") injects its content via innerHTML= directly into this
+       element — none of them wrap it in .sheet__body (that class is only emitted by
+       js/ui.js's uiSheet(), which nothing calls). Without its own scroll region a
+       sheet taller than max-height just overflows past the edge with no way to reach
+       the rest — this was previously patched onto #detailSheet alone, so #editSheet
+       (Settings) had no scrolling at all. Moved onto the shared rule so it's automatic
+       for every sheet, not something to remember per new sheet ID. Sheets sit above
+       the tabbar/FAB (z-index 50 vs 30/32) and fully cover them while open, so only
+       --safe-bottom (above) applies here, not --bottom-clear (that's for content
+       scrolling past a tabbar/FAB that stay visible underneath it, e.g. .wrap). */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   .sheet[data-open="true"] { transform: translateY(0); }
   /* Set by the drag handler; must not be eased or the finger feels laggy. */
@@ -1949,7 +1963,10 @@
     padding-top: var(--s-4);
     background: var(--surface-2);
   }
-  #detailSheet { overflow-y: auto; overscroll-behavior: contain; max-height: 88dvh; }
+  /* overflow-y/overscroll-behavior/max-height used to live here, #detailSheet-only —
+     moved onto the shared .sheet rule (components.css ~line 320) so #editSheet
+     (Settings) scrolls too. Bug: Settings' lower content, Export backup included,
+     was unreachable because only #detailSheet had ever gotten this. */
   /* Give the sheet a grab handle even though the engine does not emit one. */
   #detailSheet::before, #editSheet::before {
     content: "";
