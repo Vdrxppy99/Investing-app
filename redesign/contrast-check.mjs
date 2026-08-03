@@ -12,21 +12,26 @@
 // once tokens.css exists.
 
 const DARK = {
-  canvas: "#0F1217",
-  surface: "#171B22",
+  canvas: "#0B0F17",
+  surface: "#14171F",
   "surface-2": "#1F242D",
   "surface-3": "#262C36",
-  line: "#2A313C",
+  line: "#1B212C",
   "line-strong": "#3A424F",
-  text: "#EDF0F5",
-  "text-muted": "#9BA5B4",
-  "text-faint": "#858F9E",
-  primary: "#4C82F7",
-  "primary-fill": "#2B5FD9",
-  "primary-edge": "#1E48A8",
+  text: "#F2F4F8",
+  // Solved, not chosen — same reasoning as --border-control below.
+  // DESIGN-TARGET.md specifies #6E7789 / #525A6A; neither clears the 4.5:1
+  // body-text floor against canvas, surface OR surface-2 (measured 4.26 and
+  // 2.77 against canvas alone). Lightened just enough to clear all three,
+  // same hue family. See css/tokens.css for the full note.
+  "text-muted": "#9099AC",
+  "text-faint": "#838B9C",
+  primary: "#7C6CFF",
+  "primary-fill": "#5B4ECC",
+  "primary-edge": "#443A99",
   secondary: "#E0AE4A",
-  gain: "#2FBE7A",
-  loss: "#F26B75",
+  gain: "#2FD08A",
+  loss: "#FF5D6B",
   "on-primary": "#FFFFFF",
   // Solved, not chosen. The brief specified --line-strong for input borders, but
   // it measures 1.70 against --surface and WCAG 1.4.11 holds a control boundary
@@ -46,9 +51,9 @@ const LIGHT = {
   text: "#10151D",
   "text-muted": "#566072",
   "text-faint": "#6B7280",
-  primary: "#1F5FE0",
-  "primary-fill": "#1F5FE0",
-  "primary-edge": "#17499E",
+  primary: "#4F3DC4",
+  "primary-fill": "#4F3DC4",
+  "primary-edge": "#3A2B99",
   secondary: "#8A6110",
   gain: "#0A7F58",
   loss: "#D02D40",
@@ -56,10 +61,11 @@ const LIGHT = {
   "border-control": "#878D97",
 };
 
-// The 8-step categorical ramp for allocation/sector marks. Constraint: none may
-// read as gain or loss, so the greens and reds of the P&L tokens are excluded and
-// the ramp leans blue/violet/teal/amber/slate.
-const RAMP_DARK = ["#5B8DEF", "#9B7BEA", "#3FB6C4", "#E0AE4A", "#D9789B", "#6FA8DC", "#8A93A6", "#B98E5A"];
+// The 8-step categorical ramp for allocation/sector marks — DESIGN-TARGET.md's
+// exact asset palette, assigned by position order and stable per symbol.
+// Constraint: none may read as gain or loss, so the greens and reds of the
+// P&L tokens are excluded.
+const RAMP_DARK = ["#7C6CFF", "#5B8DEF", "#F0A24A", "#2FD08A", "#3ABEC7", "#E36A9A", "#2F6BE0", "#B45309"];
 const RAMP_LIGHT = ["#2E63C8", "#6D4BC4", "#1B7F8C", "#8A6110", "#A83C67", "#3C6FA8", "#5A6478", "#7A5A2E"];
 
 // ── maths ──────────────────────────────────────────────────────────────────

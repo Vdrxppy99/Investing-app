@@ -2,27 +2,38 @@
    TOKENS — the only file in the codebase permitted to contain a literal value.
    A hex code, a px size or a duration appearing anywhere else is a defect.
 
-   Spec: DESIGN.md §2–4, §10. Contrast: redesign/contrast-check.mjs (all pass).
+   Spec: DESIGN-TARGET.md (indigo brand, hairline cards, 7-step type scale),
+   cross-checked against design/target/five-tabs.html. Contrast:
+   redesign/contrast-check.mjs (all pass — see the text-muted/text-faint note
+   below for the one deliberate departure from DESIGN-TARGET's literal hex).
    Never add a version-stamped section to this file. One coherent set, no strata.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer tokens {
   :root {
-    /* ── Type scale — exactly 7 steps (DESIGN.md §3) ────────────────────────
+    /* ── Type scale — DESIGN-TARGET.md's 8-step scale ───────────────────────
+       hero → title → stat → heading(detail title) → label(row primary) →
+       body(secondary) → caption(row secondary/labels) → micro(section label).
        No other size may appear in the CSS, and never a half-pixel value: the
        old stylesheet had 25 sizes including 8 half-pixel ones, which is the
-       signature of nudging individual elements until they looked right. */
-    --t-display: 34px;      --lh-display: 38px;   --tr-display: -0.03em;
-    --t-title: 24px;        --lh-title: 30px;     --tr-title: -0.02em;
-    --t-heading: 19px;      --lh-heading: 24px;   --tr-heading: -0.01em;
-    --t-body: 15px;         --lh-body: 22px;
-    --t-label: 14px;        --lh-label: 18px;
-    --t-caption: 12px;      --lh-caption: 16px;
-    --t-micro: 11px;        --lh-micro: 14px;     --tr-micro: 0.08em;
+       signature of nudging individual elements until they looked right.
+       --t-display/--lh-display/--tr-display was dead (unused `.t-display`
+       utility, zero references in markup) — reclaimed as the "module stat
+       value" step (21-22px) DESIGN-TARGET specifies for R2's Insights grid
+       rather than growing the token count for a step nothing consumes yet. */
+    --t-display: 21px;     --lh-display: 26px;   --tr-display: -0.02em;
+    --t-title: 25px;       --lh-title: 30px;     --tr-title: -0.025em;
+    --t-heading: 17px;     --lh-heading: 22px;   --tr-heading: -0.01em;
+    --t-body: 12.5px;      --lh-body: 17px;
+    --t-label: 14.5px;     --lh-label: 19px;
+    --t-caption: 11.5px;   --lh-caption: 15px;
+    --t-micro: 10.5px;     --lh-micro: 14px;     --tr-micro: 0.09em;
 
-    /* The one permitted exception to the scale: the portfolio total. */
-    --t-hero: clamp(38px, 10vw, 48px);
-    --tr-hero: -0.035em;
+    /* The one permitted exception to the scale: the portfolio total.
+       34-40px per DESIGN-TARGET; the clamp lands at ~37px at a 390px
+       viewport, matching design/target/five-tabs.html frame 3 exactly. */
+    --t-hero: clamp(34px, 9.5vw, 40px);
+    --tr-hero: -0.02em;
 
     --w-regular: 400;
     --w-medium: 500;
@@ -37,16 +48,25 @@
     --s-2: 8px;
     --s-3: 12px;
     --s-4: 16px;
-    --s-5: 20px;   /* screen gutter */
+    --s-5: 20px;   /* screen gutter — DESIGN-TARGET's 20px gutter */
     --s-6: 24px;
     --s-7: 32px;
     --s-8: 40px;
     --s-9: 56px;
 
-    /* ── Radius — exactly 5 steps ────────────────────────────────────────── */
+    /* ── Radius — DESIGN-TARGET's shape scale ─────────────────────────────
+       16 cards · 13 tiles(40px) · 10 tiles(32px) · 11 segmented · 8 seg items.
+       r-card/r-button/r-sheet/r-pill/r-input predate this pass and are kept;
+       r-tile/r-tile-sm/r-seg/r-seg-item are the new squircle + segmented
+       values DESIGN-TARGET calls for (a squircle is NOT the same radius as
+       a generic button, and the segmented control is NOT a full pill). */
     --r-input: 8px;
     --r-button: 12px;
     --r-card: 16px;
+    --r-tile: 13px;      /* squircle, 40px tile */
+    --r-tile-sm: 10px;   /* squircle, 32px tile */
+    --r-seg: 11px;       /* segmented control shell */
+    --r-seg-item: 8px;   /* segmented control selected item */
     --r-sheet: 24px;
     --r-pill: 999px;
 
@@ -82,6 +102,12 @@
     --ring: 2px;            /* focus ring width and offset */
     --press-scale: 0.97;
     --edge: 2px;            /* filled-button bottom edge */
+    /* Row anatomy — DESIGN-TARGET's own named constants, not the 9-step scale:
+       10px vertical padding, 11px gap. Neither is a multiple of the 4px space
+       scale, the same way --tap and --edge above aren't; a real row spec, not
+       a rounding of --s-3. */
+    --row-pad-y: 10px;
+    --row-gap: 11px;
 
     /* ── Bottom chrome geometry ──────────────────────────────────────────── */
     --fab-size: var(--s-9);
@@ -95,36 +121,56 @@
     --heat-cell-min: 20px;
   }
 
-  /* ═══ DARK — the default and the design target (DESIGN.md §1) ════════════
-     Blue-black, not green-black. The old app's #0b0f0d with a radial green glow
-     read as a crypto tracker; this neutral shift alone changes the register. */
+  /* ═══ DARK — the default and the design target (DESIGN-TARGET.md) ═════════
+     Indigo brand replacing the old interaction blue, hairline-bordered cards
+     replacing raised solid ones. Canvas is unchanged (already correct). */
   :root,
   :root[data-theme="dark"] {
     color-scheme: dark;
 
     --canvas: #0B0F17;
-    --surface: #161B22;
+    /* Card fill: DESIGN-TARGET specifies rgba(255,255,255,.035) directly on
+       canvas. Stored pre-composited as a flat hex (rather than the rgba()
+       itself) so JS colour reads via cvar() — chart tooltip backgrounds,
+       canvas fills — get an opaque value; the composite is
+       canvas ⊕ white-at-3.5%, computed once here rather than re-derived
+       per call site. --surface-2/-3 are a pre-existing deeper tier (inputs,
+       nested cards, pressed states) that DESIGN-TARGET doesn't redefine. */
+    --surface: #14171F;
     --surface-2: #1f242d;
     --surface-3: #262c36;
 
-    --line: #2a313c;
+    --line: #1B212C;
+    --divider: #151A23;    /* row separator — subtler than --line's card border */
     --line-strong: #3a424f;
     /* Distinct from --line-strong on purpose. --line-strong is a decorative
        hairline; this is a form-control boundary and WCAG 1.4.11 holds it to 3:1.
        Solved to clear 3:1 against canvas, surface AND surface-2. DESIGN.md §2. */
     --border-control: #686e78;
 
-    --text: #edf0f5;
-    --text-muted: #9ba5b4;
-    --text-faint: #858f9e;
+    --text: #F2F4F8;
+    /* text-muted/text-faint: DESIGN-TARGET specifies #6E7789 / #525A6A, and
+       both were run through redesign/contrast-check.mjs's actual pairs (text
+       on canvas/surface/surface-2, all at the 4.5:1 body-text floor). Neither
+       literal hex clears it — #525A6A measures 2.77:1 on canvas, nowhere near
+       4.5 no matter which of the app's dark surfaces it sits on, because a
+       body-text floor and a colour that dim are incompatible on this canvas
+       family. Solved, not chosen, the same way --border-control was: lightened
+       just enough to clear 4.5:1 against canvas, surface AND surface-2 (the
+       hardest of the three), keeping the same cool blue-grey hue. */
+    --text-muted: #9099AC;
+    --text-faint: #838B9C;
 
-    /* Brand — interaction only. Deliberately NOT the same value as --gain:
-       the old app had --brand and --green byte-identical, so nothing read as
-       meaningful because everything was the same green. */
-    --primary: #4c82f7;
-    --primary-fill: #2b5fd9;
-    --primary-edge: #1e48a8;
-    --primary-tint: rgba(76, 130, 247, 0.14);
+    /* Brand — indigo, replacing the old interaction blue. Deliberately NOT the
+       same value as --gain: the old app had --brand and --green byte-identical,
+       so nothing read as meaningful because everything was the same colour.
+       --primary-fill is darker than --primary on purpose — #7C6CFF under white
+       button text only measures 3.86:1 (fails 4.5), so the fill gets its own,
+       darker step the same way the pre-existing scheme separated the two. */
+    --primary: #7C6CFF;
+    --primary-fill: #5B4ECC;
+    --primary-edge: #443A99;
+    --primary-tint: rgba(124, 108, 255, 0.14);
     --on-primary: #ffffff;
 
     /* Secondary — attention, goals, and warnings (one hue doing both, so there
@@ -134,10 +180,10 @@
 
     /* P&L — permitted on numbers, sparklines, chart marks and delta pills ONLY.
        Never a button, nav item, card, border, focus ring, or a non-P&L bar. */
-    --gain: #2fbe7a;
-    --loss: #f26b75;
-    --gain-tint: rgba(47, 190, 122, 0.14);
-    --loss-tint: rgba(242, 107, 117, 0.14);
+    --gain: #2FD08A;
+    --loss: #FF5D6B;
+    --gain-tint: rgba(47, 208, 138, 0.14);
+    --loss-tint: rgba(255, 93, 107, 0.14);
 
     /* Elevation. In dark mode elevation is SURFACE LIGHTNESS, not shadow — a
        0 18px 44px rgba(0,0,0,.42) over #0f1217 renders literally nothing, which
@@ -148,16 +194,17 @@
     --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     --scrim: rgba(0, 0, 0, 0.5);
 
-    /* Categorical ramp — allocation donut, sector bars. No step may read as
-       gain or loss, so greens and reds are excluded. All clear 3:1 on surface. */
-    --cat-1: #5b8def;
-    --cat-2: #9b7bea;
-    --cat-3: #3fb6c4;
-    --cat-4: #e0ae4a;
-    --cat-5: #d9789b;
-    --cat-6: #6fa8dc;
-    --cat-7: #8a93a6;
-    --cat-8: #b98e5a;
+    /* Categorical ramp — allocation strip, sector bars. Assigned by position
+       order and stable per symbol; DESIGN-TARGET's exact 8-hue asset palette.
+       No step may read as gain or loss. All clear 3:1 on canvas and surface. */
+    --cat-1: #7C6CFF;
+    --cat-2: #5B8DEF;
+    --cat-3: #F0A24A;
+    --cat-4: #2FD08A;
+    --cat-5: #3ABEC7;
+    --cat-6: #E36A9A;
+    --cat-7: #2F6BE0;
+    --cat-8: #B45309;
 
     --skeleton: rgba(255, 255, 255, 0.06);
     --skeleton-sheen: rgba(255, 255, 255, 0.10);
@@ -165,16 +212,25 @@
 
   /* ═══ LIGHT — a separately designed theme, not an inversion ═══════════════
      Elevation here is expressed with real shadows, because on a light canvas
-     they actually render. That is the inverse of the dark strategy above. */
+     they actually render. That is the inverse of the dark strategy above.
+     DESIGN-TARGET only specifies the dark palette; light equivalents below are
+     this file's derivation, kept in the same hue families as their dark
+     counterparts where a hue exists (brand → indigo), and left unchanged where
+     the existing values already read correctly on white (text tiers, P&L,
+     categorical ramp — all already independently contrast-checked). */
   :root[data-theme="light"] {
     color-scheme: light;
 
     --canvas: #f6f7f9;
+    /* Light theme doesn't need the dark theme's translucent-white-on-canvas
+       trick — a white card with a hairline border already reads correctly on
+       a light canvas, which is what --surface/--line already were. */
     --surface: #ffffff;
     --surface-2: #f1f3f6;
     --surface-3: #e9ecf1;
 
     --line: #e2e6ec;
+    --divider: #edeff2;
     --line-strong: #cbd2dc;
     --border-control: #878d97;
 
@@ -182,10 +238,12 @@
     --text-muted: #566072;
     --text-faint: #6b7280;
 
-    --primary: #1f5fe0;
-    --primary-fill: #1f5fe0;
-    --primary-edge: #17499e;
-    --primary-tint: rgba(31, 95, 224, 0.10);
+    /* Indigo, same brand family as dark's #7C6CFF, darkened for 4.5:1 on a
+       white canvas (a direct port of the dark hex measures under 3:1 here). */
+    --primary: #4F3DC4;
+    --primary-fill: #4F3DC4;
+    --primary-edge: #3A2B99;
+    --primary-tint: rgba(79, 61, 196, 0.10);
     --on-primary: #ffffff;
 
     --secondary: #8a6110;
@@ -219,11 +277,12 @@
      charts. Aliasing is deliberate rather than editing every reference, and it
      is where defect #2 actually gets fixed: --brand used to BE --green (byte
      identical), so charts, chrome and gains were all one colour. --brand now
-     resolves to the interaction blue while --green resolves to the P&L green, so
+     resolves to the indigo brand while --green resolves to the P&L green, so
      the same JS suddenly draws the correct semantics.
 
      --*-rgb are raw triplets because Chart.js gradients need rgba() with a
-     computed alpha, and a hex token cannot supply that.
+     computed alpha, and a hex token cannot supply that. Kept in exact sync
+     with --gain/--loss/--primary above — if those change, these must too.
      ═══════════════════════════════════════════════════════════════════════════ */
   :root, :root[data-theme="dark"] {
     --brand: var(--primary);
@@ -231,9 +290,9 @@
     --red: var(--loss);
     --mut: var(--text-muted);
     --faint: var(--text-faint);
-    --green-rgb: 47, 190, 122;
-    --red-rgb: 242, 107, 117;
-    --brand-rgb: 76, 130, 247;
+    --green-rgb: 47, 208, 138;
+    --red-rgb: 255, 93, 107;
+    --brand-rgb: 124, 108, 255;
     --card: var(--surface);
     --card2: var(--surface-2);
     --tx: var(--text);
@@ -243,7 +302,7 @@
   :root[data-theme="light"] {
     --green-rgb: 10, 127, 88;
     --red-rgb: 208, 45, 64;
-    --brand-rgb: 31, 95, 224;
+    --brand-rgb: 79, 61, 196;
   }
 }
 
@@ -254,16 +313,18 @@
    weight, no light source anywhere. Consistency is table stakes; what the
    premium trackers have is craft.
 
-   What actually reads as expensive on a dark finance UI, and what these add:
-     • surfaces that are gradients, not fills — a card lit from above
-     • a hairline top highlight, so an edge catches the light
-     • real depth under raised things, tuned dark rather than pure black
-     • tinted glows behind the few elements that carry meaning
+   Cards themselves no longer use this pass — DESIGN-TARGET's hairline-border-
+   plus-flat-fill card (css/components.css `.card`) is a deliberate, non-
+   negotiable divergence from Delta's raised-solid cards, so the top-lit
+   gradient below no longer applies there. The remaining depth tokens still
+   back everything DESIGN-TARGET doesn't redefine: buttons, the FAB, badges,
+   the segmented control's selected pill, tinted glows.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer tokens {
   :root, :root[data-theme="dark"] {
-    /* Card surfaces become a subtle top-lit gradient rather than one flat fill. */
+    /* Secondary surfaces (inputs, nested cards, stat tiles) keep the top-lit
+       gradient treatment — only the primary `.card` moved to a flat fill. */
     --surface-grad: linear-gradient(180deg, #1A2029 0%, #161B22 100%);
     --surface-2-grad: linear-gradient(180deg, #232833 0%, #1f242d 100%);
     /* The line that catches the light along a card's top edge. */
@@ -272,9 +333,9 @@
     --depth-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.22);
     --depth-2: 0 2px 6px rgba(0, 0, 0, 0.45), 0 8px 24px rgba(0, 0, 0, 0.3);
     /* Coloured glows, used only where the colour already means something. */
-    --glow-primary: 0 4px 16px rgba(76, 130, 247, 0.28);
-    --glow-gain: 0 0 24px rgba(47, 190, 122, 0.16);
-    --glow-loss: 0 0 24px rgba(242, 107, 117, 0.16);
+    --glow-primary: 0 4px 16px rgba(124, 108, 255, 0.28);
+    --glow-gain: 0 0 24px rgba(47, 208, 138, 0.16);
+    --glow-loss: 0 0 24px rgba(255, 93, 107, 0.16);
     --hero-sheen: linear-gradient(178deg, #ffffff 0%, #ffffff 72%, #eaeff7 100%);
   }
   :root[data-theme="light"] {
@@ -283,7 +344,7 @@
     --edge-light: rgba(255, 255, 255, 0.9);
     --depth-1: 0 1px 2px rgba(16, 21, 29, 0.07), 0 2px 8px rgba(16, 21, 29, 0.05);
     --depth-2: 0 2px 6px rgba(16, 21, 29, 0.09), 0 8px 24px rgba(16, 21, 29, 0.09);
-    --glow-primary: 0 4px 14px rgba(31, 95, 224, 0.22);
+    --glow-primary: 0 4px 14px rgba(79, 61, 196, 0.22);
     --glow-gain: none;
     --glow-loss: none;
     --hero-sheen: linear-gradient(178deg, #10151d 0%, #10151d 72%, #1e2632 100%);

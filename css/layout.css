@@ -110,20 +110,36 @@
      A number at --t-hero does not need a box, and boxing it made it peer with
      the day-change box beside it. Four stacked divs become one composed unit. */
   .hero { padding-block: var(--s-2) var(--s-4); }
-  .hero__total { display: block; }
+  /* Plain small-caps label — NOT .section__label/.eyebrow, which carry the
+     indigo accent bar that belongs to a group header, not a hero caption. */
+  .hero__eyebrow {
+    font-size: var(--t-caption);
+    font-weight: var(--w-bold);
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .hero__total { display: block; margin-top: var(--s-1); }
+  /* Today's delta AND the all-time return on one line (DESIGN-TARGET) — the
+     old chip list and the separate "vs S&P 500 today" sentence both retired
+     in favour of this single line. */
   .hero__delta {
     display: flex;
-    align-items: center;
-    gap: var(--s-2);
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--s-4);
     margin-top: var(--s-2);
-    font-size: var(--t-body);
+    font-size: var(--t-label);
     font-weight: var(--w-semibold);
   }
-  .hero__sub {
-    margin-top: var(--s-2);
-    font-size: var(--t-caption);
+  .hero__alltime {
     color: var(--text-muted);
+    font-weight: var(--w-semibold);
+    font-size: var(--t-caption);
   }
+  .hero__alltime b { font-weight: var(--w-bold); }
+
+  .holdings-block { margin-top: var(--s-5); }
 
   /* The desktop rail is built at all sizes but hidden until it is needed. */
   .rail-nav { display: none; }
@@ -280,6 +296,12 @@
      wider than the container and drag the card with it. */
   .chart { min-width: 0; max-width: 100%; }
   .chart canvas { max-width: 100% !important; }
+  /* Portfolio's hero chart only — full-bleed per DESIGN-TARGET, same negative-
+     margin bleed .rail already uses. Must override max-width:100% above (same
+     @layer, later + more specific wins) or the containment rule caps the
+     width right back to .wrap's padded box and the negative margin does
+     nothing visible. */
+  .chart--bleed { margin-inline: calc(var(--s-5) * -1); width: auto; max-width: none; }
 
   /* Long unbroken values (tickers, currency strings) must wrap rather than push. */
   .hero__total, .row__value, .stat__value { overflow-wrap: anywhere; }

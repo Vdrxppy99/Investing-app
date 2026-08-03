@@ -93,19 +93,33 @@
   .iconbtn svg { width: 24px; height: 24px; }
 
   /* ── 6.3 Segmented control ───────────────────────────────────────────────
-     Also the fix for Explore's three stacked screener cards. */
+     Also the fix for Explore's three stacked screener cards. Shape is
+     DESIGN-TARGET's own (11px shell, 8px item) — not the pill the rest of the
+     app uses, and the selected item is a solid brand fill with dark (canvas)
+     text rather than a tinted label, matching design/target/five-tabs.html's
+     `.seg b.on{color:#0B0F17;background:#7C6CFF}` exactly. */
   .seg {
     display: flex;
     gap: var(--s-1);
     padding: var(--s-1);
     background: var(--surface-2);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-seg);
   }
   .seg__item {
     flex: 1;
     height: 32px;
-    padding: 0 var(--s-3);
-    border-radius: var(--r-pill);
+    /* #rangeSeg packs 9 items (1D…MAX) into one row at a 390px viewport with
+       no room to spare — at --s-3 (12px) padding per side, the row's natural
+       width came out a hair wider than its container even after R1 gave it
+       the chart card's old padding back (measured: overflowing by a fraction
+       of a pixel, just enough that .page's overflow-x:clip — layout.css,
+       unrelated to this control — clipped the last button's click point out
+       from under it; caught by Phase 0's smoke suite driving every #rangeSeg
+       button in sequence, not visible to the eye). Tighter padding here is a
+       real fix, not a fudge: it buys back real margin instead of landing on
+       another number that happens to fit today's font metrics. */
+    padding: 0 var(--s-2);
+    border-radius: var(--r-seg-item);
     font-size: var(--t-caption);
     font-weight: var(--w-semibold);
     color: var(--text-muted);
@@ -113,9 +127,9 @@
                 color var(--dur-enter) var(--ease-out);
   }
   .seg__item[aria-selected="true"] {
-    background: var(--primary-tint);
-    color: var(--primary);
-    font-weight: var(--w-semibold);
+    background: var(--primary);
+    color: var(--canvas);
+    font-weight: var(--w-bold);
   }
 
   /* ── 6.4 Chip / pill ─────────────────────────────────────────────────────── */
@@ -142,11 +156,11 @@
   .row {
     display: flex;
     align-items: center;
-    gap: var(--s-3);
+    gap: var(--row-gap);
     width: 100%;
     min-height: 56px;
-    padding: var(--s-3) 0;
-    border-bottom: var(--hairline) solid var(--line);
+    padding: var(--row-pad-y) 0;
+    border-bottom: var(--hairline) solid var(--divider);
     text-align: left;
   }
   .row:last-child { border-bottom: none; }
@@ -175,10 +189,15 @@
   .row__chev svg { width: 20px; height: 20px; }
 
   /* ── 6.6 Card ────────────────────────────────────────────────────────────
-     No border in dark mode: the surface lightness IS the elevation. Adding a
-     border as well is what made every box in the old app read identically. */
+     DESIGN-TARGET's non-negotiable divergence from Delta: a hairline border
+     plus a barely-there fill, not a solid raised block. See the DEPTH-pass
+     override further down (search "Cards: lit from above") for why the
+     top-lit-gradient treatment introduced later no longer applies to `.card`
+     itself — that override is where the real, load-bearing rule lives now;
+     this is just the shape/spacing base every card inherits. */
   .card {
     background: var(--surface);
+    border: var(--hairline) solid var(--line);
     border-radius: var(--r-card);
     padding: var(--s-4);
     box-shadow: var(--shadow-1);
@@ -317,36 +336,18 @@
     border-top: var(--hairline) solid var(--line-strong);
     border-radius: var(--r-sheet) var(--r-sheet) 0 0;
     box-shadow: var(--shadow-3), var(--highlight);
-    padding-bottom: max(var(--s-3), var(--safe-bottom));
     transform: translateY(100%);
     transition: transform var(--dur-sheet) var(--ease-sheet);
     z-index: 50;
-    /* Every dynamically-built sheet (#detailSheet, #editSheet, and anything future
-       sharing class="sheet") injects its content via innerHTML= directly into this
-       element — none of them wrap it in .sheet__body (that class is only emitted by
-       js/ui.js's uiSheet(), which nothing calls). Without its own scroll region a
-       sheet taller than max-height just overflows past the edge with no way to reach
-       the rest — this was previously patched onto #detailSheet alone, so #editSheet
-       (Settings) had no scrolling at all. Moved onto the shared rule so it's automatic
-       for every sheet, not something to remember per new sheet ID. Sheets sit above
-       the tabbar/FAB (z-index 50 vs 30/32) and fully cover them while open, so only
-       --safe-bottom (above) applies here, not --bottom-clear (that's for content
-       scrolling past a tabbar/FAB that stay visible underneath it, e.g. .wrap). */
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+    /* The sheet itself does NOT scroll — .sheet__body does. Three previous
+       patches put overflow-y on THIS element (or on #detailSheet alone) and
+       failed, because .sheet is a flex column: .sheet__grip and .sheet__head
+       are real, always-visible chrome (flex-shrink:0 below) and .sheet__body
+       is the one flex item allowed to shrink and scroll. Giving the outer
+       element its own overflow too just created two competing scroll
+       containers with the same content. */
+    overflow: hidden;
   }
-  /* overflow-y:auto on .sheet is not sufficient on its own. .sheet is a flex
-     column, so its children are flex items. A flex item normally cannot shrink
-     below its content height because min-height defaults to auto — but that only
-     holds while the item's overflow is visible. .tablewrap sets overflow-x:auto,
-     which computes overflow-y to auto too, so its automatic minimum size becomes
-     0 and it collapses instead of overflowing. The holdings table squashes, the
-     content then fits inside max-height, scrollHeight === clientHeight, and the
-     sheet has nothing to scroll. Pinning every direct child at its natural height
-     is what actually creates the overflow. */
-  .sheet > * { flex-shrink: 0; }
-
   .sheet[data-open="true"] { transform: translateY(0); }
   /* Set by the drag handler; must not be eased or the finger feels laggy. */
   .sheet[data-dragging="true"] { transition: none; }
@@ -374,8 +375,17 @@
     padding: 0 var(--s-5) var(--s-3);
     flex-shrink: 0;
   }
+  /* THE fix: flex:1 1 auto lets this item shrink to fit the remaining space
+     inside .sheet's max-height, and min-height:0 is the part every previous
+     patch missed — a flex item's automatic minimum size is its content
+     height, not 0, so without this line the body still refuses to shrink
+     below its own content and never becomes a scroll container no matter
+     what overflow-y says. overflow-y:auto only starts working once the box
+     is actually allowed to be shorter than its content. */
   .sheet__body {
-    padding: 0 var(--s-5) var(--s-5);
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 var(--s-5) max(var(--s-5), var(--safe-bottom));
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -598,14 +608,16 @@
     flex: 0 0 40px;
     display: grid;
     place-items: center;
-    border-radius: var(--r-button);
+    border-radius: var(--r-tile);
     overflow: hidden;
     font-size: var(--t-caption);
     font-weight: var(--w-bold);
     color: #fff;
     line-height: 1;
   }
-  .badge.sm { width: 28px; height: 28px; flex-basis: 28px; font-size: var(--t-micro); }
+  /* 32px squircle — DESIGN-TARGET's small tile, its own radius (not a scaled-down
+     --r-tile), used by compact rows (movers, watchlist, screeners). */
+  .badge.sm { width: 32px; height: 32px; flex-basis: 32px; border-radius: var(--r-tile-sm); font-size: var(--t-micro); }
   .blogo {
     position: absolute;
     inset: 0;
@@ -638,7 +650,7 @@
     min-height: var(--lh-heading);
     margin-bottom: var(--s-3);
   }
-  .spark { width: 56px; height: 20px; flex-shrink: 0; }
+  .spark { width: 38px; height: 20px; flex-shrink: 0; }
 
   /* ── 6.22 Table — genuinely tabular data only ───────────────────────────── */
   .tablewrap { overflow-x: auto; overscroll-behavior-x: contain; }
@@ -676,6 +688,7 @@
     transition: background-color var(--dur-micro) var(--ease-out);
   }
   .disclose:active { background: var(--surface-2); }
+  .disclose:last-child { border-bottom: 0; }
   .disclose__title { flex: 1; font-size: var(--t-body); font-weight: var(--w-semibold); }
   .disclose__meta { font-size: var(--t-caption); color: var(--text-muted); }
   .disclose svg { width: 20px; height: 20px; color: var(--text-faint); }
@@ -1035,9 +1048,14 @@
 @layer components {
   .hidden { display: none !important; }
 
+  /* Matches the [aria-selected="true"] rule in the base .seg definition —
+     .on and aria-selected are two selection mechanisms the engine JS uses
+     interchangeably across the app's segmented controls (see the comment
+     above), so both need the same DESIGN-TARGET solid-fill treatment. */
   .seg__item.on {
-    background: var(--primary-tint);
-    color: var(--primary);
+    background: var(--primary);
+    color: var(--canvas);
+    font-weight: var(--w-bold);
   }
   .tabbar__item.on,
   .rail-nav__item.on { color: var(--primary); }
@@ -1065,16 +1083,18 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
-  /* Holding rows and market rows — the list-row anatomy under other names. */
+  /* Holding rows and market rows — the list-row anatomy under other names.
+     10px vertical padding / 11px gap / a divider hairline (not the card-border
+     --line) — DESIGN-TARGET's row spec, distinct from a card's own edge. */
   .hrow, .mrow, .drow, .nrow {
     position: relative;
     display: flex;
     align-items: center;
-    gap: var(--s-3);
+    gap: var(--row-gap);
     width: 100%;
     min-height: 56px;
-    padding: var(--s-3) 0;
-    border-bottom: var(--hairline) solid var(--line);
+    padding: var(--row-pad-y) 0;
+    border-bottom: var(--hairline) solid var(--divider);
     text-align: left;
     transition: background-color var(--dur-micro) var(--ease-out);
   }
@@ -1093,7 +1113,7 @@
     text-overflow: ellipsis;
     min-width: 0;
   }
-  .hspark { flex: 0 0 56px; width: 56px; height: 20px; }
+  .hspark { flex: 0 0 38px; width: 38px; height: 20px; }
   .hsym, .msym {
     font-size: var(--t-label);
     font-weight: var(--w-semibold);
@@ -1137,7 +1157,7 @@
     color: var(--text);
   }
   .hpl, .cmove { font-size: var(--t-caption); font-weight: var(--w-semibold); }
-  .hspark, .mspark { width: 56px; height: 20px; flex-shrink: 0; }
+  .hspark, .mspark { width: 38px; height: 20px; flex-shrink: 0; }
   .htip, .htips { font-size: var(--t-caption); color: var(--text-muted); }
 
   /* Delta pills. Gain/loss colour is permitted here — these ARE numbers. */
@@ -1488,14 +1508,10 @@
   .ebtns { display: flex; flex-wrap: wrap; gap: var(--s-2); }
   .ebtns .btn { flex: 1 1 auto; }
 
-  /* Sheet chrome emitted by sheets.js. */
-  .sheet-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s-3);
-    padding-bottom: var(--s-3);
-  }
+  /* Sheet chrome emitted by sheets.js/portfolio.js — head content lives inside
+     the real .sheet__head element now (index.html), so no wrapping class is
+     needed here beyond what .sheet__head already provides. */
+  #watchBtn.on { color: var(--primary); }
   .xbtn {
     display: inline-grid;
     place-items: center;
@@ -1507,6 +1523,26 @@
     font-size: var(--t-heading);
   }
   .infobody, .cdetail { display: grid; gap: var(--s-3); font-size: var(--t-body); }
+  /* Sheet head chrome — openDetail/openStockSheet/openInfoSheet/openListSheet
+     (js/sheets.js, js/portfolio.js) all build a title + optional subtitle +
+     optional price inside .sheet__head; these replace what used to be a run
+     of one-off inline font-size/color styles per call site. */
+  .sheet__title { font-size: var(--t-heading); font-weight: var(--w-bold); }
+  .sheet__sub { color: var(--text-muted); font-size: var(--t-caption); margin-top: var(--s-1); }
+  .sheet__price { font-size: var(--t-title); font-weight: var(--w-bold); margin-top: var(--s-2); }
+  .sheet__headbtns { display: flex; gap: var(--s-2); align-items: flex-start; }
+  .chart-box--sheet { height: 180px; }
+  .chart-box__msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: var(--t-body);
+    text-align: center;
+    padding: var(--s-3);
+  }
   .cmhead, .ctitle { font-size: var(--t-heading); font-weight: var(--w-bold); }
   .cicon { flex-shrink: 0; color: var(--text-muted); }
 
@@ -1892,7 +1928,7 @@
     column-gap: var(--s-3);
   }
   .hmid { min-width: 0; }
-  .hspark { flex: 0 1 56px; min-width: 0; }
+  .hspark { flex: 0 1 38px; min-width: 0; }
   /* max-width:45% was the squeeze, not the cure — the grid track already caps it. */
   .hright { justify-self: end; text-align: right; max-width: none; }
   .hval, .hpl { white-space: nowrap; }
@@ -1913,8 +1949,13 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
-  /* ── Cards: lit from above, with an edge that catches light ──────────────── */
-  .card, .group2 {
+  /* ── Cards: DESIGN-TARGET's hairline + flat fill, not lit-from-above ──────
+     `.card` no longer takes the top-lit gradient this pass introduced — a
+     hairline border and a barely-there fill is the deliberate divergence
+     from Delta's raised-solid cards (DESIGN-TARGET.md's positioning table),
+     not something craft/depth should paper back over. `.group2` (Insights'
+     module cards, not yet rebuilt) keeps the original treatment. */
+  .group2 {
     background: var(--surface-grad);
     box-shadow: var(--depth-1), inset 0 1px 0 var(--edge-light);
   }
@@ -1959,14 +2000,15 @@
   .btn--primary:active, .btn.pri:active { box-shadow: none; }
   .fab { box-shadow: var(--glow-primary), var(--depth-2); }
 
-  /* ── Segmented control: the selected pill is a real raised object ────────── */
-  .seg { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28); }
+  /* ── Segmented control: DESIGN-TARGET's solid fill, not a raised tint ─────
+     This used to re-apply a lifted-surface-plus-tinted-text look that the
+     craft pass gave every selected segment. DESIGN-TARGET's own segmented
+     control (design/target/five-tabs.html: `.seg b.on{color:#0B0F17;
+     background:#7C6CFF}`) is flatter than that: a solid brand fill with dark
+     text, no shadow. The shell keeps a faint inset so the control still reads
+     as a track the pill sits in. */
+  .seg { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.16); }
   :root[data-theme="light"] .seg { box-shadow: inset 0 1px 3px rgba(16,21,29,.06); }
-  .seg__item[aria-selected="true"], .seg__item.on {
-    background: var(--surface-grad);
-    color: var(--primary);
-    box-shadow: var(--depth-1), inset 0 1px 0 var(--edge-light);
-  }
 
   /* ── Delta pills: tinted, bordered, not just coloured text ───────────────── */
   .pctpill, .prpill, .daypill, .chip--gain, .chip--loss {
@@ -2011,38 +2053,60 @@
     background: var(--primary);
     flex-shrink: 0;
   }
-
-  /* ── Divided rows: hairlines only between, never a heavy grid ───────────── */
-  .hrow, .mrow, .nrow { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
-}
-
-@layer components {
-  /* The engine injects its own sheet bodies (recap, info, holding detail) straight
-     into #detailSheet, so they never picked up .sheet__body padding and ran to the
-     screen edges. Pad the sheet itself and let the grip and head sit flush. */
-  #detailSheet, #editSheet { padding: 0 var(--s-5) var(--s-5); }
-  #detailSheet > .sheet-head, #editSheet > .sheet-head {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding-top: var(--s-4);
-    background: var(--surface-2);
+  /* Optional right-aligned value — DESIGN-TARGET's section label carries a
+     count/subtotal ("ETFs · 5 … $129,051.24") flush right, in text colour
+     rather than the label's own faint tone, so it reads as data, not caption. */
+  .section__label em, .eyebrow em {
+    font-style: normal;
+    margin-left: auto;
+    color: var(--text);
+    font-weight: var(--w-bold);
+    font-size: var(--t-caption);
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums lining;
   }
-  /* overflow-y/overscroll-behavior/max-height used to live here, #detailSheet-only —
-     moved onto the shared .sheet rule (components.css ~line 320) so #editSheet
-     (Settings) scrolls too. Bug: Settings' lower content, Export backup included,
-     was unreachable because only #detailSheet had ever gotten this. */
-  /* Give the sheet a grab handle even though the engine does not emit one. */
-  #detailSheet::before, #editSheet::before {
-    content: "";
+
+  /* ── Allocation strip — DESIGN-TARGET's replacement for the allocation
+     donut: a flat 7px multi-segment bar, no legend, no card. Segment width
+     and colour are data, set as custom properties after insertion (uiSetFill's
+     convention), never an inline `style=`. */
+  .allocstrip {
+    display: flex;
+    width: 100%;
+    height: 7px;
+    border-radius: var(--r-input);
+    overflow: hidden;
+    gap: 2px;
+  }
+  .allocstrip > i {
     display: block;
-    width: 36px;
-    height: 4px;
-    margin: var(--s-3) auto var(--s-2);
-    border-radius: var(--r-pill);
-    background: var(--line-strong);
+    height: 100%;
+    width: var(--w, 0%);
+    background: var(--seg, var(--primary));
   }
+
+  /* Cash row under the holdings groups. Was unstyled (relying on JS-set
+     display:flex with no gap/justify), so the label and value ran together
+     with no space between them. */
+  .cashrow {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--row-pad-y) 0;
+    color: var(--text-muted);
+    font-size: var(--t-caption);
+  }
+
+  /* Divided rows already border on --divider (components.css `.hrow` rule) —
+     DESIGN-TARGET's own subtler-than-card-border separator, not a color-mix
+     of --line needed on top of it. */
 }
+
+/* #detailSheet / #editSheet no longer need their own patch layer: both now carry
+   the real .sheet__grip / .sheet__head / .sheet__body markup (index.html) instead
+   of having an entire sheet's worth of content injected straight into the outer
+   .sheet element, so the shared rules above (grip, head, body) are what render
+   them — nothing left to override here. See the .sheet__body comment above for
+   the actual scroll fix. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NO HORIZONTAL SCROLLING — owner: "i dont like to scroll horizontally when

@@ -83,14 +83,19 @@ $('page-insights').addEventListener('click', e=>{ // look-through rows now live 
   const el=e.target.closest('.mrow');
   if(el && el.dataset.sym) openStockSheet(el.dataset.sym, el.dataset.name||'');
 });
-/* swipe a bottom sheet down to dismiss it (mobile) */
+/* swipe a bottom sheet down to dismiss it (mobile). Checks .sheet__body's
+   scrollTop, not the outer .sheet's — the sheet rebuild (UPGRADE_PLAN.md R1)
+   moved the actual scroll container to .sheet__body, so a drag started while
+   the body is scrolled down must still scroll it rather than dismissing. */
 function wireSheetDrag(sheetId, closeFn){
-  const sh=$(sheetId); let y0=null, dy=0, dragging=false;
-  sh.addEventListener('touchstart', e=>{ if(sh.scrollTop>2) return; y0=e.touches[0].clientY; dy=0; dragging=true; }, {passive:true});
+  const sh=$(sheetId); const body=sh.querySelector('.sheet__body');
+  const scrollTop=()=> body ? body.scrollTop : 0;
+  let y0=null, dy=0, dragging=false;
+  sh.addEventListener('touchstart', e=>{ if(scrollTop()>2) return; y0=e.touches[0].clientY; dy=0; dragging=true; }, {passive:true});
   sh.addEventListener('touchmove', e=>{
     if(!dragging||y0==null) return;
     dy=e.touches[0].clientY-y0;
-    if(dy>0 && sh.scrollTop<=2) sh.style.transform=`translateY(${dy}px)`;
+    if(dy>0 && scrollTop()<=2) sh.style.transform=`translateY(${dy}px)`;
   }, {passive:true});
   sh.addEventListener('touchend', ()=>{
     if(!dragging) return; dragging=false;
@@ -103,7 +108,10 @@ wireSheetDrag('detailSheet', closeDetail);
 wireSheetDrag('editSheet', ()=>$('editModal').classList.add('hidden'));
 wireSearch(); wirePTR();
 $('taxCard').onclick=openTaxSheet;
-$('divTitle').onclick=openDivSheet;
+/* #divTitle lived on #incomeCard, which left the Portfolio screen in R1 (see
+   renderIncome's comment) — no trigger element for openDivSheet exists until
+   R4 gives dividends a home on Insights or Home. */
+if($('divTitle')) $('divTitle').onclick=openDivSheet;
 $('peCard').onclick=openPESheet;
 $('riskCard').onclick=openRiskSheet;
 $('healthCard').onclick=openHealthSheet;
@@ -117,8 +125,11 @@ function ringSvg(pct, color, r){
     <circle class="rc" cx="${R+8}" cy="${R+8}" r="${R}"/>
     <circle class="rp" cx="${R+8}" cy="${R+8}" r="${R}" style="stroke:${color};stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off.toFixed(1)}"/></svg>`;
 }
+/* Goal left the Portfolio screen in R1 (DESIGN-TARGET.md — it belongs on
+   Home, built in R4). #goalCard no longer exists here; these no-op until R4
+   gives goal tracking a new home, rather than being deleted. */
 function renderGoalForm(prefill){ // shared by first-time setup and "Change goal" (prefilled — never lose the number)
-  const card=$('goalCard');
+  const card=$('goalCard'); if(!card) return;
   card.querySelector('.card-title').style.display='';
   $('goalBody').innerHTML=`<div class="goalset">
     <div style="color:var(--mut);font-size:12.5px;line-height:1.5;margin-bottom:10px;font-weight:500">Set a target and track your progress with a projected finish date based on your real return.</div>
@@ -130,7 +141,8 @@ function renderGoalForm(prefill){ // shared by first-time setup and "Change goal
   const gr=$('goalRemove'); if(gr) gr.onclick=()=>{ state.goal=null; lsSet('pt_goal',null); renderGoal(); };
 }
 function renderGoal(){
-  const card=$('goalCard'), t=totals('all');
+  const card=$('goalCard'); if(!card) return;
+  const t=totals('all');
   if(!state.goal || !(state.goal.amt>0)){ renderGoalForm(0); return; }
   const goal=state.goal.amt, pct=t.value/goal, remain=goal-t.value;
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.15):0.08; // cap optimism
@@ -193,8 +205,13 @@ function renderHealth(){
       <div class="bar"><i style="width:${m.v.toFixed(0)}%;background:${barCol(m.v)}"></i></div></div>`).join('')}</div>
     ${tips.length?`<div class="htips">${tips.map(t=>`<div class="htip"><span class="ti">→</span><span>${t.tip}</span></div>`).join('')}</div>`:''}`;
 }
+/* Movers left the Portfolio screen in R1 (DESIGN-TARGET.md — attribution
+   belongs on Home, built in R4). #moverCard no longer exists here; this
+   no-ops (still called from js/api.js's live-price paths) until R4 gives it
+   a new home, rather than being deleted. */
 function renderMover(){ // day-change attribution: which holdings drove today's move
-  const card=$('moverCard'); const rs=rows(state.view.acc);
+  const card=$('moverCard'); if(!card) return;
+  const rs=rows(state.view.acc);
   const items=rs.map(r=>{
     const p=priceOf(r.sym), pv=prevOf(r.sym); if(!(pv>0)||!(p>0)) return null;
     return {sym:r.sym, pct:(p/pv-1)*100, impact:r.qty*(p-pv)};
@@ -210,8 +227,15 @@ function renderMover(){ // day-change attribution: which holdings drove today's 
       <span class="pctpill ${x.pct>=0?'up':'down'}" style="margin-left:8px">${fmtPct(x.pct)}</span></div></div>`).join('');
   $('moverBody').querySelectorAll('.drow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
 }
+/* renderMover/renderGoal/renderIncome are still called here — each now no-ops
+   safely (see their own guards) since Goal/Movers/Dividends left this screen
+   in R1; kept in the pipeline rather than special-cased out, so wiring them
+   back up on Home in R4 is a one-line change (add the markup back, delete
+   nothing here). renderAlloc() likewise no-ops unless the allocation sheet is
+   open — renderAllocStrip() (called from renderList()) is what actually
+   paints the always-visible strip. */
 function renderAll(){
-  renderMover(); renderGoal(); renderHomePr(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
+  renderMover(); renderGoal(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-explore').classList.contains('hidden')) renderMarkets();
 }
@@ -296,12 +320,25 @@ function paintMiniBar(){
   d.className='daypill '+(t.day>=0?'up':'down');
 }
 let mbTick=false;
+/* R1 shortened the Portfolio hero+chart block a lot (mover/goal/dividends/the
+   allocation donut all left for Home/R4), so a hardcoded 170px threshold — sized
+   for the OLD, much taller layout — now fires while the range segmented control
+   or the allocation strip is still on screen, and the fixed top bar covers them:
+   real, reproducible click-interception (caught by Phase 0's smoke suite driving
+   #rangeSeg). Measure the actual bottom edge of the hero composition instead of
+   guessing a new constant, so this stays correct as that block's height changes
+   again in later phases. #allocStrip is the last element of that composition
+   before the holdings list. */
+function miniBarThreshold(){
+  const marker = $('allocStrip');
+  return marker ? marker.getBoundingClientRect().bottom + window.scrollY : 170;
+}
 window.addEventListener('scroll', ()=>{
   if(mbTick) return; mbTick=true;
   setTimeout(()=>{
     mbTick=false;
     if($('page-portfolio').classList.contains('hidden')) return; // other tabs keep the bar pinned (showPage owns it)
-    const show=window.scrollY>170 && !document.body.classList.contains('locked');
+    const show=window.scrollY>miniBarThreshold() && !document.body.classList.contains('locked');
     if(show) paintMiniBar();
     $('miniBar').classList.toggle('show', show);
   }, 80);

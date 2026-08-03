@@ -24,38 +24,23 @@ const CHART_TOOLTIP = {
 };
 
 /* ============ RENDER: HEADER + LIST ============ */
+/* DESIGN-TARGET's hero line: today's $/% delta AND the all-time return
+   together, replacing the old chip list (Profit/Invested/Deposited/Return-
+   per-yr) and the separate "vs S&P 500 today" sentence — neither has a slot
+   in the redesigned hero. Return/yr (XIRR) still surfaces on Insights; the
+   others don't have a home yet (see UPGRADE_PLAN.md backlog). */
 function renderHeader(){
   if(scrubbing) return;
   const t = totals(state.view.acc);
   const dayPct = (t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
-  $('totalVal').innerHTML = `<span id="tvNum">${fmt(t.value)}</span>` + ` <span class="daypill ${t.day>=0?'up':'down'}">${fmtSign(t.day)} · ${fmtPct(dayPct)}</span>`;
+  $('totalVal').innerHTML = `<span id="tvNum">${fmt(t.value)}</span>`;
   if(typeof rollUpTvNum==='function') rollUpTvNum(t.value);
-  const plPct = t.invested>0 ? t.profit/t.invested*100 : 0;
   const dep = +state.deposits || 0;
-  const chips = [];
-  if(state.view.acc==='all' && dep>0){
-    const earn = t.value - dep;
-    chips.push({k:'Total profit', v:`${fmtSign(earn)} (${fmtPct(earn/dep*100)})`, c:cls(earn)});
-    chips.push({k:'Deposited', v:fmt(dep)});
-  } else {
-    chips.push({k:'Profit', v:`${fmtSign(t.profit)} (${fmtPct(plPct)})`, c:cls(t.profit)});
-    chips.push({k:'Invested', v:fmt(t.invested)});
-  }
-  const rr = personalReturn(state.view.acc);
-  if(rr!=null) chips.push({k:'Return / yr', v:fmtPct(rr*100), c:cls(rr)});
-  $('totalSub').innerHTML = chips.map(c=>`<div class="chip" data-ex="${c.k}"><span class="lbl">${c.k} <span class="cq">?</span></span><span class="${c.c||''}">${c.v}</span></div>`).join('');
-  $('totalSub').querySelectorAll('.chip').forEach(el=>el.onclick=()=>explainStat(el.dataset.ex));
-  // the 3-second story: how today compares to the market
-  const voo=state.quotes.VOO, tl=$('todayLine');
-  if(tl){
-    if(voo && voo.prev>0 && (t.value-t.day)>0){
-      const sp=(voo.price/voo.prev-1)*100, d=dayPct-sp;
-      tl.className='todayline '+(Math.abs(d)<0.02?'':cls(d));
-      tl.textContent = Math.abs(d)<0.02 ? 'Moving with the market today'
-        : d>0 ? `Outpacing the S&P 500 by ${d.toFixed(2)}% today`
-              : `Trailing the S&P 500 by ${Math.abs(d).toFixed(2)}% today`;
-    } else tl.textContent='';
-  }
+  const allTimePct = (state.view.acc==='all' && dep>0) ? (t.value-dep)/dep*100
+    : (t.invested>0 ? t.profit/t.invested*100 : 0);
+  const arrow = t.day>=0 ? '▲' : '▼';
+  $('todayLine').innerHTML = `<span class="${cls(t.day)} n">${arrow} ${fmtSign(t.day)} · ${fmtPct(dayPct)}</span>`
+    + `<span class="hero__alltime">all time <b class="${cls(allTimePct)} n">${fmtPct(allTimePct)}</b></span>`;
   $('ccyBtn').textContent = state.view.ccy==='USD' ? '$' : '€';
   // keep the pinned glass bar in sync with live ticks (it's visible on every non-Portfolio tab)
   if($('miniBar').classList.contains('show') && typeof paintMiniBar==='function') paintMiniBar();
@@ -65,58 +50,103 @@ function renderChips(){
     `<button data-a="${a}" class="${state.view.acc===a?'on':''}">${a==='all'?'All':esc(ACCOUNTS[a]||a)}</button>`).join('');
   $('accChips').querySelectorAll('button').forEach(b=> b.onclick = ()=>{ state.view.acc=b.dataset.a; renderAll(); });
 }
+/* ETF vs individual-stock split for the DESIGN-TARGET holdings grouping
+   ("ETFs · 5 — $129,051.24" / "Stocks · 1 — $18,990.12"). A simple known-ticker
+   list, same spirit as DIVERSIFIED_FUNDS (js/app.js) — good enough for display
+   grouping, not a claim about fund structure. Anything not recognized here
+   (a user-added individual stock) falls into "Stocks". */
+const KNOWN_ETFS = new Set(['VOO','VTI','VXF','VXUS','VYM','VT','VNQ','VGT','BND','SCHD','QQQ','AVUV','GLDM']);
+function assetGroupOf(sym){ return KNOWN_ETFS.has(sym) ? 'ETFs' : 'Stocks'; }
+
 const lastShownPx = {};
-function renderList(){
-  let rs = rows(state.view.acc); // pre-sorted by value
-  const sm = state.view.sort;
-  if(sm==='day') rs=[...rs].sort((a,b)=>{
-    const da=prevOf(a.sym)>0?priceOf(a.sym)/prevOf(a.sym)-1:0, db=prevOf(b.sym)>0?priceOf(b.sym)/prevOf(b.sym)-1:0;
-    return db-da; });
-  else if(sm==='profit') rs=[...rs].sort((a,b)=>{
-    const pa=a.cost>0?(a.qty*priceOf(a.sym)-a.cost)/a.cost:0, pb=b.cost>0?(b.qty*priceOf(b.sym)-b.cost)/b.cost:0;
-    return pb-pa; });
-  const wtot = rs.reduce((a,x)=>a+x.qty*priceOf(x.sym),0)||1;
-  $('holdList').innerHTML = rs.map(r=>{
-    const p=priceOf(r.sym), val=r.qty*p, pl=val-r.cost, plp=r.cost>0?pl/r.cost*100:0;
-    const dp = prevOf(r.sym)>0 ? (p/prevOf(r.sym)-1)*100 : 0;
-    const was = lastShownPx[r.sym];
-    const tick = (was!=null && p!==was) ? (p>was ? ' tick-up' : ' tick-down') : '';
-    lastShownPx[r.sym] = p;
-    return `<div class="hrow${tick}" data-sym="${esc(r.sym)}">
-      ${badgeHtml(r.sym)}
-      <div class="hmid">
-        <div class="hsym"><span class="hname">${esc((NAMES[r.sym]||r.sym.replace('-','.')).replace(/^Vanguard /,''))}</span> <span class="htick">${esc(r.sym.replace('-','.'))}</span></div>
-        <div class="hinfo">${fmtPx(p)} <span class="${cls(dp)}">${fmtPct(dp)}</span> · ${r.qty.toFixed(3).replace(/\.?0+$/,'')} sh</div>
-      </div>
-      <div class="hspark">${spark(r.sym)}</div>
-      <div class="hright">
-        <div class="hval">${fmt(val)}</div>
-        <div class="hpl ${cls(pl)}">${fmtSign(pl)} · ${fmtPct(plp)}</div>
-      </div><div class="wbar"><i style="width:${(val/wtot*100).toFixed(1)}%"></i></div></div>`;
-  }).join('') || `<div class="empty"><div class="ei">📄</div><div class="et">No holdings yet</div>
-    <div class="eb">Add your first position with ⚙︎ above, or restore everything from a backup file.</div>
-    <button class="btn pri" id="emptyAdd" style="margin-top:12px">Open settings</button></div>`;
-  const ea=$('emptyAdd'); if(ea) ea.onclick=openEdit;
-  $('holdList').querySelectorAll('.hrow').forEach(el=> el.onclick = ()=>openDetail(el.dataset.sym));
-  const cash = cashFor(state.view.acc);
-  $('cashRow').style.display = cash>0 ? 'flex' : 'none';
-  $('cashRow').innerHTML = `<span>Cash · settlement fund</span><span>${fmt(cash)}</span>`;
+/* Row anatomy per DESIGN-TARGET: squircle tile, name + ticker, "qty sh · avg
+   cost", a sparkline, value, and TOTAL return % — today's move belongs on
+   Home (R4), not here. */
+function holdingRow(r){
+  const p=priceOf(r.sym), val=r.qty*p, pl=val-r.cost, plp=r.cost>0?pl/r.cost*100:0;
+  const was = lastShownPx[r.sym];
+  const tick = (was!=null && p!==was) ? (p>was ? ' tick-up' : ' tick-down') : '';
+  lastShownPx[r.sym] = p;
+  const avg = r.qty>0 ? r.cost/r.qty : 0;
+  return `<div class="hrow${tick}" data-sym="${esc(r.sym)}">
+    ${badgeHtml(r.sym)}
+    <div class="hmid">
+      <div class="hsym"><span class="hname">${esc((NAMES[r.sym]||r.sym.replace('-','.')).replace(/^Vanguard /,''))}</span> <span class="htick">${esc(r.sym.replace('-','.'))}</span></div>
+      <div class="hinfo">${r.qty.toFixed(3).replace(/\.?0+$/,'')} sh · avg ${fmtPx(avg)}</div>
+    </div>
+    <div class="hspark">${spark(r.sym)}</div>
+    <div class="hright">
+      <div class="hval">${fmt(val)}</div>
+      <div class="hpl ${cls(pl)}">${fmtPct(plp)}</div>
+    </div></div>`;
 }
-$('sortSeg').querySelectorAll('button').forEach(b=>{
-  b.classList.toggle('on', b.dataset.s===state.view.sort);
-  b.onclick=()=>{ state.view.sort=b.dataset.s; lsSet('pt_sort',b.dataset.s);
-    $('sortSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderList(); };
-});
+function renderList(){
+  const rs = rows(state.view.acc); // pre-sorted by value
+  if(!rs.length){
+    $('holdList').innerHTML = `<div class="empty"><div class="ei">📄</div><div class="et">No holdings yet</div>
+      <div class="eb">Add your first position with ⚙︎ above, or restore everything from a backup file.</div>
+      <button class="btn pri" id="emptyAdd">Open settings</button></div>`;
+    $('emptyAdd').onclick=openEdit;
+  } else {
+    const groups = {ETFs:[], Stocks:[]};
+    for(const r of rs) groups[assetGroupOf(r.sym)].push(r);
+    $('holdList').innerHTML = ['ETFs','Stocks'].filter(g=>groups[g].length).map(g=>{
+      const gtot = groups[g].reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
+      return `<div class="section__label">${g} &middot; ${groups[g].length}<em>${fmt(gtot)}</em></div>` + groups[g].map(holdingRow).join('');
+    }).join('');
+    $('holdList').querySelectorAll('.hrow').forEach(el=> el.onclick = ()=>openDetail(el.dataset.sym));
+  }
+  const cash = cashFor(state.view.acc);
+  $('cashRow').classList.toggle('hidden', !(cash>0));
+  $('cashRow').innerHTML = `<span>Cash · settlement fund</span><span class="n">${fmt(cash)}</span>`;
+  renderAllocStrip();
+}
+/* Sort-by-today/profit segmented control retired with the R1 rebuild — holdings
+   are now grouped by asset class (ETFs/Stocks) rather than one flat sorted
+   list, and grouping is the organizing principle DESIGN-TARGET specifies.
+   Rows still sort by value within each group (rows()'s natural order). */
 /* ============ RENDER: ALLOCATION + INCOME ============ */
+/* DESIGN-TARGET replaces the donut CARD with a flat strip folded directly
+   under the hero chart — no legend, no numbers, just proportional colour.
+   The donut, legend, asset-class breakdown and target-mix/rebalance planner
+   all still exist (unchanged maths) but only render when openAllocSheet()
+   is tapped open, via the same #allocChart/#allocLegend/#allocClasses/#tgtWrap
+   ids renderAlloc() has always targeted — renderAlloc() itself just no-ops
+   now when the sheet isn't open (the ids don't exist in the DOM until then). */
+$('allocStrip').onclick = openAllocSheet;
+function renderAllocStrip(){
+  const el=$('allocStrip'); if(!el) return;
+  const rs = rows(state.view.acc).filter(r=>r.qty*priceOf(r.sym)>0);
+  const tot = rs.reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
+  if(!tot){ el.innerHTML=''; el.disabled=true; return; }
+  el.disabled=false;
+  el.innerHTML = rs.map(()=>'<i></i>').join('');
+  el.querySelectorAll('i').forEach((it,i)=>{
+    const r=rs[i], pct=r.qty*priceOf(r.sym)/tot*100;
+    it.style.setProperty('--w', pct.toFixed(1)+'%');
+    it.style.setProperty('--seg', colorOf(r.sym));
+  });
+}
+function openAllocSheet(){
+  if($('allocStrip').disabled) return;
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Allocation</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `<div class="alloc"><div class="alloc__donut"><canvas id="allocChart"></canvas></div>
+    <div id="allocLegend"></div></div>
+    <div id="allocClasses"></div>
+    <div id="tgtWrap"></div>`;
+  showOverlay('detail');
+  $('detailX').onclick=closeDetail;
+  $('detailX').focus({preventScroll:true});
+  renderAlloc();
+}
 let allocChart=null;
 const ASSET_CLASSES = { 'US stocks':['VOO','VTI','VXF'], 'International':['VXUS'], 'Dividend':['VYM'], 'Berkshire':['BRK-B'] };
 function renderAlloc(){
+  const el=$('allocChart'); if(!el) return; // sheet closed — nothing to draw into
   const rs = rows(state.view.acc).filter(r=>r.qty*priceOf(r.sym)>0);
-  const el=$('allocChart');
   if(window.Chart){ const orphan=Chart.getChart(el); if(orphan) orphan.destroy(); }
   allocChart=null;
   const tot = rs.reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
-  $('allocCard').style.display = (tot>0 && window.Chart) ? '' : 'none';
   if(!tot || !window.Chart) return;
   const centerOpt = { l1: rs.length+' funds', l2: fmt(tot).replace(/[.,]\d\d(\s|$)/,'$1') };
   allocChart = new Chart(el,{type:'doughnut',
@@ -239,9 +269,13 @@ async function ensureDivs(){
   lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal);
   if(res.some(r=>r.status==='fulfilled'&&r.value===true)) renderIncome();
 }
+/* Dividends left the Portfolio screen in R1 (DESIGN-TARGET.md — they belong on
+   Home, built in R4). #incomeCard no longer exists here; this no-ops until R4
+   gives it a new home, rather than being deleted — the forecasting maths below
+   is unchanged and still correct. */
 function renderIncome(){
+  const card=$('incomeCard'); if(!card) return;
   const rl = state.lots.filter(l=>l.div && (state.view.acc==='all'||l.acc===state.view.acc));
-  const card=$('incomeCard');
   // forecast: trailing-12-month distributions per share × shares you hold now
   let fwd=0; const upcoming=[]; const byMonth={};
   const t=totals(state.view.acc);
@@ -764,13 +798,13 @@ function openDetail(sym){
   const er=(typeof FUND_META!=='undefined'&&FUND_META[sym])?FUND_META[sym].er:null;
   const accLines = Object.keys(r.accs).length>1
     ? `<div class="accbreak">${Object.entries(r.accs).map(([a,x])=>`<div>${esc(ACCOUNTS[a]||a)} — ${x.qty.toFixed(3).replace(/\.?0+$/,'')} sh · ${fmt(x.qty*p)} <span class="${cls(x.qty*p-x.cost)}">(${fmtSign(x.qty*p-x.cost)})</span></div>`).join('')}</div>` : '';
-  $('detailSheet').innerHTML = `
-    <div class="sheet-head"><div>
-      <div class="hsym" style="font-size:18px">${esc(sym.replace('-','.'))}</div>
-      <div style="color:var(--mut);font-size:13px;margin-top:2px">${esc(NAMES[sym]||'')}</div>
-      <div style="font-size:26px;font-weight:700;margin-top:8px">${fmtPx(p)} <span style="font-size:14px" class="${cls(dp)}">${fmtPct(dp)} today</span></div>
-    </div><button class="xbtn" id="detailX">✕</button></div>
-    <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px"></div></div>
+  $('detailSheetHead').innerHTML = `<div>
+      <div class="hsym sheet__title">${esc(sym.replace('-','.'))}</div>
+      <div class="sheet__sub">${esc(NAMES[sym]||'')}</div>
+      <div class="sheet__price">${fmtPx(p)} <span class="t-label ${cls(dp)}">${fmtPct(dp)} today</span></div>
+    </div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `
+    <div class="chart-box chart-box--sheet"><canvas id="detailChart"></canvas><div id="detailMsg" class="chart-box__msg"></div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats">
       <div class="stat"><div class="k">Shares</div><div class="v">${r.qty.toFixed(3).replace(/\.?0+$/,'')}</div></div>
@@ -845,8 +879,8 @@ function openEdit(){
     <td><input data-i="${i}" data-f="qty" type="number" step="any" value="${h.qty}"></td>
     <td><input data-i="${i}" data-f="cost" type="number" step="any" value="${h.cost}"></td>
     <td><button class="del" data-i="${i}">✕</button></td></tr>`).join('');
-  $('editSheet').innerHTML = `
-    <div class="sheet-head"><div class="hsym" style="font-size:17px">Edit holdings</div><button class="xbtn" id="editX">✕</button></div>
+  $('editSheetHead').innerHTML = `<div class="hsym sheet__title">Edit holdings</div><button class="xbtn" id="editX" aria-label="Close">✕</button>`;
+  $('editSheetBody').innerHTML = `
     <div class="buybox">
       <div class="buytitle">Record a purchase</div>
       <div class="buyrow">

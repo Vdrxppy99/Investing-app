@@ -9,7 +9,8 @@ const EXPLAIN = {
   'Invested':['Invested','Your cost basis: the total you paid for the shares you still hold in this account.']
 };
 function openInfoSheet(title, html){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div><div class="infobody">${html}</div>`;
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `<div class="infobody">${html}</div>`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
@@ -48,8 +49,8 @@ function showConfirm(title, msg, yesLabel, onYes){
 }
 function explainStat(key){ const e=EXPLAIN[key]; if(e) openInfoSheet(e[0], `<p>${e[1]}</p>`); }
 function openListSheet(title, bodyHtml, note){
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div class="hsym" style="font-size:18px">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>
-    ${bodyHtml}${note?`<div class="inc-note">${note}</div>`:''}`;
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `${bodyHtml}${note?`<div class="inc-note">${note}</div>`:''}`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
@@ -60,12 +61,13 @@ async function openStockSheet(sym, name){
   const isIdx=sym.startsWith('^');
   const fmtP=v=>isIdx ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : fmtPx(v);
   const q=state.quotes[sym];
-  $('detailSheet').innerHTML = `<div class="sheet-head"><div>
-      <div class="hsym" style="font-size:18px">${esc(sym.replace('-','.'))}</div>
-      <div style="color:var(--mut);font-size:13px;margin-top:2px">${esc(name||'')}</div>
-      <div id="ssPrice" style="font-size:26px;font-weight:700;margin-top:8px">${q?fmtP(q.price):'…'}</div>
-    </div><div style="display:flex;gap:8px;align-items:flex-start"><button class="xbtn" id="watchBtn" style="font-size:17px"></button><button class="xbtn" id="detailX">✕</button></div></div>
-    <div class="chart-box" style="height:180px"><canvas id="detailChart"></canvas><div id="detailMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:13px">Loading chart…</div></div>
+  $('detailSheetHead').innerHTML = `<div>
+      <div class="hsym sheet__title">${esc(sym.replace('-','.'))}</div>
+      <div class="sheet__sub">${esc(name||'')}</div>
+      <div id="ssPrice" class="sheet__price">${q?fmtP(q.price):'…'}</div>
+    </div><div class="sheet__headbtns"><button class="xbtn" id="watchBtn" aria-label="Toggle watchlist"></button><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>`;
+  $('detailSheetBody').innerHTML = `
+    <div class="chart-box chart-box--sheet"><canvas id="detailChart"></canvas><div id="detailMsg" class="chart-box__msg">Loading chart…</div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats" id="ssStats"></div>`;
   showOverlay('detail');
@@ -74,7 +76,7 @@ async function openStockSheet(sym, name){
   const inWatch=()=>(state.watch||[]).some(w=>w.sym===sym);
   const paintWatch=()=>{ const b=$('watchBtn'); if(!b) return;
     b.textContent=inWatch()?'★':'☆';
-    b.style.color=inWatch()?'var(--brand)':'';
+    b.classList.toggle('on', inWatch());
     b.title=b.ariaLabel=inWatch()?'Remove from watchlist':'Add to watchlist'; };
   $('watchBtn').onclick=()=>{
     if(inWatch()) state.watch=state.watch.filter(w=>w.sym!==sym);
@@ -118,7 +120,7 @@ function openTaxSheet(){
     return {l, b, g:l.qty*priceOf(l.sym)-l.cost, lt:now-b>=YR};
   }).sort((a,b)=>(a.lt===b.lt) ? a.b-b.b : (a.lt?1:-1));
   const body=items.map(x=>`<div class="krow"><span class="k">${esc(x.l.sym.replace('-','.'))} · ${new Date(x.b).toLocaleDateString([],{month:'short',day:'numeric',year:'2-digit'})}${x.l.div?' · div':''}</span>
-    <span><span class="${cls(x.g)}">${fmtSign(x.g)}</span> ${x.lt?'<span class="pctpill up" style="font-size:10px">LT</span>':`<span class="pctpill down" style="font-size:10px">LT ${new Date(x.b+YR).toLocaleDateString([],{month:'short',day:'numeric'})}</span>`}</span></div>`).join('');
+    <span><span class="${cls(x.g)}">${fmtSign(x.g)}</span> ${x.lt?'<span class="pctpill up">LT</span>':`<span class="pctpill down">LT ${new Date(x.b+YR).toLocaleDateString([],{month:'short',day:'numeric'})}</span>`}</span></div>`).join('');
   openListSheet('Tax lots · all '+items.length, body, 'LT = long-term (held over 1 year → lower US capital-gains rate). Red pills show when that lot turns long-term. Estimates — not tax advice.');
 }
 function openSectorSheet(){

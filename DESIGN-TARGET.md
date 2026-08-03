@@ -55,6 +55,12 @@ Asset palette, assigned by position order and stable per symbol:
 #7C6CFF  #5B8DEF  #F0A24A  #2FD08A  #3ABEC7  #E36A9A  #2F6BE0  #B45309
 ```
 
+**Contrast note.** `--text-muted` and `--text-faint` as originally specified
+(`#6E7789` / `#525A6A`) measured 4.26:1 and 2.77:1 against the canvas, below the
+4.5:1 floor this document requires. R1 lightened both to clear it, same hue
+family. **The values now in `css/tokens.css` are canonical, not the hexes
+above.** `redesign/contrast-check.mjs --strict` is the arbiter.
+
 ### Type scale — 7 steps, no others
 
 ```

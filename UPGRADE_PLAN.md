@@ -231,6 +231,21 @@ full-bleed chart, allocation strip replacing the donut, holdings grouped by
 asset class with subtotals, rows carrying share count, average cost, sparkline
 and total return. Allocation, goal, dividends and movers leave this screen.
 
+**Also in R1 — rebuild the sheet primitive properly.** Three separate patches
+have failed to make `#editSheet` scroll (`overflow-y` on `#detailSheet` only,
+then on shared `.sheet`, then `.sheet > * { flex-shrink: 0 }`). Stop patching.
+`.sheet` is a flex column that receives raw `innerHTML`, with no separation
+between the head and the body, so there is no element that can own the scroll.
+Build the real component: a non-shrinking `.sheet__head` and a
+`.sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+overscroll-behavior: contain }`. `min-height: 0` is the part every patch so far
+has missed — without it a flex item will not shrink below its content and the
+body can never become a scroll container. The dead `.sheet__body` rule and the
+uncalled `uiSheet()` helper in `js/ui.js` were written for exactly this. Route
+`#detailSheet` and `#editSheet` through it, and verify by measurement —
+`scrollHeight > clientHeight`, scroll to the bottom, confirm the last element
+is inside the visible box. Not by screenshot.
+
 ### R2 — Insights
 Restructure ~20 stacked cards into the health ring plus the module grid. No new
 maths — every figure already exists in `js/insights.js`.
@@ -241,6 +256,14 @@ into one segmented card, sector rows. Following: watchlist plus the ETF
 look-through, presented as a headline feature.
 
 ### R4 — Home
+
+**Carried into R4 from R1.** Two elements were dropped from the Portfolio hero
+because DESIGN-TARGET's composition has no slot for them, and they have not been
+relocated: `#homePr` (the period-return pills) and the "vs S&P 500 today"
+narrative sentence. Both belong on Home — the pills as a row under the portfolio
+card, the narrative as a Today's-movers lead line. Do not let them vanish.
+
+
 The new glance screen. Portfolio card, today's movers with attribution, upcoming
 dividends with day-count chips, goal progress. Built last, because it summarises
 pieces that must exist first.

@@ -173,89 +173,53 @@
 
   <div id="staleBanner" class="banner" hidden></div>
 
-  <!-- HERO. Deliberately has no card around it: a number this large does not need
-       a box, and boxing it made it peer with the day-change box beside it. Four
-       stacked divs are now one composed unit. -->
+  <!-- HERO — DESIGN-TARGET.md's Portfolio composition: eyebrow, 37px total, one
+       line carrying BOTH today's delta and the all-time return (no separate
+       chip list, no donut card below it — allocation folds into the strip
+       right under the chart instead). Deliberately no card around any of this:
+       a number this large does not need a box. -->
   <header class="hero">
     <div class="greet brand" id="greetLine"></div>
     <div id="status" class="status"><span class="status__dot"></span><span id="statusTx">Loading</span></div>
+    <div class="hero__eyebrow" id="pfEyebrow">Total portfolio</div>
     <div class="t-hero hero__total" id="totalVal" data-selectable aria-live="polite">&mdash;</div>
     <div class="hero__delta" id="todayLine"></div>
-    <div class="hero__sub" id="totalSub"></div>
     <div class="rail" id="accChips"></div>
   </header>
 
-  <div class="split">
-    <div class="split__main stack">
-
-      <section class="card">
-        <div class="chart__readout" id="chartDelta"></div>
-        <div class="chart"><div id="mainChart"></div><div id="chartMsg" class="chart__msg"></div></div>
-        <div class="chartctl">
-          <div class="seg" id="metricSeg" role="tablist" aria-label="Metric">
-            <button class="seg__item" data-m="value" role="tab" aria-selected="false">Value</button>
-            <button class="seg__item" data-m="profit" role="tab" aria-selected="true">Profit</button>
-          </div>
-          <div class="seg" id="rangeSeg" role="tablist" aria-label="Range">
-            <button class="seg__item" data-r="1D" role="tab" aria-selected="false">1D</button>
-            <button class="seg__item" data-r="1W" role="tab" aria-selected="false">1W</button>
-            <button class="seg__item" data-r="2W" role="tab" aria-selected="false">2W</button>
-            <button class="seg__item" data-r="1M" role="tab" aria-selected="true">1M</button>
-            <button class="seg__item" data-r="6M" role="tab" aria-selected="false">6M</button>
-            <button class="seg__item" data-r="YTD" role="tab" aria-selected="false">YTD</button>
-            <button class="seg__item" data-r="1Y" role="tab" aria-selected="false">1Y</button>
-            <button class="seg__item" data-r="5Y" role="tab" aria-selected="false">5Y</button>
-            <button class="seg__item" data-r="MAX" role="tab" aria-selected="false">Max</button>
-          </div>
-          <button class="btn btn--ghost btn--sm" id="benchBtn">vs S&amp;P 500</button>
-        </div>
-        <div class="t-caption faint" id="athLine"></div>
-        <div class="rail" id="homePr"></div>
-      </section>
-
-      <!-- Visibility is owned by renderMovers() via style.display; do NOT add
-           `hidden` here, because [hidden] carries !important and would win. -->
-      <section class="card" id="moverCard"><div id="moverBody"></div></section>
-
-      <section class="card">
-        <div class="card__head">
-          <h2 class="card__title">Holdings</h2>
-          <div class="seg" id="sortSeg" role="tablist" aria-label="Sort holdings">
-            <button class="seg__item" data-s="value" role="tab" aria-selected="true">Value</button>
-            <button class="seg__item" data-s="day" role="tab" aria-selected="false">Today</button>
-            <button class="seg__item" data-s="profit" role="tab" aria-selected="false">Profit</button>
-          </div>
-        </div>
-        <div id="holdList"></div>
-        <div id="cashRow"></div>
-      </section>
+  <!-- Chart — full-bleed, no card (DESIGN-TARGET). chart--bleed cancels .wrap's
+       screen gutter for this one element, same negative-margin technique .rail
+       already uses to bleed to the edge. -->
+  <div class="chart__readout" id="chartDelta"></div>
+  <div class="chart chart--bleed"><div id="mainChart"></div><div id="chartMsg" class="chart__msg"></div></div>
+  <div class="chartctl">
+    <div class="seg" id="metricSeg" role="tablist" aria-label="Metric">
+      <button class="seg__item" data-m="value" role="tab" aria-selected="false">Value</button>
+      <button class="seg__item" data-m="profit" role="tab" aria-selected="true">Profit</button>
     </div>
-
-    <!-- Demoted modules. Disclosure rows on mobile, real cards in this column at
-         >=1024px — same components, different slot. -->
-    <!-- Demoted, not hidden. Collapsed disclosures on mobile; the media query at
-         >=1024px forces them open and strips the summary so they read as plain
-         cards in the side column. Same markup, two presentations. -->
-    <aside class="split__side">
-      <section class="card" id="allocCard">
-        <h2 class="card__title card-title">Allocation</h2>
-        <div class="cardstack">
-          <div class="alloc"><div class="alloc__donut"><canvas id="allocChart"></canvas></div>
-          <div id="allocLegend"></div></div>
-          <div id="allocClasses"></div>
-          <div id="tgtWrap"></div>
-        </div>
-      </section>
-      <section class="card" id="goalCard">
-        <h2 class="card__title card-title">Goal</h2>
-        <div class="cardstack"><div id="goalBody"></div></div>
-      </section>
-      <section class="card" id="incomeCard">
-        <h2 class="card__title card-title" id="divTitle">Dividends</h2>
-        <div class="cardstack"><div id="incomeBody"></div></div>
-      </section>
-    </aside>
+    <div class="seg" id="rangeSeg" role="tablist" aria-label="Range">
+      <button class="seg__item" data-r="1D" role="tab" aria-selected="false">1D</button>
+      <button class="seg__item" data-r="1W" role="tab" aria-selected="false">1W</button>
+      <button class="seg__item" data-r="2W" role="tab" aria-selected="false">2W</button>
+      <button class="seg__item" data-r="1M" role="tab" aria-selected="true">1M</button>
+      <button class="seg__item" data-r="6M" role="tab" aria-selected="false">6M</button>
+      <button class="seg__item" data-r="YTD" role="tab" aria-selected="false">YTD</button>
+      <button class="seg__item" data-r="1Y" role="tab" aria-selected="false">1Y</button>
+      <button class="seg__item" data-r="5Y" role="tab" aria-selected="false">5Y</button>
+      <button class="seg__item" data-r="MAX" role="tab" aria-selected="false">Max</button>
+    </div>
+    <button class="btn btn--ghost btn--sm" id="benchBtn">vs S&amp;P 500</button>
   </div>
+  <div class="t-caption faint" id="athLine"></div>
+
+  <!-- Allocation strip — replaces the donut card. Tap for the full breakdown,
+       asset-class mix and target-mix/rebalance planner (openAllocSheet). -->
+  <button class="allocstrip" id="allocStrip" aria-label="Allocation breakdown"></button>
+
+  <section class="stack holdings-block">
+    <div id="holdList"></div>
+    <div id="cashRow" class="cashrow hidden"></div>
+  </section>
 
   <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v9.1.0</span></p>
 </div>
@@ -418,8 +382,21 @@
   <button class="tabbar__item" data-page="insights"><svg aria-hidden="true"><use href="#i-activity"/></svg>Insights</button>
 </nav>
 
-<div class="scrim hidden" id="detail" data-open="false"><div class="sheet" id="detailSheet" data-open="false" role="dialog" aria-modal="true"></div></div>
-<div class="scrim hidden" id="editModal" data-open="false"><div class="sheet" id="editSheet" data-open="false" role="dialog" aria-modal="true"></div></div>
+<!-- Real .sheet__grip/.sheet__head/.sheet__body children, not content thrown
+     straight into .sheet — see css/components.css's .sheet__body comment for
+     why that split is what actually makes these scroll. js/sheets.js and
+     js/portfolio.js target *SheetHead/*SheetBody directly; nothing writes to
+     the outer #detailSheet/#editSheet innerHTML anymore. -->
+<div class="scrim hidden" id="detail" data-open="false"><div class="sheet" id="detailSheet" data-open="false" role="dialog" aria-modal="true">
+  <div class="sheet__grip"></div>
+  <div class="sheet__head" id="detailSheetHead"></div>
+  <div class="sheet__body" id="detailSheetBody"></div>
+</div></div>
+<div class="scrim hidden" id="editModal" data-open="false"><div class="sheet" id="editSheet" data-open="false" role="dialog" aria-modal="true">
+  <div class="sheet__grip"></div>
+  <div class="sheet__head" id="editSheetHead"></div>
+  <div class="sheet__body" id="editSheetBody"></div>
+</div></div>
 <div class="toast" id="toast" role="status" data-open="false"></div>
 
 <!-- Loaded before vault.js: the lock screen references the icon sprite and
