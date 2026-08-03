@@ -65,7 +65,9 @@ const LIGHT = {
 // exact asset palette, assigned by position order and stable per symbol.
 // Constraint: none may read as gain or loss, so the greens and reds of the
 // P&L tokens are excluded.
-const RAMP_DARK = ["#7C6CFF", "#5B8DEF", "#F0A24A", "#2FD08A", "#3ABEC7", "#E36A9A", "#2F6BE0", "#B45309"];
+// Corrected post-R1: position 4 was #2FD08A (== gain), position 3 shifted
+// amber→orange to stay distinguishable from 4. Kept in sync with tokens.css.
+const RAMP_DARK = ["#7C6CFF", "#5B8DEF", "#F97316", "#EAB308", "#3ABEC7", "#E36A9A", "#2F6BE0", "#B45309"];
 const RAMP_LIGHT = ["#2E63C8", "#6D4BC4", "#1B7F8C", "#8A6110", "#A83C67", "#3C6FA8", "#5A6478", "#7A5A2E"];
 
 // ── maths ──────────────────────────────────────────────────────────────────

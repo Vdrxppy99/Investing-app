@@ -9,16 +9,6 @@ const centerTxt = { id:'centerTxt', afterDraw(c){
   ctx.restore();
 }};
 if(window.Chart) Chart.register(centerTxt);
-function drawDonut(id, labels, data, colors, center){
-  const el=$(id); if(!window.Chart) return null;
-  const o=Chart.getChart(el); if(o) o.destroy();
-  return new Chart(el,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:cvar('--card')}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false},centerTxt:center||false,
-      tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>c.label+': '+fmt(c.parsed)}}}}});
-}
-function donutLegend(el, items, total){
-  $(el).innerHTML = items.map(i=>`<div class="alg"><span class="dot" style="background:${i.color}"></span>${esc(i.label)}<span class="alp">${(i.v/total*100).toFixed(1)}%</span></div>`).join('');
-}
 function renderGainsTable(){
   const rs=rows('all');
   // dividends actually received per fund (recorded reinvestment lots) — replaces the old
@@ -35,10 +25,6 @@ function renderGainsTable(){
     <tr><td>Total</td><td></td><td class="${divTot>0?'pos':''}">${fmt(divTot)}</td><td class="${cls(unrl)}"><b>${fmtSign(unrl)}</b></td></tr>`;
   $('gainsTable').querySelectorAll('tr[data-sym]').forEach(tr=> tr.onclick=()=>openDetail(tr.dataset.sym));
 }
-function stackBar(el, items){ // part-of-whole as a single stacked bar
-  const tot=items.reduce((a,i)=>a+i.v,0)||1;
-  $(el).innerHTML = items.map(i=>`<span style="width:${(i.v/tot*100).toFixed(2)}%;background:${i.color}" title="${esc(i.label)}"></span>`).join('');
-}
 /* VXUS regional mix — published fund page, estimate */
 const VXUS_REGIONS = { 'Europe':.40, 'Asia-Pacific':.27, 'Emerging markets':.26, 'Canada & other':.07 };
 function locItems(){
@@ -54,11 +40,6 @@ function locItems(){
     {label:'Canada & other', v:intl*VXUS_REGIONS['Canada & other'], color:CAT[5]},
     {label:'Cash',          v:cash,                        color:CAT[2]}
   ].filter(i=>i.v>0);
-}
-function renderLocDonut(){
-  const items=locItems();
-  stackBar('locBar', items);
-  donutLegend('locLegend', items, items.reduce((a,i)=>a+i.v,0));
 }
 function renderLook(){
   if(!$('lookList')) return;
@@ -117,13 +98,11 @@ function renderDrawdown(){
       `${niceLbl(labels[i])} · <b class="${dd[i]<-0.05?'neg':'pos'}">${dd[i]<-0.05?dd[i].toFixed(1)+'% below peak':'at the peak'}</b>`;
   });
 }
-function renderPECard(){
+// Share-weighted portfolio P/E — shared by renderModGrid()'s tile and openPESheet()'s detail.
+function portfolioPE(){
   const rs=rows('all'); let wsum=0, earn=0;
   for(const r of rs){ const m=FUND_META[r.sym]; if(!m||!m.pe) continue; const v=r.qty*priceOf(r.sym); wsum+=v; earn+=v/m.pe; }
-  const pe=earn>0?wsum/earn:0;
-  $('peCard').innerHTML='<div class="it">Portfolio P/E <span class="chev">›</span></div>'+
-    `<div class="big-n">${pe.toFixed(1)}×</div><div class="sub-n">You pay ~$${pe.toFixed(0)} per $1 of yearly earnings across everything you own.</div>`+
-    rs.filter(r=>FUND_META[r.sym]).map(r=>`<div class="krow"><span class="k">${esc(r.sym.replace('-','.'))}</span><span>${FUND_META[r.sym].pe}×</span></div>`).join('');
+  return earn>0?wsum/earn:null;
 }
 function riskStats(){
   const rs=rows('all'); const t=totals('all');
@@ -176,21 +155,6 @@ function riskStats(){
   const annRet=mu*periodsPerYear*100, RF=4;
   const sharpe=vol>0?(annRet-RF)/vol:0;
   return {vol, beta, mdd:mdd*100, best:{d:retDays[bi], p:rets[bi]*100}, worst:{d:retDays[wi], p:rets[wi]*100}, sharpe, annRet};
-}
-function renderRiskCard(){
-  const r=riskStats();
-  if(!r){ $('riskCard').innerHTML='<div class="it">Risk <span class="chev">›</span></div><div class="sub-n">Needs a year of price history — connect once.</div>'; return; }
-  const lvl = r.vol<10?['Low',cvar('--green')]:r.vol<18?['Moderate',cvar('--warn')]:r.vol<28?['Elevated','#ec835a']:['High',cvar('--red')];
-  const dstr=d=>new Date(d+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric'});
-  $('riskCard').innerHTML='<div class="it">Risk <span class="chev">›</span></div>'+
-    `<span class="risk-badge" style="background:${lvl[1]}22;color:${lvl[1]}">${lvl[0]}</span>`+
-    `<div class="krow"><span class="k">Volatility (1Y)</span><span>${r.vol.toFixed(1)}%</span></div>
-     <div class="krow"><span class="k">Beta vs S&P 500</span><span>${r.beta.toFixed(2)}</span></div>
-     <div class="krow"><span class="k">Max drawdown</span><span class="neg">${r.mdd.toFixed(1)}%</span></div>
-     <div class="krow"><span class="k">Best day</span><span class="pos">${fmtPct(r.best.p)} · ${dstr(r.best.d)}</span></div>
-     <div class="krow"><span class="k">Worst day</span><span class="neg">${fmtPct(r.worst.p)} · ${dstr(r.worst.d)}</span></div>
-     <div class="krow"><span class="k">Sharpe ratio</span><span class="${r.sharpe>=1?'pos':''}">${r.sharpe.toFixed(2)}${r.sharpe>=1?' · strong':r.sharpe>=0.5?' · decent':''}</span></div>`+
-    `<div class="sub-n" style="margin-top:9px">${r.beta<0.995?`You swing ${Math.round((1-r.beta)*100)}% less than the market.`:r.beta>1.005?`You swing ${Math.round((r.beta-1)*100)}% more than the market.`:'You move in lockstep with the market.'}</div>`;
 }
 function renderWorthChart(){
   const el=$('worthChart'); if(!window.Chart) return;
@@ -350,6 +314,10 @@ function renderPerf(){
   html += `<div class="inc-note">Your returns are deposit-adjusted (new money doesn't inflate them); S&P 500 = VOO price change over the same window, excluding its dividends. "Same buys" replays each of your ${state.lots.filter(l=>!l.div).length} purchases into VOO on the same dates — the honest benchmark for your timing. Tap a period to see it on the chart.</div>`;
   $('perfBody').innerHTML=html;
   $('perfBody').querySelectorAll('tr[data-r]').forEach(tr=> tr.onclick=()=>{
+    // R2: this table now lives inside the Performance sheet (openPerfSheet), not
+    // inline on the page — close it before navigating tabs, or Portfolio would
+    // render underneath a still-open scrim.
+    closeDetail();
     showPage('portfolio');
     const t=document.querySelector(`#rangeSeg button[data-r="${tr.dataset.r}"]`); if(t) t.click();
   });
@@ -361,7 +329,177 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
     if(c && el.width===0 && el.parentNode && el.parentNode.clientWidth>0){ try{ c.resize(); }catch(e){} }
   });
 }
-function renderInsights(){ renderHealth(); renderPerf(); renderDrawdown(); renderCoach(); renderProjection(); renderFI(); renderGainsTable(); renderLook(); ensureLookQuotes(); renderLocDonut(); renderPECard(); renderRiskCard(); renderCrashCard(); renderTaxCard(); renderSectorDonut(); renderHeatmap(); renderWorthChart(); renderContribChart(); setTimeout(ensureChartsSized,150); }
+/* ============ R2 restructure: health card + module grid + heatmap + sector
+   exposure are the only things rendered unconditionally (DESIGN-TARGET.md /
+   five-tabs.html frame 4). Everything else — performance detail, drawdown,
+   gains, tax lots, contributions, projection, financial independence, coach,
+   crash test, geography, look-through, asset worth — is unchanged maths,
+   just rendered lazily the moment its sheet opens (open*Sheet functions
+   below), instead of unconditionally into cards that no longer exist. */
+function renderInsights(){
+  renderHealth();
+  renderModGrid();
+  renderHeatmap();
+  renderSectorStrip();
+  renderMoreList();
+}
+/* Six single-stat tiles: XIRR, vs VOO ("same buys" $ comparison), Volatility,
+   Beta, Max drawdown, Portfolio P/E. Colour is applied only to the figures
+   that ARE gain/loss (XIRR, vs VOO, Max drawdown) — Volatility/Beta/P/E are
+   risk & valuation magnitudes, not gain/loss, so they stay neutral text per
+   DESIGN-TARGET's "green/red only on gain/loss" rule. */
+function renderModGrid(){
+  const grid=$('modGrid'); if(!grid) return;
+  const rr=personalReturn('all');
+  const t=totals('all'), sp=spPathValue(), mine=t.value-cashFor('all');
+  const vsVoo = (sp && sp.value>0) ? (mine-sp.value)/sp.value*100 : null;
+  const r=riskStats();
+  const pe=portfolioPE();
+  const tile=(mod,label,value,tone,sub)=>
+    `<div class="stat press" data-mod="${mod}">`+
+    `<div class="stat__label">${esc(label)}</div>`+
+    `<div class="stat__value${tone?` ${tone}`:''}">${esc(value)}</div>`+
+    `<div class="stat__delta">${esc(sub)}</div></div>`;
+  grid.innerHTML =
+    tile('perf', 'XIRR', rr!=null?fmtPct(rr*100):'—', rr!=null?cls(rr*100):'', 'annualised') +
+    tile('perf', 'vs VOO', vsVoo!=null?fmtPct(vsVoo):'—', vsVoo!=null?cls(vsVoo):'', 'same buys in VOO') +
+    tile('risk', 'Volatility', r?r.vol.toFixed(2)+'%':'—', '', r?'Sharpe '+r.sharpe.toFixed(2):'Needs price history') +
+    tile('risk', 'Beta', r?r.beta.toFixed(2):'—', '', 'vs S&P 500') +
+    tile('risk', 'Max drawdown', r?fmtPct(r.mdd)+'%':'—', r?'neg':'', 'peak to trough') +
+    tile('pe', 'Portfolio P/E', pe!=null?pe.toFixed(1)+'×':'—', '', 'across your holdings');
+  grid.querySelectorAll('[data-mod]').forEach(el=> el.onclick=()=>{
+    const m=el.dataset.mod;
+    if(m==='perf') openPerfSheet();
+    else if(m==='risk') openRiskSheet();
+    else if(m==='pe') openPESheet();
+  });
+}
+/* Sector exposure as one segmented strip (allocstrip — same component/
+   convention as the Portfolio hero's allocation strip, js/portfolio.js
+   renderAllocStrip) plus a wrapped plain-text legend, replacing the old
+   per-sector .hbrow list. Same SECTOR_WEIGHTS aggregation as before — no
+   maths changed, only presentation. Colours read live from --cat-N tokens
+   (never boot.js's stale CAT array) so this can't reproduce the gain-colour
+   collision the categorical palette had before this phase's tokens.css fix. */
+function renderSectorStrip(){
+  const el=$('sectorStrip'); const legend=$('sectorLegend'); if(!el||!legend) return;
+  const per={};
+  for(const r of rows('all')){
+    const w=SECTOR_WEIGHTS[r.sym]; if(!w) continue;
+    const v=r.qty*priceOf(r.sym);
+    for(const [s,pc] of Object.entries(w)) per[s]=(per[s]||0)+v*pc/100;
+  }
+  let other=per['Other']||0; delete per['Other'];
+  const items=Object.entries(per).sort((a,b)=>b[1]-a[1]);
+  const top=items.slice(0,6); other += items.slice(6).reduce((a,x)=>a+x[1],0);
+  if(other>0) top.push(['Other', other]);
+  if(!top.length){ el.innerHTML=''; legend.innerHTML=''; return; }
+  const tot=top.reduce((a,x)=>a+x[1],0)||1;
+  el.innerHTML = top.map(()=>'<i></i>').join('');
+  el.querySelectorAll('i').forEach((it,i)=>{
+    const [label,v]=top[i];
+    it.style.setProperty('--w', (v/tot*100).toFixed(2)+'%');
+    it.style.setProperty('--seg', label==='Other' ? cvar('--faint') : cvar('--cat-'+(i+1)));
+  });
+  legend.innerHTML = top.map(([label,v])=>`<span>${esc(label)} ${(v/tot*100).toFixed(0)}%</span>`).join('');
+}
+/* The "More" list — every remaining Insights feature, demoted to a compact
+   disclose row (js/ui.js's own comment: "how a demoted module is reached on
+   mobile" — built in R1 for exactly this). Meta text reuses the same formulas
+   the old cards used; tapping opens the same sheets/render functions,
+   invoked fresh so they never depend on a card that no longer exists. */
+function renderMoreList(){
+  const list=$('moreList'); if(!list) return;
+  const t=totals('all');
+  const now=Date.now(), YR=31557600000;
+  let st=0, lt=0;
+  for(const l of state.lots){ const g=l.qty*priceOf(l.sym)-l.cost; if(now-new Date(l.date+'T12:00:00').getTime()>=YR) lt+=g; else st+=g; }
+  const totG=st+lt, ltPct=totG>0?lt/totG*100:0;
+  const m12=new Set(state.lots.filter(l=>!l.div && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
+  const rowsDef=[
+    {title:'Tax lots', meta:`${ltPct.toFixed(0)}% long-term`, fn:openTaxSheet},
+    {title:'Contributions', meta:`${m12} of last 12 months`, fn:openContribSheet},
+    {title:'Where this is headed', meta:`${projYears}y projection`, fn:openProjSheet},
+    {title:'Financial independence', meta:`${fmt(t.value*0.04/12)}/mo safe income`, fn:openFISheet},
+    {title:'Next moves', meta:`${coachItems().length} to review`, fn:openCoachSheet},
+    {title:'Crash test', meta:'Past crashes, scaled to you', fn:openCrashSheet},
+    {title:'Where your money lives', meta:'Regional breakdown', fn:openLocSheet},
+    {title:'Stocks you indirectly own', meta:'Your ETF look-through', fn:openLookSheet},
+    {title:'Asset worth', meta:'By category · 1Y', fn:openWorthSheet}
+  ];
+  list.innerHTML = rowsDef.map((r,i)=>
+    `<button class="disclose" data-i="${i}"><span class="disclose__title">${esc(r.title)}</span>`+
+    `<span class="disclose__meta">${esc(r.meta)}</span><svg aria-hidden="true"><use href="#i-chevron-right"/></svg></button>`).join('');
+  list.querySelectorAll('[data-i]').forEach((el,i)=> el.onclick=rowsDef[+el.dataset.i].fn);
+}
+/* ---- sheets for content that used to render inline — same render functions,
+   invoked once their target elements exist inside the open sheet. ---- */
+function openPerfSheet(){
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Performance</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `
+    <div id="perfBody"></div>
+    <div class="card">
+      <div class="stat__label">Drawdown · 1Y</div>
+      <div id="ddStat"></div>
+      <div class="chart chart--short"><canvas id="ddChart"></canvas></div>
+    </div>
+    <div class="tablewrap"><table class="table" id="gainsTable"></table></div>`;
+  showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
+  renderPerf(); renderDrawdown(); renderGainsTable();
+  setTimeout(ensureChartsSized,150);
+}
+function openContribSheet(){
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Contributions</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `
+    <div class="t-caption muted" id="contribSub"></div>
+    <div class="scrubro" id="contribRO"></div>
+    <div class="chart chart--short"><canvas id="contribChart"></canvas></div>`;
+  showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
+  renderContribChart();
+  setTimeout(ensureChartsSized,150);
+}
+function openProjSheet(){
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Where this is headed</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `
+    <div class="seg" id="projSeg" role="tablist" aria-label="Projection years">
+      <button class="seg__item" data-y="5" role="tab" aria-selected="${projYears===5}">5y</button>
+      <button class="seg__item" data-y="10" role="tab" aria-selected="${projYears===10}">10y</button>
+      <button class="seg__item" data-y="20" role="tab" aria-selected="${projYears===20}">20y</button>
+    </div>
+    <div class="scrubro" id="projRO"></div>
+    <div class="chart"><canvas id="projChart"></canvas></div>
+    <p class="t-caption faint" id="projNote"></p>
+    <p class="t-caption faint" id="projMC"></p>`;
+  showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
+  $('projSeg').querySelectorAll('button').forEach(b=> b.classList.toggle('on', +b.dataset.y===projYears));
+  $('projSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{
+    projYears=+b.dataset.y;
+    $('projSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+    renderProjection();
+  });
+  renderProjection();
+  setTimeout(ensureChartsSized,150);
+}
+function openCoachSheet(){
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Next moves</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `<div class="grid-2" id="coachGrid"></div>`;
+  showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
+  renderCoach();
+}
+function openLookSheet(){
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Stocks you indirectly own</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `<div class="t-caption muted" id="lookSub"></div><div id="lookList"></div>`;
+  showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
+  renderLook(); ensureLookQuotes();
+}
+function openWorthSheet(){
+  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Asset worth · 1Y</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetBody').innerHTML = `<div class="scrubro" id="worthRO"></div>
+    <div class="chart chart--short"><canvas id="worthChart"></canvas></div><div class="dlegend" id="worthLegend"></div>`;
+  showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
+  renderWorthChart();
+  setTimeout(ensureChartsSized,150);
+}
 
 /* ---- Crash Test: what past crashes would do to TODAY's portfolio (and that they all healed) ---- */
 const CRASH_SCENARIOS=[
@@ -369,16 +507,6 @@ const CRASH_SCENARIOS=[
   {n:'2020 COVID crash',      d:.34, rec:'~5 months'},
   {n:'2022 rate shock',       d:.25, rec:'~2 years'}
 ];
-function renderCrashCard(){
-  const el=$('crashBody'); if(!el) return;
-  const t=totals('all');
-  if(!(t.value>0)){ el.innerHTML='<div class="sub-n">Add holdings to run the stress test.</div>'; return; }
-  const rk=riskStats();
-  const beta=(rk&&rk.beta>0)?Math.min(rk.beta,1.3):1; // your funds move a bit less/more than the index
-  el.innerHTML = CRASH_SCENARIOS.map(c=>{ const hit=t.value*c.d*beta;
-    return `<div class="krow"><span class="k">${c.n}</span><span><b class="neg">−${fmt(hit).replace('-','')}</b> <span style="color:var(--faint);font-size:11px">healed in ${c.rec}</span></span></div>`; }).join('');
-  const cc=$('crashCard'); if(cc) cc.onclick=openCrashSheet;
-}
 function openCrashSheet(){
   const t=totals('all'); if(!(t.value>0)) return;
   const rk=riskStats(); const beta=(rk&&rk.beta>0)?Math.min(rk.beta,1.3):1;
@@ -618,24 +746,10 @@ function askContext(){
 // drift is well under a day per lot and never changes which TAX YEAR a lot falls into.
 // "Matching" here is trivial: every lot carries its own cost basis already (no FIFO/specific-lot
 // selection), since the app has no sell/disposal feature — each lot is classified against its
-// own purchase date, independent of any other lot.
-function renderTaxCard(){
-  const now=Date.now(), YR=31557600000;
-  let st=0, lt=0; const turning=[];
-  for(const l of state.lots){
-    const g=l.qty*priceOf(l.sym)-l.cost;
-    const bought=new Date(l.date+'T12:00:00').getTime();
-    if(now-bought>=YR) lt+=g;
-    else { st+=g; turning.push({sym:l.sym, when:bought+YR, g}); }
-  }
-  turning.sort((a,b)=>a.when-b.when);
-  const tot=st+lt, ltPct=tot>0?lt/tot*100:0;
-  $('taxCard').innerHTML='<div class="it">Tax Lots <span class="chev">›</span></div>'+
-    `<div class="big-n">${ltPct.toFixed(0)}%</div><div class="sub-n">of your gains are long-term (lower US tax rate)</div>`+
-    `<div class="krow"><span class="k">Long-term gains</span><span class="${cls(lt)}">${fmtSign(lt)}</span></div>
-     <div class="krow"><span class="k">Short-term gains</span><span class="${cls(st)}">${fmtSign(st)}</span></div>`+
-    turning.slice(0,3).map(x=>`<div class="krow"><span class="k">${esc(x.sym.replace('-','.'))} ${fmtSign(x.g)} → LT</span><span>${new Date(x.when).toLocaleDateString([],{month:'short',day:'numeric'})}</span></div>`).join('');
-}
+// own purchase date, independent of any other lot. (The long-term-% figure this
+// produces is read by renderMoreList()'s "Tax lots" meta line and rendered in
+// full by openTaxSheet() — js/sheets.js — both unchanged maths, just no longer
+// behind a dedicated renderTaxCard() now that the standalone Tax Lots card is gone.)
 /* approximate sector mix per fund (published fund pages, estimates) */
 const SECTOR_WEIGHTS = {
   'VOO':{Technology:33,Financials:13,'Consumer Disc.':11,'Comm. Services':10,Healthcare:10,Industrials:8,Other:15},
@@ -645,23 +759,6 @@ const SECTOR_WEIGHTS = {
   'VYM':{Financials:22,Healthcare:12,'Consumer Staples':12,Industrials:12,Technology:10,Other:32},
   'BRK-B':{Financials:100}
 };
-function renderSectorDonut(){
-  const per={};
-  for(const r of rows('all')){
-    const w=SECTOR_WEIGHTS[r.sym]; if(!w) continue;
-    const v=r.qty*priceOf(r.sym);
-    for(const [s,pc] of Object.entries(w)) per[s]=(per[s]||0)+v*pc/100;
-  }
-  let other=per['Other']||0; delete per['Other'];
-  const items=Object.entries(per).sort((a,b)=>b[1]-a[1]);
-  const top=items.slice(0,6); other += items.slice(6).reduce((a,x)=>a+x[1],0);
-  if(other>0) top.push(['Other',other]);
-  if(!top.length){ const ss=$('sectorSub'); if(ss) ss.textContent=''; $('sectorBars').innerHTML='<div class="sub-n">Add holdings to see your sector mix.</div>'; return; }
-  const tot=top.reduce((a,x)=>a+x[1],0)||1; const max=top[0][1]||1;
-  const ss=$('sectorSub');
-  if(ss && top.length) ss.textContent=`${top[0][0]} is your biggest bet at ${(top[0][1]/tot*100).toFixed(0)}% — every ${top[0][0].toLowerCase()} rally works for you.`;
-  $('sectorBars').innerHTML = top.map(([label,v])=>`<div class="hbrow"><div class="t"><span>${esc(label)}</span><span class="p">${(v/tot*100).toFixed(1)}%</span></div><div class="bar"><i style="width:${(v/max*100).toFixed(1)}%"></i></div></div>`).join('');
-}
 function renderHeatmap(){
   const md=monthlyDietzReturns();
   if(!md || Object.keys(md.ret).length<2){ $('hmBody').innerHTML='<div class="sub-n">Needs price history.</div>'; return; }

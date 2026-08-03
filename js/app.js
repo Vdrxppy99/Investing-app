@@ -107,16 +107,16 @@ function wireSheetDrag(sheetId, closeFn){
 wireSheetDrag('detailSheet', closeDetail);
 wireSheetDrag('editSheet', ()=>$('editModal').classList.add('hidden'));
 wireSearch(); wirePTR();
-$('taxCard').onclick=openTaxSheet;
 /* #divTitle lived on #incomeCard, which left the Portfolio screen in R1 (see
    renderIncome's comment) — no trigger element for openDivSheet exists until
    R4 gives dividends a home on Insights or Home. */
 if($('divTitle')) $('divTitle').onclick=openDivSheet;
-$('peCard').onclick=openPESheet;
-$('riskCard').onclick=openRiskSheet;
 $('healthCard').onclick=openHealthSheet;
 $('sectorCard').onclick=openSectorSheet;
-$('locCard').onclick=openLocSheet;
+/* taxCard/peCard/riskCard/locCard no longer exist as static elements (R2 —
+   UPGRADE_PLAN.md — folded into #modGrid tiles and #moreList disclose rows).
+   Their onclick wiring now happens where they're built: renderModGrid() and
+   renderMoreList() in js/insights.js. */
 
 /* ============ WIRING ============ */
 function ringSvg(pct, color, r){
@@ -188,22 +188,23 @@ function healthScore(){
   const score=Math.round(metrics.reduce((a,m)=>a+m.v,0)/metrics.length);
   return {score, metrics};
 }
+/* DESIGN-TARGET.md / five-tabs.html frame 4: ring is always brand-indigo and
+   the grade letter is plain text — green/red are reserved for gain/loss
+   figures, and a composite A–F grade is neither. Below the ring: one sentence
+   naming the single weakest metric (the lowest-scoring one with a tip), not
+   the old 4-bar breakdown — that full breakdown still lives one tap away in
+   openHealthSheet(), unchanged. */
 function renderHealth(){
   const {score,metrics}=healthScore();
   const grade=score>=85?'A':score>=75?'B':score>=65?'C':score>=50?'D':'F';
-  const col=score>=75?cvar('--green'):score>=55?cvar('--warn'):cvar('--red');
-  const label=score>=85?'Excellent':score>=75?'Strong':score>=65?'Solid':score>=50?'Needs work':'At risk';
-  const barCol=v=>v>=75?cvar('--green'):v>=50?cvar('--warn'):cvar('--red');
-  const tips=metrics.filter(m=>m.tip).slice(0,3);
+  const weakest=metrics.filter(m=>m.tip).sort((a,b)=>a.v-b.v)[0];
+  const oneLiner=weakest?weakest.tip:'Diversification, global mix, cost and cash deployment are all strong — nothing is holding the grade down.';
   $('healthBody').innerHTML=`
     <div class="hsplit">
-      <div class="hscore">${ringSvg(score/100, col, 40)}<div class="rt"><b style="color:${col}">${grade}</b><span>${score}/100</span></div></div>
-      <div class="hgrade"><div class="hg">${label}</div>
-        <div class="hd">A blend of your diversification, global mix, fees, and how much is put to work.</div></div>
-    </div>
-    <div class="hbars">${metrics.map(m=>`<div class="hmet"><div class="t"><span>${m.k}</span><span class="s">${m.detail}</span></div>
-      <div class="bar"><i style="width:${m.v.toFixed(0)}%;background:${barCol(m.v)}"></i></div></div>`).join('')}</div>
-    ${tips.length?`<div class="htips">${tips.map(t=>`<div class="htip"><span class="ti">→</span><span>${t.tip}</span></div>`).join('')}</div>`:''}`;
+      <div class="hscore">${ringSvg(score/100, cvar('--brand'), 40)}<div class="rt"><b>${grade}</b><span>${score}/100</span></div></div>
+      <div class="hgrade"><div class="hg">Portfolio health</div>
+        <div class="hd">${oneLiner}</div></div>
+    </div>`;
 }
 /* Movers left the Portfolio screen in R1 (DESIGN-TARGET.md — attribution
    belongs on Home, built in R4). #moverCard no longer exists here; this

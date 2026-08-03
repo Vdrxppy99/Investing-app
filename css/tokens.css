@@ -196,11 +196,15 @@
 
     /* Categorical ramp — allocation strip, sector bars. Assigned by position
        order and stable per symbol; DESIGN-TARGET's exact 8-hue asset palette.
-       No step may read as gain or loss. All clear 3:1 on canvas and surface. */
+       No step may read as gain or loss. All clear 3:1 on canvas and surface.
+       Corrected post-R1 (DESIGN-TARGET.md): position 4 was #2FD08A, byte-
+       identical to --gain, which contradicted the doc's own "green/red only
+       on gain/loss" rule. Position 3 shifted amber→orange so 3 and 4 stay
+       distinguishable now that 4 is yellow-gold, not green. */
     --cat-1: #7C6CFF;
     --cat-2: #5B8DEF;
-    --cat-3: #F0A24A;
-    --cat-4: #2FD08A;
+    --cat-3: #F97316;
+    --cat-4: #EAB308;
     --cat-5: #3ABEC7;
     --cat-6: #E36A9A;
     --cat-7: #2F6BE0;

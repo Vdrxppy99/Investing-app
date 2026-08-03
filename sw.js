@@ -1,10 +1,17 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.4.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.5.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
 // and #editSheet. No financial maths touched.
+// v9.5.0 — UPGRADE_PLAN.md Phase R2: Insights screen restructured from ~20
+// stacked cards into a health card + 6-tile module grid + heatmap + sector
+// strip, everything else demoted into lazily-rendered detail sheets (js/insights.js,
+// index.html, js/app.js). openTaxSheet/openSectorSheet/openLocSheet (js/sheets.js)
+// routed through the R1 .sheet__head/.sheet__body primitive. Categorical
+// palette position 4 corrected (was byte-identical to --gain) in css/tokens.css
+// and redesign/contrast-check.mjs. No financial maths touched.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

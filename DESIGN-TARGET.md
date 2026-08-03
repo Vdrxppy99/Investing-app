@@ -52,8 +52,14 @@ All of these live in `css/tokens.css` and nowhere else.
 Asset palette, assigned by position order and stable per symbol:
 
 ```
-#7C6CFF  #5B8DEF  #F0A24A  #2FD08A  #3ABEC7  #E36A9A  #2F6BE0  #B45309
+#7C6CFF  #5B8DEF  #F97316  #EAB308  #3ABEC7  #E36A9A  #2F6BE0  #B45309
 ```
+
+**Corrected after R1.** The original 4th entry was `#2FD08A`, byte-identical to
+`--gain` — which contradicted this document's own rule that green and red appear
+only on gain/loss. R1 implemented it literally as instructed and correctly
+flagged the contradiction. Position 3 shifted amber to orange to keep 3 and 4
+distinguishable. No categorical colour may equal `--gain` or `--loss`.
 
 **Contrast note.** `--text-muted` and `--text-faint` as originally specified
 (`#6E7789` / `#525A6A`) measured 4.26:1 and 2.77:1 against the canvas, below the
