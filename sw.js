@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.5.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.6.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -12,6 +12,13 @@ const V = 'pt-v9.5.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered 
 // routed through the R1 .sheet__head/.sheet__body primitive. Categorical
 // palette position 4 corrected (was byte-identical to --gain) in css/tokens.css
 // and redesign/contrast-check.mjs. No financial maths touched.
+// v9.6.0 — UPGRADE_PLAN.md Phase R3: Explore split into two tabs, Markets
+// (search, indices, screeners, sectors, ideas) and Following (watchlist, plus
+// the ETF look-through promoted to a headline section — index.html, js/explore.js,
+// js/app.js, js/sheets.js, js/i18n.js). Sector rows are now a plain krow list
+// instead of heat-tinted inline-styled tiles. TAB_ORDER (js/app.js) updated to
+// the new four-tab order for correct view-transition slide direction. No
+// financial maths touched.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

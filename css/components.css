@@ -1396,11 +1396,6 @@
   }
   .idx-card .c { font-size: var(--t-caption); font-weight: var(--w-semibold); }
   .idx-card svg, .idx-card canvas { width: 100%; height: 22px; display: block; }
-
-  /* explore.js paints a heat colour onto sector tiles inline. Keep the tile
-     legible on top of whatever it sets by giving the text its own contrast
-     rather than relying on the fill being light or dark. */
-  #sectorRow .idx-card .n { color: var(--text); }
 }
 
 @layer components {

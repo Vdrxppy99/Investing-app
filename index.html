@@ -150,9 +150,10 @@
      like a phone screenshot pasted onto white. -->
 <nav class="rail-nav" aria-label="Sections">
   <div class="rail-nav__brand"><svg aria-hidden="true"><use href="#i-wallet"/></svg>My Portfolio</div>
+  <button class="rail-nav__item" data-page="markets"><svg aria-hidden="true"><use href="#i-compass"/></svg>Markets</button>
   <button class="rail-nav__item" data-page="portfolio" aria-current="page"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
-  <button class="rail-nav__item" data-page="explore"><svg aria-hidden="true"><use href="#i-compass"/></svg>Explore</button>
   <button class="rail-nav__item" data-page="insights"><svg aria-hidden="true"><use href="#i-activity"/></svg>Insights</button>
+  <button class="rail-nav__item" data-page="following"><svg aria-hidden="true"><use href="#i-star"/></svg>Following</button>
   <span class="rail-nav__spacer"></span>
 </nav>
 
@@ -224,9 +225,13 @@
   <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v9.1.0</span></p>
 </div>
 
-<!-- ═══════════════════ EXPLORE ═══════════════════ -->
-<div id="page-explore" class="page hidden">
-  <div class="appbar"><h1 class="t-title" id="exploreTitle" tabindex="-1">Explore</h1></div>
+<!-- ═══════════════════ MARKETS ═══════════════════ -->
+<!-- DESIGN-TARGET.md §2 / five-tabs.html frame 2: half of the old Explore tab —
+     search, indices, the three screener lists collapsed into one segmented
+     card (already true here, see the comment on #screenSeg below — that fix
+     predates R3), and sector performance as a plain row list, not tiles. -->
+<div id="page-markets" class="page hidden">
+  <div class="appbar"><h1 class="t-title" id="marketsTitle" tabindex="-1">Markets</h1></div>
 
   <!-- Search is the hero of this screen and sticks: it must never scroll away. -->
   <div class="searchsticky">
@@ -240,19 +245,9 @@
   <section class="card" id="searchResults" hidden></section>
 
   <div class="stack">
-    <div id="watchWrap" hidden>
-      <div class="section__label">Watchlist</div>
-      <section class="card"><div id="watchList"></div></section>
-    </div>
-
     <div>
       <div class="section__label">Indices</div>
       <div class="tiles" id="idxRow"><div class="skel skel--tile"></div><div class="skel skel--tile"></div><div class="skel skel--tile"></div></div>
-    </div>
-
-    <div>
-      <div class="section__label">Sectors today</div>
-      <div class="tiles" id="sectorRow"><div class="skel skel--tile"></div><div class="skel skel--tile"></div><div class="skel skel--tile"></div></div>
     </div>
 
     <!-- THE FIX: Most Active / Gainers / Losers were three separate stacked cards
@@ -260,7 +255,7 @@
          mattered. One card, one segmented control. -->
     <section class="card">
       <div class="card__head">
-        <h2 class="card__title">Movers</h2>
+        <h2 class="card__title">Screeners</h2>
         <div class="seg" id="screenSeg" role="tablist" aria-label="Screener">
           <button class="seg__item" data-screen="active" role="tab" aria-selected="true">Active</button>
           <button class="seg__item" data-screen="gain" role="tab" aria-selected="false">Gainers</button>
@@ -272,11 +267,41 @@
       <div id="loseList" data-screen-panel="lose" hidden></div>
     </section>
 
+    <div>
+      <div class="section__label">Sectors today</div>
+      <section class="card"><div id="sectorRow"></div></section>
+    </div>
+
     <section class="card">
       <h2 class="card__title">Ideas</h2>
       <p class="t-caption muted">Funds that add something your current mix doesn't have. To research, not advice.</p>
       <div id="ideaList"></div>
     </section>
+  </div>
+
+  <p class="t-caption faint foot">Market data from the Yahoo Finance free feed. Not financial advice.</p>
+</div>
+
+<!-- ═══════════════════ FOLLOWING ═══════════════════ -->
+<!-- DESIGN-TARGET.md §5 / five-tabs.html frame 5: the other half of the old
+     Explore tab — watchlist, then the ETF look-through given a headline
+     section instead of being buried one tap deep in Insights' #moreList
+     (js/insights.js's openLookSheet still reaches the same data for anyone
+     coming from there; nothing was removed, this just gives it a front door). -->
+<div id="page-following" class="page hidden">
+  <div class="appbar"><h1 class="t-title" id="followingTitle" tabindex="-1">Following</h1></div>
+
+  <div class="stack">
+    <div id="watchWrap" hidden>
+      <div class="section__label">Watchlist</div>
+      <section class="card"><div id="watchList"></div></section>
+    </div>
+
+    <div>
+      <div class="section__label">Stocks you already own</div>
+      <p class="t-caption muted">Held indirectly through your ETFs — your look-through.</p>
+      <section class="card"><div id="followLookList"></div></section>
+    </div>
   </div>
 
   <p class="t-caption faint foot">Market data from the Yahoo Finance free feed. Not financial advice.</p>
@@ -321,9 +346,10 @@
 </div><!-- /shell -->
 
 <nav class="tabbar" aria-label="Sections">
+  <button class="tabbar__item" data-page="markets"><svg aria-hidden="true"><use href="#i-compass"/></svg>Markets</button>
   <button class="tabbar__item" data-page="portfolio" aria-current="page"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
-  <button class="tabbar__item" data-page="explore"><svg aria-hidden="true"><use href="#i-compass"/></svg>Explore</button>
   <button class="tabbar__item" data-page="insights"><svg aria-hidden="true"><use href="#i-activity"/></svg>Insights</button>
+  <button class="tabbar__item" data-page="following"><svg aria-hidden="true"><use href="#i-star"/></svg>Following</button>
 </nav>
 
 <!-- Real .sheet__grip/.sheet__head/.sheet__body children, not content thrown

@@ -320,6 +320,10 @@
   }
   .tiles > * { min-width: 0; }
 
+  /* DESIGN-TARGET.md §2: indices are a fixed 2x2 grid, not the auto-fill wrap
+     .tiles gives every other tile row (which renders 3-up at phone width). */
+  #idxRow { grid-template-columns: 1fr 1fr; }
+
   /* Collapsible sections are gone, so a card's contents just stack. */
   .cardstack { display: grid; gap: var(--s-3); min-width: 0; }
   .cardstack > * { min-width: 0; }
@@ -335,8 +339,9 @@
   .greet .bdate { color: var(--text-faint); }
 
   /* ── Tab-switch view transitions (Phase 3) ────────────────────────────────
-     Directional slide matching the tabbar's left-to-right order (Portfolio <
-     Explore < Insights). Progressive enhancement only — js/app.js feature-detects
+     Directional slide matching the tabbar's left-to-right order (Markets <
+     Portfolio < Insights < Following — see TAB_ORDER in js/app.js). Progressive
+     enhancement only — js/app.js feature-detects
      document.startViewTransition and swaps instantly where it's unsupported, so
      nothing here is load-bearing. prefers-reduced-motion is handled in base.css
      alongside every other animation, not duplicated here. */

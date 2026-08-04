@@ -61,8 +61,8 @@ function lookExposure(){ // your indirect $ in each mega-cap via fund top-holdin
 }
 async function refreshMarkets(force){
   if(mkt.fetching) return;
-  if(!force && Date.now()-mkt.ts<5*60000){ renderMarkets(); return; }
-  mkt.fetching=true; renderMarkets();
+  if(!force && Date.now()-mkt.ts<5*60000){ renderMarkets(); renderFollowing(); return; }
+  mkt.fetching=true; renderMarkets(); renderFollowing();
   const QUOTE_TTL=5*60000;
   const watchJobs=(state.watch||[])
     .filter(w=>{const q=state.quotes[w.sym]; return !q||!q.ts||Date.now()-q.ts>QUOTE_TTL;})
@@ -77,7 +77,7 @@ async function refreshMarkets(force){
   await Promise.allSettled([...IDX_LIST.map(fetchIndexCard), fetchScreener('most_actives'), fetchScreener('day_gainers'), fetchScreener('day_losers'), ...watchJobs, ...ideaJobs, ...sectorJobs]);
   mkt.ts=Date.now(); mkt.fetching=false;
   lsSet('pt_quotes',state.quotes);
-  renderMarkets();
+  renderMarkets(); renderFollowing();
 }
 function sparkArr(pts,W,H,up){
   const v=(pts||[]).filter(x=>x!=null); if(v.length<3) return '';
@@ -98,27 +98,14 @@ function renderMarkets(){
     return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)}"><div class="n">${x.n}</div><div class="p">${d.price.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="c ${cls(pct)}">${fmtPct(pct)}</div>${sparkArr(d.spark,102,26,pct>=0)}</div>`;
   }).join('');
   const skelTiles=n=>Array.from({length:n},()=>'<div class="skel-tile"></div>').join('');
-  $('idxRow').innerHTML = cards || (mkt.fetching ? skelTiles(4) : `<div class="mload">Couldn’t load — tap the Explore tab again to retry.</div>`);
-  // sector pulse: every sector ETF, hottest first, heat-tinted like a compact heatmap
+  $('idxRow').innerHTML = cards || (mkt.fetching ? skelTiles(4) : `<div class="mload">Couldn’t load — tap the Markets tab again to retry.</div>`);
+  // sector pulse: every sector ETF, hottest first — DESIGN-TARGET.md §2 plain row list, not heat-tinted tiles
   const secs=SECTOR_ETFS.map(([s,n])=>{ const q=state.quotes[s];
       return q&&q.prev>0 ? {s,n,pct:(q.price/q.prev-1)*100} : null; }).filter(Boolean)
     .sort((a,b)=>b.pct-a.pct);
-  $('sectorRow').innerHTML = secs.length ? secs.map(x=>{
-    const a=Math.min(.4,Math.abs(x.pct)/4+.06);
-    const col=x.pct>=0?`rgba(${cvar('--green-rgb')},${a})`:`rgba(${cvar('--red-rgb')},${a})`;
-    return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)} sector (${esc(x.s)})" style="background:${col};flex-basis:118px">
-      <div class="n">${esc(x.n)}</div><div class="c ${cls(x.pct)}" style="font-size:15px;font-weight:800;margin-top:4px">${fmtPct(x.pct)}</div>
-      <div class="n" style="margin-top:5px;opacity:.7">${esc(x.s)}</div></div>`;
-  }).join('') : (mkt.fetching ? Array.from({length:5},()=>'<div class="skel-tile" style="flex-basis:118px;height:84px"></div>').join('') : `<div class="mload">Couldn’t load — tap Explore again.</div>`);
-  const wl=state.watch||[];
-  $('watchWrap').style.display = wl.length ? '' : 'none';
-  $('watchList').innerHTML = wl.map(w=>{
-    const q=state.quotes[w.sym];
-    const isIdx=w.sym.startsWith('^');
-    const px = q&&q.price>0 ? (isIdx ? q.price.toLocaleString(undefined,{maximumFractionDigits:2}) : fmtPx(q.price)) : '…';
-    const pct = q&&q.prev>0 ? (q.price/q.prev-1)*100 : null;
-    return mRow(w.sym, w.name, px, pct);
-  }).join('');
+  $('sectorRow').innerHTML = secs.length ? secs.map(x=>
+    `<div class="krow" data-sym="${esc(x.s)}" data-name="${esc(x.n)} sector (${esc(x.s)})"><span class="k">${esc(x.n)}</span><span><b class="${cls(x.pct)}">${fmtPct(x.pct)}</b></span></div>`
+  ).join('') : (mkt.fetching ? skel(5) : `<div class="mload">Couldn’t load — tap Markets again.</div>`);
   const ownedNow=new Set(rows('all').map(r=>r.sym));
   $('ideaList').innerHTML = IDEAS.filter(i=>!ownedNow.has(i.sym)).map(i=>{
     const q=state.quotes[i.sym];
@@ -131,10 +118,30 @@ function renderMarkets(){
   }).join('') || '<div class="mload">You own everything on the ideas list — impressive.</div>';
   const fill=(id,el)=>{ const L=mkt.lists[id];
     $(el).innerHTML = L&&L.length ? L.map(q=>mRow(q.sym,q.name,fmtPx(q.px),q.pct)).join('')
-      : (mkt.fetching ? skel(4) : `<div class="mload">Couldn’t load — tap the Explore tab again to retry.</div>`); };
+      : (mkt.fetching ? skel(4) : `<div class="mload">Couldn’t load — tap the Markets tab again to retry.</div>`); };
   fill('most_actives','activeList'); fill('day_gainers','gainList'); fill('day_losers','loseList');
-  /* row taps are handled by one delegated listener on #page-explore (app.js) —
+  /* row taps are handled by one delegated listener on #page-markets (app.js) —
      no per-row wiring, so rows re-rendered mid-fetch can never lose their handler */
+}
+function renderFollowing(){
+  const wl=state.watch||[];
+  $('watchWrap').style.display = wl.length ? '' : 'none';
+  $('watchList').innerHTML = wl.map(w=>{
+    const q=state.quotes[w.sym];
+    const isIdx=w.sym.startsWith('^');
+    const px = q&&q.price>0 ? (isIdx ? q.price.toLocaleString(undefined,{maximumFractionDigits:2}) : fmtPx(q.price)) : '…';
+    const pct = q&&q.prev>0 ? (q.price/q.prev-1)*100 : null;
+    return mRow(w.sym, w.name, px, pct);
+  }).join('');
+  // ETF look-through — DESIGN-TARGET.md §5 headline feature: $ value + portfolio % held
+  // indirectly through funds, not a gain/loss figure, so it's plain muted text, not a pill.
+  const look=lookExposure();
+  const tot=totals('all').value;
+  $('followLookList').innerHTML = look.length ? look.map(l=>
+    `<div class="mrow" data-sym="${esc(l.sym)}" data-name="${esc(LOOK_NAMES[l.sym]||l.sym)}">${badgeHtml(l.sym)}
+      <div class="mmid"><div class="msym">${esc(l.sym)}</div><div class="mname">${esc(LOOK_NAMES[l.sym]||'')} · via ${esc(l.via.join(', '))}</div></div>
+      <div class="mright"><div class="mpx">${fmt(l.usd)}</div><div class="mchg muted">${tot>0?(l.usd/tot*100).toFixed(1):'0.0'}%</div></div></div>`
+  ).join('') : '<div class="mload">Buy a fund like VOO or VTI to see what you indirectly own.</div>';
 }
 
 /* ============ MARKET SEARCH ============ */

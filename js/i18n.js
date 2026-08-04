@@ -24,7 +24,7 @@
   const DE = {
     /* ── navigation & chrome ─────────────────────────────────────────────── */
     "Portfolio": "Portfolio",
-    "Explore": "Entdecken",
+    "Markets": "Märkte",
     "Insights": "Analyse",
     "My Portfolio": "Mein Portfolio",
     "Example data": "Beispieldaten",
@@ -105,13 +105,14 @@
     "Indices": "Indizes",
     "Sectors today": "Sektoren heute",
     "Sectors": "Sektoren",
-    "Movers": "Bewegungen",
+    "Screeners": "Screener",
     "Active": "Aktiv",
     "Gainers": "Gewinner",
     "Losers": "Verlierer",
     "Ideas": "Ideen",
     "Watchlist": "Merkliste",
     "Following": "Beobachtet",
+    "Stocks you already own": "Aktien, die du bereits besitzt",
     "Nothing here yet": "Noch nichts hier",
     "Clear search": "Suche löschen",
 
@@ -224,6 +225,8 @@
       "Mit einem Blick öffnen statt zu tippen. Dein Passwort bleibt als Wiederherstellungsschlüssel bestehen.",
     "Funds that add something your current mix doesn't have. To research, not advice.":
       "Fonds, die deiner Mischung etwas hinzufügen. Zum Recherchieren, keine Anlageberatung.",
+    "Held indirectly through your ETFs — your look-through.":
+      "Indirekt über deine ETFs gehalten — dein Look-through.",
     "Nothing needs your attention. The portfolio is running clean.":
       "Nichts erfordert deine Aufmerksamkeit. Das Portfolio läuft sauber.",
     "Shows once at each market open and close.":

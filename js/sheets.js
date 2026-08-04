@@ -82,7 +82,7 @@ async function openStockSheet(sym, name){
     if(inWatch()) state.watch=state.watch.filter(w=>w.sym!==sym);
     else state.watch=[...(state.watch||[]), {sym, name:name||''}];
     lsSet('pt_watch',state.watch); paintWatch();
-    if(!$('page-explore').classList.contains('hidden')) renderMarkets();
+    if(!$('page-following').classList.contains('hidden')) renderFollowing();
   };
   paintWatch();
   if(detailChart){ detailChart.destroy(); detailChart=null; }

@@ -19,7 +19,7 @@ function wirePTR(){
     if(!pulling) return; pulling=false;
     if(ptr.classList.contains('armed')){
       ptr.classList.remove('armed'); ptr.classList.add('loading'); ptr.style.height=TH*0.7+'px';
-      if(!$('page-explore').classList.contains('hidden')) refreshMarkets(true);
+      if(!$('page-markets').classList.contains('hidden') || !$('page-following').classList.contains('hidden')) refreshMarkets(true);
       refreshAll(true).then(()=>{ ptr.classList.remove('loading'); ptr.style.height='0px'; });
     } else { ptr.style.height='0px'; }
   });
@@ -40,7 +40,7 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) clearBa
 
 /* ============ PAGE SWITCHING ============ */
 function showPage(p){
-  if(p!=='explore' && $('searchResults')){ $('searchResults').style.display='none'; if($('mktSearch')) $('mktSearch').value=''; if($('mktSearchX')) $('mktSearchX').style.display='none'; }
+  if(p!=='markets' && $('searchResults')){ $('searchResults').style.display='none'; if($('mktSearch')) $('mktSearch').value=''; if($('mktSearchX')) $('mktSearchX').style.display='none'; }
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('hidden', el.id!=='page-'+p));
   document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on', b.dataset.page===p));
   window.scrollTo(0,0);
@@ -52,17 +52,20 @@ function showPage(p){
   document.body.classList.toggle('mbfix', pin);
   if(pin){ paintMiniBar(); $('miniBar').classList.add('show'); }
   else $('miniBar').classList.toggle('show', window.scrollY>170);
-  if(p==='explore') refreshMarkets(false);
+  if(p==='markets' || p==='following') refreshMarkets(false);
   if(p==='insights') renderInsights();
 }
 /* Tab switches use the View Transitions API (UPGRADE_PLAN.md Phase 3) — a directional
    slide matching the tabbar's left-to-right order, feature-detected so unsupported
    browsers just get the instant swap they already had. Reduced motion is handled by the
    ::view-transition-* override in base.css, not duplicated here (the transition still
-   runs — the DOM still updates correctly — it just renders with no visible animation). */
-const TAB_ORDER=['portfolio','explore','insights'];
+   runs — the DOM still updates correctly — it just renders with no visible animation).
+   UPGRADE_PLAN.md Phase R3: Explore split into Markets/Following, so this order is now
+   the four tabs left-to-right exactly as they appear in the tabbar/rail-nav markup —
+   Home (R4) will slot in before 'markets' when it exists. */
+const TAB_ORDER=['markets','portfolio','insights','following'];
 function focusPageHeading(p){
-  const id={portfolio:'pfTitle',explore:'exploreTitle',insights:'insightsTitle'}[p];
+  const id={markets:'marketsTitle',portfolio:'pfTitle',insights:'insightsTitle',following:'followingTitle'}[p];
   const el=id&&$(id); if(el) el.focus({preventScroll:true});
 }
 document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{
@@ -74,11 +77,13 @@ document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{
   const vt = document.startViewTransition({ update:()=>showPage(target), types:[dir] });
   vt.finished.finally(()=>focusPageHeading(target));
 });
-/* one delegated tap handler for every symbol row/card on Explore — survives any re-render */
-$('page-explore').addEventListener('click', e=>{
+/* one delegated tap handler per page for every symbol row/card — survives any re-render.
+   Markets and Following were one 'Explore' page pre-R3; each needs its own listener now
+   that they're separate elements. */
+['page-markets','page-following'].forEach(id=> $(id).addEventListener('click', e=>{
   const el=e.target.closest('.mrow, .idx-card');
   if(el && el.dataset.sym) openStockSheet(el.dataset.sym, el.dataset.name||'');
-});
+}));
 $('page-insights').addEventListener('click', e=>{ // look-through rows now live here too
   const el=e.target.closest('.mrow');
   if(el && el.dataset.sym) openStockSheet(el.dataset.sym, el.dataset.name||'');
@@ -238,7 +243,8 @@ function renderMover(){ // day-change attribution: which holdings drove today's 
 function renderAll(){
   renderMover(); renderGoal(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
-  if(!$('page-explore').classList.contains('hidden')) renderMarkets();
+  if(!$('page-markets').classList.contains('hidden')) renderMarkets();
+  if(!$('page-following').classList.contains('hidden')) renderFollowing();
 }
 $('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → Nasdaq 100 → off
   const next = state.view.bench==='off' ? 'VOO' : state.view.bench==='VOO' ? 'VT' : state.view.bench==='VT' ? 'QQQ' : 'off';
