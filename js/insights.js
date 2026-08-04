@@ -365,7 +365,7 @@ function renderModGrid(){
     tile('perf', 'vs VOO', vsVoo!=null?fmtPct(vsVoo):'—', vsVoo!=null?cls(vsVoo):'', 'same buys in VOO') +
     tile('risk', 'Volatility', r?r.vol.toFixed(2)+'%':'—', '', r?'Sharpe '+r.sharpe.toFixed(2):'Needs price history') +
     tile('risk', 'Beta', r?r.beta.toFixed(2):'—', '', 'vs S&P 500') +
-    tile('risk', 'Max drawdown', r?fmtPct(r.mdd)+'%':'—', r?'neg':'', 'peak to trough') +
+    tile('risk', 'Max drawdown', r?fmtPct(r.mdd):'—', r?'neg':'', 'peak to trough') +
     tile('pe', 'Portfolio P/E', pe!=null?pe.toFixed(1)+'×':'—', '', 'across your holdings');
   grid.querySelectorAll('[data-mod]').forEach(el=> el.onclick=()=>{
     const m=el.dataset.mod;

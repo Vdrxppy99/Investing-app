@@ -638,7 +638,8 @@ function drawHeroChart(times, labels, data, msgEl, bench, markers){
   const chart=LC.createChart(el, {
     autoSize:true,
     layout:{ background:{type:LC.ColorType.Solid,color:'transparent'}, textColor:mut,
-             fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif", fontSize:10 },
+             fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif", fontSize:10,
+             attributionLogo:false }, // Apache-2.0 permits removing TradingView's built-in chart-corner logo; see vendor/lightweight-charts.standalone.production.js license header
     grid:{ vertLines:{visible:false}, horzLines:{color:grid} },
     rightPriceScale:{ visible:true, borderVisible:false, scaleMargins:{top:0.16,bottom:0.06} },
     leftPriceScale:{ visible:false },
