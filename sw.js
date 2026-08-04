@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.6.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.7.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -19,6 +19,14 @@ const V = 'pt-v9.6.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered 
 // instead of heat-tinted inline-styled tiles. TAB_ORDER (js/app.js) updated to
 // the new four-tab order for correct view-transition slide direction. No
 // financial maths touched.
+// v9.7.0 — UPGRADE_PLAN.md Phase R4 (final): Home tab added as the new landing
+// screen (index.html, js/app.js, js/portfolio.js, js/insights.js) — greeting +
+// market-open countdown, portfolio card w/ sparkline + allocation strip +
+// period-return pills (#homePr, owed from R1), Today's movers (w/ the "vs S&P
+// 500 today" narrative, owed from R1), Coming up (dividend ex-dates), Goal
+// (flat progress bar, replacing the old ring). TAB_ORDER now five tabs:
+// home, markets, portfolio, insights, following. No financial maths touched;
+// renderHomePr()/renderComingUp() read only pre-existing computed values.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

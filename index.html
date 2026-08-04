@@ -150,8 +150,9 @@
      like a phone screenshot pasted onto white. -->
 <nav class="rail-nav" aria-label="Sections">
   <div class="rail-nav__brand"><svg aria-hidden="true"><use href="#i-wallet"/></svg>My Portfolio</div>
+  <button class="rail-nav__item" data-page="home" aria-current="page"><svg aria-hidden="true"><use href="#i-home"/></svg>Home</button>
   <button class="rail-nav__item" data-page="markets"><svg aria-hidden="true"><use href="#i-compass"/></svg>Markets</button>
-  <button class="rail-nav__item" data-page="portfolio" aria-current="page"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
+  <button class="rail-nav__item" data-page="portfolio"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
   <button class="rail-nav__item" data-page="insights"><svg aria-hidden="true"><use href="#i-activity"/></svg>Insights</button>
   <button class="rail-nav__item" data-page="following"><svg aria-hidden="true"><use href="#i-star"/></svg>Following</button>
   <span class="rail-nav__spacer"></span>
@@ -159,8 +160,54 @@
 
 <div class="wrap">
 
+<!-- ═══════════════════ HOME ═══════════════════ -->
+<!-- DESIGN-TARGET.md §1 / five-tabs.html frame 1: the new landing tab — glance
+     screen with a greeting, one portfolio card (total, today's delta, a 1M
+     sparkline, the allocation strip, and the period-return pills carried over
+     from R1's hero — see #homePr's comment in js/insights.js), Today's movers
+     (with the "vs S&P 500 today" narrative that also left the R1 hero, as its
+     lead line), Coming up (dividend ex-dates), and Goal. No new maths: every
+     figure here is computed by js/app.js / js/portfolio.js / js/insights.js
+     exactly as before, just given a front door instead of being orphaned. -->
+<div id="page-home" class="page">
+  <div class="appbar">
+    <h1 class="t-title" id="homeTitle" tabindex="-1">Home</h1>
+  </div>
+  <div class="greet" id="homeGreet"></div>
+  <p class="t-caption muted" id="homeCountdown"></p>
+
+  <section class="card" id="homeCard">
+    <div class="hero__eyebrow">Portfolio</div>
+    <div class="t-hero-sm hero__total" id="homeTotal">&mdash;</div>
+    <div class="hero__delta" id="homeToday"></div>
+    <svg width="304" height="62" viewBox="0 0 304 62" id="homeSpark" class="home-spark"></svg>
+    <button class="allocstrip home-alloc" id="homeAllocStrip" aria-label="Allocation breakdown"></button>
+    <div class="rail" id="homePr"></div>
+  </section>
+
+  <div class="stack">
+    <div>
+      <div class="section__label"><span>Today's movers</span><em id="moverTotal"></em></div>
+      <p class="t-caption muted" id="moverNarrative"></p>
+      <section class="card" id="moverCard"><div id="moverBody"></div></section>
+    </div>
+
+    <div id="comingSection">
+      <div class="section__label"><span>Coming up</span></div>
+      <section class="card"><div id="comingBody"></div></section>
+    </div>
+
+    <div>
+      <div class="section__label"><span>Goal</span><em id="goalPct"></em></div>
+      <section class="card" id="goalCard"><div id="goalBody"></div></section>
+    </div>
+  </div>
+
+  <p class="t-caption faint foot">Built from your purchase history. Not financial advice.</p>
+</div>
+
 <!-- ═══════════════════ PORTFOLIO ═══════════════════ -->
-<div id="page-portfolio" class="page">
+<div id="page-portfolio" class="page hidden">
   <div class="appbar">
     <h1 class="t-title" id="pfTitle" tabindex="-1">Portfolio</h1>
     <div class="appbar__actions">
@@ -292,7 +339,7 @@
   <div class="appbar"><h1 class="t-title" id="followingTitle" tabindex="-1">Following</h1></div>
 
   <div class="stack">
-    <div id="watchWrap" hidden>
+    <div id="watchWrap">
       <div class="section__label">Watchlist</div>
       <section class="card"><div id="watchList"></div></section>
     </div>
@@ -346,8 +393,9 @@
 </div><!-- /shell -->
 
 <nav class="tabbar" aria-label="Sections">
+  <button class="tabbar__item" data-page="home" aria-current="page"><svg aria-hidden="true"><use href="#i-home"/></svg>Home</button>
   <button class="tabbar__item" data-page="markets"><svg aria-hidden="true"><use href="#i-compass"/></svg>Markets</button>
-  <button class="tabbar__item" data-page="portfolio" aria-current="page"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
+  <button class="tabbar__item" data-page="portfolio"><svg aria-hidden="true"><use href="#i-wallet"/></svg>Portfolio</button>
   <button class="tabbar__item" data-page="insights"><svg aria-hidden="true"><use href="#i-activity"/></svg>Insights</button>
   <button class="tabbar__item" data-page="following"><svg aria-hidden="true"><use href="#i-star"/></svg>Following</button>
 </nav>

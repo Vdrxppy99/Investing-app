@@ -2080,6 +2080,33 @@
     background: var(--seg, var(--primary));
   }
 
+  /* ── Home screen (R4) ─────────────────────────────────────────────────────
+     Sparkline/allocation-strip/pills rhythm inside the portfolio card, and the
+     goal progress bar — same --w custom-property convention as .allocstrip
+     above, never an inline style=. */
+  .home-spark { display: block; width: 100%; height: 62px; margin-top: var(--s-3); }
+  .home-alloc { margin-top: var(--s-4); }
+  #homePr { margin-top: var(--s-3); }
+  .goalrow { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3); }
+  .goalrow > span:first-child { color: var(--text-muted); font-size: var(--t-caption); }
+  .goalrow > span:last-child { font-weight: var(--w-bold); }
+  .goalbar {
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--divider);
+    overflow: hidden;
+  }
+  .goalbar > i {
+    display: block;
+    height: 100%;
+    width: var(--w, 0%);
+    background: var(--primary);
+    border-radius: var(--r-pill);
+  }
+  /* First-time goal-setup form (renderGoalForm) — gap replaces what used to be
+     inline margin-top on each child. */
+  .goalset { display: grid; gap: var(--s-3); }
+
   /* Cash row under the holdings groups. Was unstyled (relying on JS-set
      display:flex with no gap/justify), so the label and value ran together
      with no space between them. */

@@ -125,7 +125,7 @@ function renderMarkets(){
 }
 function renderFollowing(){
   const wl=state.watch||[];
-  $('watchWrap').style.display = wl.length ? '' : 'none';
+  $('watchWrap').hidden = !wl.length;
   $('watchList').innerHTML = wl.map(w=>{
     const q=state.quotes[w.sym];
     const isIdx=w.sym.startsWith('^');

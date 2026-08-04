@@ -65,6 +65,12 @@
     letter-spacing: var(--tr-hero);
     font-weight: var(--w-black);
   }
+  .t-hero-sm {
+    font-size: var(--t-hero-sm);
+    line-height: 1;
+    letter-spacing: var(--tr-hero);
+    font-weight: var(--w-black);
+  }
   .t-display {
     font-size: var(--t-display);
     line-height: var(--lh-display);

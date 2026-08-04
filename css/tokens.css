@@ -34,6 +34,9 @@
        viewport, matching design/target/five-tabs.html frame 3 exactly. */
     --t-hero: clamp(34px, 9.5vw, 40px);
     --tr-hero: -0.02em;
+    /* Home's own portfolio-card total — a sibling of --t-hero, one step down
+       (33px vs the Portfolio tab's 34-40px), per DESIGN-TARGET's type scale note. */
+    --t-hero-sm: 33px;
 
     --w-regular: 400;
     --w-medium: 500;

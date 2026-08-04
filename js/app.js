@@ -46,9 +46,10 @@ function showPage(p){
   window.scrollTo(0,0);
   // entrance animation plays once per page per session, not on every revisit
   const pg=$('page-'+p); if(pg && !pg.classList.contains('seen')) setTimeout(()=>pg.classList.add('seen'), 450);
-  // money is ALWAYS visible: tabs without the hero pin the glass balance bar (owner request);
-  // on Portfolio it stays scroll-triggered so it never doubles the hero
-  const pin = p!=='portfolio';
+  // money is ALWAYS visible: tabs without their own hero pin the glass balance bar (owner
+  // request); Home and Portfolio each have their own total in view, so they stay
+  // scroll-triggered instead, or the pinned bar would double the number on screen
+  const pin = p!=='portfolio' && p!=='home';
   document.body.classList.toggle('mbfix', pin);
   if(pin){ paintMiniBar(); $('miniBar').classList.add('show'); }
   else $('miniBar').classList.toggle('show', window.scrollY>170);
@@ -60,12 +61,11 @@ function showPage(p){
    browsers just get the instant swap they already had. Reduced motion is handled by the
    ::view-transition-* override in base.css, not duplicated here (the transition still
    runs — the DOM still updates correctly — it just renders with no visible animation).
-   UPGRADE_PLAN.md Phase R3: Explore split into Markets/Following, so this order is now
-   the four tabs left-to-right exactly as they appear in the tabbar/rail-nav markup —
-   Home (R4) will slot in before 'markets' when it exists. */
-const TAB_ORDER=['markets','portfolio','insights','following'];
+   UPGRADE_PLAN.md Phase R4: Home is now the landing tab, slotted in before 'markets' —
+   this is the five tabs left-to-right exactly as they appear in the tabbar/rail-nav markup. */
+const TAB_ORDER=['home','markets','portfolio','insights','following'];
 function focusPageHeading(p){
-  const id={markets:'marketsTitle',portfolio:'pfTitle',insights:'insightsTitle',following:'followingTitle'}[p];
+  const id={home:'homeTitle',markets:'marketsTitle',portfolio:'pfTitle',insights:'insightsTitle',following:'followingTitle'}[p];
   const el=id&&$(id); if(el) el.focus({preventScroll:true});
 }
 document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{
@@ -130,26 +130,32 @@ function ringSvg(pct, color, r){
     <circle class="rc" cx="${R+8}" cy="${R+8}" r="${R}"/>
     <circle class="rp" cx="${R+8}" cy="${R+8}" r="${R}" style="stroke:${color};stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${off.toFixed(1)}"/></svg>`;
 }
-/* Goal left the Portfolio screen in R1 (DESIGN-TARGET.md — it belongs on
-   Home, built in R4). #goalCard no longer exists here; these no-op until R4
-   gives goal tracking a new home, rather than being deleted. */
+/* Goal left the Portfolio screen in R1 (DESIGN-TARGET.md — it belongs on Home)
+   and lands there for real in R4: #goalCard/#goalBody now live on Home, and
+   the old ring gauge is replaced by a flat .goalbar (DESIGN-TARGET's Home
+   frame shows a progress bar, not a ring — the ring stays defined in
+   css/components.css since healthScore()'s .hscore ring still uses it) with
+   the percentage moved out to #goalPct, the "sec" header's trailing value,
+   matching every other Home section (#moverTotal, #homePr). Same underlying
+   math as before — totals(), personalReturn(), the monthly-compounding ETA
+   loop — none of it changed. */
 function renderGoalForm(prefill){ // shared by first-time setup and "Change goal" (prefilled — never lose the number)
-  const card=$('goalCard'); if(!card) return;
-  card.querySelector('.card-title').style.display='';
-  $('goalBody').innerHTML=`<div class="goalset">
-    <div style="color:var(--mut);font-size:12.5px;line-height:1.5;margin-bottom:10px;font-weight:500">Set a target and track your progress with a projected finish date based on your real return.</div>
+  const body=$('goalBody'); const pctEl=$('goalPct'); if(!body) return;
+  if(pctEl) pctEl.textContent='';
+  body.innerHTML=`<div class="goalset">
+    <p class="t-caption muted">Set a target and track your progress with a projected finish date based on your real return.</p>
     <input id="goalInput" type="number" inputmode="decimal" placeholder="Target amount, e.g. 100000" aria-label="Goal amount"${prefill>0?` value="${prefill}"`:''}>
-    <button class="btn pri" id="goalSave" style="width:100%;margin-top:10px">${prefill>0?'Update goal':'Set goal'}</button>
-    ${prefill>0?'<div class="ebtns" style="margin-top:8px"><button class="btn sec" id="goalCancel" style="flex:1">Cancel</button><button class="btn warn" id="goalRemove" style="flex:1">Remove goal</button></div>':''}</div>`;
+    <button class="btn pri btn--full" id="goalSave">${prefill>0?'Update goal':'Set goal'}</button>
+    ${prefill>0?'<div class="ebtns"><button class="btn sec" id="goalCancel">Cancel</button><button class="btn warn" id="goalRemove">Remove goal</button></div>':''}</div>`;
   $('goalSave').onclick=()=>{ const v=+$('goalInput').value; if(v>0){ state.goal={amt:v}; lsSet('pt_goal',state.goal); renderGoal(); if(typeof renderProjection==='function' && !$('page-insights').classList.contains('hidden')) renderProjection(); } };
   const gc=$('goalCancel'); if(gc) gc.onclick=renderGoal;
   const gr=$('goalRemove'); if(gr) gr.onclick=()=>{ state.goal=null; lsSet('pt_goal',null); renderGoal(); };
 }
 function renderGoal(){
-  const card=$('goalCard'); if(!card) return;
+  const body=$('goalBody'); const pctEl=$('goalPct'); if(!body) return;
   const t=totals('all');
   if(!state.goal || !(state.goal.amt>0)){ renderGoalForm(0); return; }
-  const goal=state.goal.amt, pct=t.value/goal, remain=goal-t.value;
+  const goal=state.goal.amt, pctRaw=t.value/goal, remain=goal-t.value;
   const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.15):0.08; // cap optimism
   let eta='';
   if(remain>0){
@@ -157,14 +163,15 @@ function renderGoal(){
     const rm=Math.pow(1+r,1/12)-1; let v=t.value, m=0;
     while(v<goal && m<720){ v=v*(1+rm); m++; }
     const yr=new Date(); yr.setMonth(yr.getMonth()+m);
-    eta = (m<720 && t.value>0) ? `Today's money alone gets there <span class="eta">${yr.toLocaleDateString([],{month:'short',year:'numeric'})}</span> at ~${(r*100).toFixed(0)}%/yr — every new buy pulls that date closer.` : `Today's balance alone won't compound to this within 60 years — new deposits will do the heavy lifting.`;
-  } else { eta=`<span class="eta">Goal reached</span> — ${fmt(-remain)} past target. Time for a bigger one?`; }
-  card.querySelector('.card-title').style.display='none';
-  $('goalBody').innerHTML=`<div class="goalwrap">
-    <div class="ring">${ringSvg(pct, remain>0?'var(--brand)':'var(--green)')}<div class="rt"><b>${(pct*100).toFixed(0)}%</b><span>of goal</span></div></div>
-    <div class="goalinfo"><div class="gt">${fmt(t.value)} of ${fmt(goal)}</div>
-      <div class="gs">${remain>0?fmt(remain)+' to go · ':''}${eta}</div>
-      <div class="gs" style="margin-top:6px"><a href="#" id="goalEdit" style="color:var(--mut)">Change goal</a></div></div></div>`;
+    eta = (m<720 && t.value>0) ? yr.toLocaleDateString([],{month:'short',year:'numeric'}) : '—';
+  } else { eta='Reached'; }
+  if(pctEl) pctEl.textContent=(pctRaw*100).toFixed(0)+'%';
+  body.innerHTML=`<div class="stack stack--tight">
+    <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>${eta}</span></div>
+    <div class="goalbar"><i></i></div>
+    <p class="t-caption muted">${remain>0?fmt(remain)+' to go — every new buy pulls that date closer. ':fmt(-remain)+' past target. '}<a href="#" id="goalEdit">Change goal</a></p>
+  </div>`;
+  body.querySelector('.goalbar > i').style.setProperty('--w', (Math.min(1,pctRaw)*100).toFixed(1)+'%');
   $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal); };
 }
 function healthScore(){
@@ -212,36 +219,143 @@ function renderHealth(){
     </div>`;
 }
 /* Movers left the Portfolio screen in R1 (DESIGN-TARGET.md — attribution
-   belongs on Home, built in R4). #moverCard no longer exists here; this
-   no-ops (still called from js/api.js's live-price paths) until R4 gives it
-   a new home, rather than being deleted. */
+   belongs on Home) and lands there for real in R4. Two pieces owed from R1
+   (UPGRADE_PLAN.md's R4 note) land here too, since this is that section's
+   front door: #moverTotal (the section header's trailing value, matching
+   every other Home "sec") and #moverNarrative, the "vs S&P 500 today" line
+   that also used to live on the Portfolio hero — same comparison formula as
+   maybeShowRecap() below (voo.price/voo.prev-1 vs dayPct), not reinvented. */
 function renderMover(){ // day-change attribution: which holdings drove today's move
-  const card=$('moverCard'); if(!card) return;
+  const card=$('moverCard'); const totalEl=$('moverTotal'), narrEl=$('moverNarrative'); if(!card) return;
   const rs=rows(state.view.acc);
   const items=rs.map(r=>{
     const p=priceOf(r.sym), pv=prevOf(r.sym); if(!(pv>0)||!(p>0)) return null;
     return {sym:r.sym, pct:(p/pv-1)*100, impact:r.qty*(p-pv)};
   }).filter(x=>x && Math.abs(x.pct)>=0.01).sort((a,b)=>Math.abs(b.impact)-Math.abs(a.impact));
-  if(!items.length){ card.style.display='none'; return; }
+  if(!items.length){ card.style.display='none'; if(totalEl) totalEl.textContent=''; if(narrEl) narrEl.textContent=''; return; }
   card.style.display='';
   const tot=items.reduce((a,x)=>a+x.impact,0);
-  $('moverBody').innerHTML = `<div class="drivehead"><span>Today's drivers</span><span class="${cls(tot)}">${fmtSign(tot)}</span></div>`+
-    items.slice(0,3).map(x=>`<div class="drow" data-sym="${esc(x.sym)}">
-      ${badgeHtml(x.sym,true)}
-      <div class="mmid"><div class="msym">${esc(x.sym.replace('-','.'))}</div></div>
-      <div class="mright"><span class="${cls(x.impact)}" style="font-weight:700;font-size:13.5px">${fmtSign(x.impact)}</span>
-      <span class="pctpill ${x.pct>=0?'up':'down'}" style="margin-left:8px">${fmtPct(x.pct)}</span></div></div>`).join('');
-  $('moverBody').querySelectorAll('.drow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
+  const totAbs=items.reduce((a,x)=>a+Math.abs(x.impact),0);
+  if(totalEl) totalEl.innerHTML=`<span class="${cls(tot)}">${fmtSign(tot)}</span>`;
+  if(narrEl){
+    const t=totals(state.view.acc);
+    const dayPct=(t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
+    const voo=state.quotes.VOO, sp=(voo&&voo.prev>0)?(voo.price/voo.prev-1)*100:null;
+    narrEl.textContent = sp!=null ? `${dayPct-sp>=0?'Ahead of':'Behind'} the S&P 500 today by ${Math.abs(dayPct-sp).toFixed(2)}%.` : '';
+  }
+  $('moverBody').innerHTML = items.slice(0,3).map(x=>{
+    const share = totAbs>0 ? Math.round(Math.abs(x.impact)/totAbs*100) : 0;
+    return `<div class="mrow" data-sym="${esc(x.sym)}">${badgeHtml(x.sym,true)}
+      <div class="mmid"><div class="msym">${esc((NAMES[x.sym]||x.sym.replace('-','.')).replace(/^Vanguard /,''))}</div><div class="mname">drove ${share}% of today's move</div></div>
+      <div class="mright"><span class="pctpill ${x.pct>=0?'up':'down'}">${fmtPct(x.pct)}</span><div class="msub">${fmtSign(x.impact)}</div></div></div>`;
+  }).join('');
+  $('moverBody').querySelectorAll('.mrow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
 }
-/* renderMover/renderGoal/renderIncome are still called here — each now no-ops
-   safely (see their own guards) since Goal/Movers/Dividends left this screen
-   in R1; kept in the pipeline rather than special-cased out, so wiring them
-   back up on Home in R4 is a one-line change (add the markup back, delete
-   nothing here). renderAlloc() likewise no-ops unless the allocation sheet is
-   open — renderAllocStrip() (called from renderList()) is what actually
-   paints the always-visible strip. */
+/* ============ HOME (R4) ============
+   The glance screen. No new maths anywhere below — every figure is computed
+   by a function that already existed elsewhere; this section just gives each
+   one a render target on the new landing tab. */
+function homeGreeting(){ // time-of-day only, deliberately — no display-name field exists anywhere else in the app (js/vault.js's DEFAULT_USER is a login credential, not a profile name), and this is public source in a GitHub Pages repo
+  const h=new Date().getHours();
+  return h<12?'Good morning':h<18?'Good afternoon':'Good evening';
+}
+/* "Markets open/close in XhYm" — chrome, not a financial figure, so it isn't
+   bound by the golden master. Same weekend/holiday-aware walk marketOpen()/
+   lastCloseKey() already use, same lack of full DST rigor as they have. */
+function marketCountdownText(){
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hourCycle:'h23',weekday:'short',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date());
+  const g=t=>parts.find(p=>p.type===t).value;
+  const wd=g('weekday'), nowMin=+g('hour')*60 + +g('minute');
+  const dow={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[wd];
+  const isTrading=x=>{ const d=x.getUTCDay(); return d!==0 && d!==6 && !US_MARKET_HOLIDAYS.has(x.toISOString().slice(0,10)); };
+  const today=new Date(`${g('year')}-${g('month')}-${g('day')}T00:00:00Z`);
+  const todayTrading = dow>=1 && dow<=5 && isTrading(today);
+  if(todayTrading && nowMin>=570 && nowMin<960){
+    const left=960-nowMin;
+    return `Markets close in ${Math.floor(left/60)}h ${left%60}m`;
+  }
+  let d=new Date(today);
+  if(!(todayTrading && nowMin<570)) do{ d.setUTCDate(d.getUTCDate()+1); }while(!isTrading(d));
+  const daysAhead=Math.round((d-today)/86400000);
+  const left = 570-nowMin + daysAhead*1440;
+  return `Markets open in ${Math.floor(left/60)}h ${left%60}m`;
+}
+function renderHomeChrome(){
+  const g=$('homeGreet'), c=$('homeCountdown');
+  if(g) g.textContent=homeGreeting();
+  if(c) c.textContent=marketCountdownText();
+}
+/* 62px sparkline for the Home card — modeled on design/target/five-tabs.html's
+   P()/big() reference (same cubic-bezier path builder), but reading real data
+   (buildSeries('all') sliced to 1M, the shortest range with 2+ baked points —
+   see test/smoke.spec.js) instead of a hardcoded array, and the live --primary
+   token via the var()-in-SVG-attribute convention spark() (js/core.js) already
+   uses, instead of a literal hex. One brand colour, not --green/--red: gain/
+   loss already reads from the sign on #homeToday, matching R1/Phase-3's "never
+   colour alone" rule for the hero chart. */
+function renderHomeSpark(){
+  const svg=$('homeSpark'); if(!svg) return;
+  const s=buildSeries('all'); const A=s?sliceRange(s,'1M').value:[];
+  if(A.length<2){ svg.innerHTML=''; return; }
+  const w=304, h=62;
+  const lo=Math.min(...A), hi=Math.max(...A), sp=(hi-lo)||1;
+  const X=i=>i*w/(A.length-1), Y=v=>(1-(v-lo)/sp)*h;
+  let d=`M${X(0).toFixed(1)} ${Y(A[0]).toFixed(1)}`;
+  for(let i=1;i<A.length;i++){ const a=X(i-1),b=Y(A[i-1]),c=X(i),e=Y(A[i]),m=(a+c)/2;
+    d+=` C${m.toFixed(1)} ${b.toFixed(1)},${m.toFixed(1)} ${e.toFixed(1)},${c.toFixed(1)} ${e.toFixed(1)}`; }
+  svg.innerHTML = `<defs><linearGradient id="homeSparkGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--primary)" stop-opacity=".26"/><stop offset="1" stop-color="var(--primary)" stop-opacity="0"/></linearGradient></defs>
+    <path d="${d} L${w} ${h} L0 ${h} Z" fill="url(#homeSparkGrad)"/>
+    <path d="${d}" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="${X(A.length-1).toFixed(1)}" cy="${Y(A[A.length-1]).toFixed(1)}" r="3.2" fill="var(--primary)"/>`;
+}
+function renderHomeCard(){
+  const el=$('homeTotal'); if(!el) return;
+  const t=totals(state.view.acc);
+  const dayPct=(t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
+  el.textContent=fmt(t.value);
+  const arrow=t.day>=0?'▲':'▼';
+  $('homeToday').innerHTML=`<span class="${cls(t.day)} n">${arrow} ${fmtSign(t.day)} · ${fmtPct(dayPct)}</span><span class="hero__alltime">today</span>`;
+  renderHomeSpark();
+  renderAllocStrip('homeAllocStrip');
+}
+/* "Coming up" duplicates renderIncome()'s (js/portfolio.js) "upcoming" loop
+   rather than refactoring it into a shared helper — same math, a second
+   presentation surface (#incomeCard still doesn't exist; this doesn't touch
+   it), not new maths, and not worth the risk of reshaping code that already
+   works to avoid ~8 duplicated lines. */
+function renderComingUp(){
+  const sec=$('comingSection'); const body=$('comingBody'); if(!body) return;
+  const upcoming=[];
+  for(const r of rows(state.view.acc)){
+    const d=state.divs[r.sym]; if(!d||!d.list||!d.list.length) continue;
+    const yr=d.list.filter(e=>e[0]>Date.now()-370*86400e3);
+    for(const e of yr){
+      const next=e[0]+31557600000; // same payout, one year later
+      if(next>Date.now() && next<Date.now()+180*86400e3) upcoming.push({sym:r.sym, when:next, est:r.qty*e[1]});
+    }
+  }
+  upcoming.sort((a,b)=>a.when-b.when);
+  if(!upcoming.length){ if(sec) sec.style.display='none'; ensureDivs(); return; }
+  if(sec) sec.style.display='';
+  body.innerHTML = upcoming.slice(0,3).map(u=>{
+    const days=Math.max(0,Math.ceil((u.when-Date.now())/86400000));
+    return `<div class="drow" data-sym="${esc(u.sym)}">${badgeHtml(u.sym,true)}
+      <div class="mmid"><div class="msym">Dividend · ex-div ${new Date(u.when).toLocaleDateString([],{month:'short',day:'numeric'})}</div><div class="mname">estimated ${fmt(u.est)}</div></div>
+      <div class="mright"><span class="chip chip--primary">${days}d</span></div></div>`;
+  }).join('');
+  body.querySelectorAll('.drow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
+}
+$('homeAllocStrip').onclick = openAllocSheet;
+/* renderMover/renderGoal/renderIncome are still called here — renderIncome()
+   still no-ops (see its own guard: #incomeCard was never rebuilt, Home's
+   renderComingUp() covers that ground instead) while renderMover()/renderGoal()
+   now paint Home for real. renderAlloc() likewise no-ops unless the allocation
+   sheet is open — renderAllocStrip() (called from renderList() and
+   renderHomeCard()) is what actually paints the always-visible strips. */
 function renderAll(){
   renderMover(); renderGoal(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
+  renderHomeChrome(); renderHomeCard(); renderHomePr(); renderComingUp();
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-markets').classList.contains('hidden')) renderMarkets();
   if(!$('page-following').classList.contains('hidden')) renderFollowing();

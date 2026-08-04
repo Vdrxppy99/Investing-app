@@ -3,9 +3,10 @@ const { test, expect } = require('@playwright/test');
 const { FROZEN_TIME, blockExternalNetwork, unlockDemo } = require('./helpers');
 
 // The News tab was deliberately removed (owner decision, see CLAUDE.md).
-// UPGRADE_PLAN.md Phase R3 split Explore into Markets + Following — the
-// tabbar now has these four, in TAB_ORDER (js/app.js) order.
-const TABS = ['markets', 'portfolio', 'insights', 'following'];
+// UPGRADE_PLAN.md Phase R3 split Explore into Markets + Following; Phase R4
+// added Home as the new landing tab. The tabbar now has these five, in
+// TAB_ORDER (js/app.js) order.
+const TABS = ['home', 'markets', 'portfolio', 'insights', 'following'];
 // 1D has no offline fallback (js/portfolio.js renderChart): it needs a live intraday
 // fetch, which this suite deliberately blocks, so it shows "Loading today's prices…"
 // rather than a painted line.
@@ -57,6 +58,7 @@ test('the holdings table row count matches the demo holdings count', async ({ pa
 
 test('the hero chart canvas is non-empty at every range with offline data', async ({ page }) => {
   await unlockDemo(page);
+  await page.locator('.tabbar__item[data-page="portfolio"]').click();
   // #mainChart is a plain div since Phase 2 (Lightweight Charts owns the canvas(es) it
   // creates inside it, one per rendering layer) — check every canvas LWC has mounted there.
   const host = page.locator('#mainChart');
@@ -80,6 +82,7 @@ test('the hero chart canvas is non-empty at every range with offline data', asyn
 
 test('1D range shows the offline placeholder instead of a stale chart', async ({ page }) => {
   await unlockDemo(page);
+  await page.locator('.tabbar__item[data-page="portfolio"]').click();
   await page.locator(`#rangeSeg button[data-r="${OFFLINE_EMPTY_RANGE}"]`).click();
   await expect(page.locator('#chartMsg')).toHaveText('Loading today’s prices…');
 });

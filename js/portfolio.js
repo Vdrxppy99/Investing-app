@@ -114,8 +114,10 @@ function renderList(){
    ids renderAlloc() has always targeted — renderAlloc() itself just no-ops
    now when the sheet isn't open (the ids don't exist in the DOM until then). */
 $('allocStrip').onclick = openAllocSheet;
-function renderAllocStrip(){
-  const el=$('allocStrip'); if(!el) return;
+// id param lets Home (R4) paint a second copy of the same strip (#homeAllocStrip)
+// from the same holdings — no second computation, just a second paint target.
+function renderAllocStrip(id){
+  const el=$(id||'allocStrip'); if(!el) return;
   const rs = rows(state.view.acc).filter(r=>r.qty*priceOf(r.sym)>0);
   const tot = rs.reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
   if(!tot){ el.innerHTML=''; el.disabled=true; return; }
@@ -267,7 +269,7 @@ async function ensureDivs(){
   const res=await Promise.allSettled(stale.map(fetchDivs));
   divsFetching=false;
   lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal);
-  if(res.some(r=>r.status==='fulfilled'&&r.value===true)) renderIncome();
+  if(res.some(r=>r.status==='fulfilled'&&r.value===true)){ renderIncome(); if(typeof renderComingUp==='function') renderComingUp(); }
 }
 /* Dividends left the Portfolio screen in R1 (DESIGN-TARGET.md — they belong on
    Home, built in R4). #incomeCard no longer exists here; this no-ops until R4
