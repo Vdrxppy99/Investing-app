@@ -461,9 +461,12 @@ Not part of any phase. Pick these off when convenient.
   precondition holds, it turns a moment-of-typing exposure into a
   standing one: any XSS payload can pull the passcode (and, from it, redo the
   PBKDF2-310k unwrap) for as long as the tab stays open, not just at entry
-  time. **Not fixed — reconciliation only, this session.** Fix: clear
-  `$id('unlockPass').value` (and null out the local `typed`) immediately after
-  `unlockWithPass` succeeds, mirroring the existing failure-path clear.
+  time. **Fixed this session** — `#unlockPass` now clears on the success path
+  too (mirroring the existing failure-path clear), and the same gap was found
+  and closed in `#setPass1`/`#setPass2` (setup) and `#restorePass` (cloud
+  restore), which had the identical bug: cleared on failure, left holding the
+  plaintext on success. Verified empirically against a real (non-demo) unlock
+  and a real setup flow, not by reading the code.
   *(This finding was dropped from the Backlog when it was first written up —
   the slot below had taken its "C-1" label for a different, also-real finding.
   Renumbered that one to C-2 and restored this one here; no code changed by

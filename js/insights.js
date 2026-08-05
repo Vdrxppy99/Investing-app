@@ -893,8 +893,8 @@ function renderCoach(){
   grid.innerHTML = items.length ? items.map(x=>
     `<div class="icard cmove sev-${x.sev||'info'}">
       <div class="cmhead"><span class="cicon">${x.ic}</span><span class="chev">›</span></div>
-      <div class="ctitle">${x.title}</div>
-      <div class="cdetail">${x.detail}</div></div>`).join('')
+      <div class="ctitle">${esc(x.title)}</div>
+      <div class="cdetail">${esc(x.detail)}</div></div>`).join('')
     : '<div class="icard wide"><div class="sub-n" style="text-align:center;padding:10px 0">✓ Nothing needs your attention — the portfolio is running clean.</div></div>';
   grid.querySelectorAll('.cmove').forEach((el,i)=> el.onclick=()=>openInfoSheet(items[i].t, `<p>${items[i].b}</p>`));
 }

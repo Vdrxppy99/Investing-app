@@ -467,6 +467,7 @@ function boot(){
     try{
       await cloudRestore(p);
       await showFaceStepOrStart();
+      $id('restorePass').value='';
     }catch(ex){
       btn.disabled = false;
       err(ex && ex.message === 'rate'
@@ -489,7 +490,10 @@ function boot(){
       const who = $id('setUser') ? $id('setUser').value.trim() : '';
       if(!who){ err('Choose a username.'); return; }
       err(''); const btn=$id('setupBtn'); btn.textContent='Encrypting'; btn.disabled=true;
-      try{ window.vaultSetUser(who); await doSetup(a); await showFaceStepOrStart(); }
+      try{
+        window.vaultSetUser(who); await doSetup(a); await showFaceStepOrStart();
+        $id('setPass1').value=''; $id('setPass2').value='';
+      }
       catch(e){ err('Setup failed. Try again.'); btn.textContent='Create passcode'; btn.disabled=false; }
     };
   } else {
@@ -533,6 +537,7 @@ function boot(){
       await unlockWithPass(typed);
       await nativeOfferEnrol(typed);   // no-op outside the native shell
       startApp();
+      $id('unlockPass').value='';
     }
     catch(e){
       err('Wrong passcode.');

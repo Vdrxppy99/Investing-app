@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.7.4'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.7.5'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -64,6 +64,15 @@ const V = 'pt-v9.7.4'; // ⚠ bump on EVERY deploy — semver epoch (renumbered 
 // compute per-render inline style="" (bar widths, hash-derived badge
 // gradients) that neither a nonce nor a CSP hash can cover, since the values
 // differ every render. No financial maths touched.
+// v9.7.5 — session close-out, three small fixes: (1) C-1 — js/vault.js's #unlockPass,
+// #setPass1/#setPass2 and #restorePass now clear on the SUCCESS path too, not just on
+// failure, so the plaintext passcode no longer sits in the live DOM for the rest of the
+// tab's life after a real unlock (verified empirically, not by reading the code — see
+// UPGRADE_PLAN.md Backlog C-1). (2) js/insights.js renderCoach() now esc()s x.title/
+// x.detail before they reach innerHTML — local-only today, defence-in-depth. (3) added
+// test/export-import.spec.js: the export/import round-trip had zero prior coverage and
+// is the one path where a bug loses the whole portfolio; it also asserts the exported
+// JSON carries no `bk` key, the TP-1 regression guard. No financial maths touched.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',
