@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.7.3'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.7.4'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -49,6 +49,21 @@ const V = 'pt-v9.7.3'; // ⚠ bump on EVERY deploy — semver epoch (renumbered 
 // all-numeric passcodes rejected, enforced once in js/vault.js (passcodeError)
 // and applied to both first-time setup and vaultChangePass — PBKDF2 iteration
 // count (310,000) untouched. No financial maths touched.
+// v9.7.4 — Content-Security-Policy added (index.html <meta http-equiv>, the only
+// delivery path on GitHub Pages — no response headers, so no frame-ancestors/
+// report-uri). connect-src/img-src derived from js/api.js and js/seed.js's real
+// fetch/image origins. Two footguns found and fixed empirically, not just
+// removed for the policy: js/app.js haptic() used style.cssText (blocked under
+// style-src without 'unsafe-inline'); js/core.js badgeHtml() built
+// onload=/onerror= as literal HTML attributes on an innerHTML'd <img> (blocked
+// under script-src with no 'unsafe-inline', even though the handlers are
+// JS-authored, not markup-authored) — replaced with two capture-phase
+// document listeners keyed off the .blogo class. style-src still needs
+// 'unsafe-inline' (split as style-src-attr, so <style> tag injection stays
+// blocked): ~82 sites across portfolio.js/insights.js/explore.js/sheets.js
+// compute per-render inline style="" (bar widths, hash-derived badge
+// gradients) that neither a nonce nor a CSP hash can cover, since the values
+// differ every render. No financial maths touched.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

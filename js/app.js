@@ -29,7 +29,7 @@ function wirePTR(){
 let haptEl=null;
 function haptic(){
   try{
-    if(!haptEl){ haptEl=document.createElement('input'); haptEl.type='checkbox'; haptEl.setAttribute('switch',''); haptEl.style.cssText='position:fixed;left:-99px;opacity:0;pointer-events:none'; document.body.appendChild(haptEl); }
+    if(!haptEl){ haptEl=document.createElement('input'); haptEl.type='checkbox'; haptEl.setAttribute('switch',''); haptEl.style.position='fixed'; haptEl.style.left='-99px'; haptEl.style.opacity='0'; haptEl.style.pointerEvents='none'; document.body.appendChild(haptEl); }
     haptEl.click();
   }catch(e){}
 }

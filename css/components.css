@@ -1101,6 +1101,12 @@
   .hrow:last-child, .mrow:last-child, .drow:last-child, .nrow:last-child { border-bottom: none; }
   .hrow:active, .mrow:active, .nrow:active { background: var(--surface-2); }
 
+  /* Press feedback for rows that look tappable via delegated handlers (js/tappable.js)
+     rather than a native button — moved from a JS-injected <style> tag so a CSP
+     style-src with no 'unsafe-inline' doesn't block it; this rule is static. */
+  #allocLegend .alg, #allocClasses .alg, #ideaList .mrow, #watchList .mrow { cursor: pointer; }
+  #allocLegend .alg:active, #allocClasses .alg:active { opacity: .6; }
+
   .hmid, .mmid, .row-mid { flex: 1 1 auto; min-width: 0; }
   .htick { color: var(--text-faint); font-weight: var(--w-semibold); flex-shrink: 0; }
   /* nowrap WITHOUT overflow:hidden let the price + delta + share-count line

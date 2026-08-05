@@ -109,11 +109,16 @@ function skel(n){ // shimmer placeholder rows — premium apps never show spinne
   return h;
 }
 function badge(sym){ return esc(sym.split('-')[0].slice(0,4)); }
+/* .blogo load/error is wired via the capture-phase listeners below, not inline
+   onload/onerror attributes — those are blocked under a script-src CSP with no
+   'unsafe-inline', even when the markup is assembled in JS rather than HTML. */
+document.addEventListener('load', e=>{ if(e.target.classList && e.target.classList.contains('blogo')) e.target.classList.add('on'); }, true);
+document.addEventListener('error', e=>{ if(e.target.classList && e.target.classList.contains('blogo')) e.target.remove(); }, true);
 function badgeHtml(sym, small){ // colored letter tile; a real company logo crossfades over it once loaded
   const direct=(typeof TICKER_LOGOS!=='undefined')&&TICKER_LOGOS[sym];
   const d=!direct&&(typeof TICKER_DOMAINS!=='undefined')&&TICKER_DOMAINS[sym];
   const src=direct||(d?`https://www.google.com/s2/favicons?domain=${d}&sz=128`:null);
-  const logo=src?`<img class="blogo" src="${src}" alt="" referrerpolicy="no-referrer" onload="this.classList.add('on')" onerror="this.remove()">`:'';
+  const logo=src?`<img class="blogo" src="${src}" alt="" referrerpolicy="no-referrer">`:'';
   return `<div class="badge${small?' sm':''}" style="${bstyle(colorOf(sym))}">${badge(sym)}${logo}</div>`;
 }
 function bstyle(c){ return `background:linear-gradient(140deg,${c},color-mix(in srgb,${c} 55%,#000))`; }

@@ -8,6 +8,27 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Portfolio">
 <meta name="theme-color" content="#0b0f0d">
+<!-- GitHub Pages serves no response headers, so this is the only CSP delivery path
+     available — meta http-equiv cannot set frame-ancestors or report-uri (header-only,
+     silently ignored if attempted here), so this app has no clickjacking directive and
+     no violation-reporting endpoint. Derived from js/api.js (every fetch origin),
+     js/seed.js (favicon/logo image hosts), and an empirical local walkthrough — see
+     UPGRADE_PLAN.md Backlog / CLAUDE.md sync log for the violations hit and fixed. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self';
+  style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
+  style-src-elem 'self' https://fonts.googleapis.com;
+  style-src-attr 'unsafe-inline';
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' https://www.google.com https://*.gstatic.com https://assets.parqet.com;
+  connect-src 'self' https://portfolio-push.vdrxppy99.workers.dev https://query1.finance.yahoo.com https://query2.finance.yahoo.com https://stooq.com https://api.frankfurter.dev https://api.allorigins.win https://corsproxy.io;
+  worker-src 'self';
+  manifest-src 'self';
+  base-uri 'self';
+  form-action 'self';
+  object-src 'none';
+">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>My Portfolio</title>

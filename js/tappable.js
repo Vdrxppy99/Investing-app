@@ -79,11 +79,7 @@
     }
   });
 
-  /* Give them the same press feedback every other row has, so they LOOK tappable
-     before you find out that they are. */
-  var style = document.createElement("style");
-  style.textContent =
-    "#allocLegend .alg,#allocClasses .alg,#ideaList .mrow,#watchList .mrow{cursor:pointer}" +
-    "#allocLegend .alg:active,#allocClasses .alg:active{opacity:.6}";
-  document.head.appendChild(style);
+  // Press feedback for these rows lives in css/components.css (.tappable-fb rule) —
+  // a CSP style-src with no 'unsafe-inline' blocks a JS-injected <style> element,
+  // and this rule is static, so it belongs in the stylesheet, not built here.
 })();
