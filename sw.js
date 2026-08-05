@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.7.1'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.7.2'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -33,6 +33,15 @@ const V = 'pt-v9.7.1'; // ⚠ bump on EVERY deploy — semver epoch (renumbered 
 // were unaffected. js/portfolio.js drawHeroChart() sets attributionLogo:false
 // (Apache-2.0 permits removing Lightweight Charts' built-in TradingView logo
 // from the hero chart's bottom-left corner). No financial maths touched.
+// v9.7.2 — fix: desktop rail nav (.rail-nav__item, >=1024px) had no click handler at
+// all — only .tabbar__item was bound (js/app.js), so left-rail navigation was
+// completely inert on wide viewports. Both now share one handler (haptics, view
+// transitions, TAB_ORDER direction, heading focus). showPage() also now keeps
+// aria-current="page" in sync on every nav button, not just .on — it was static
+// markup stuck on "Home" forever, and since css/layout.css's
+// `.rail-nav__item[aria-current="page"]` rule sits in a later @layer than
+// components.css's `.on` rule, the rail would have shown Home permanently
+// highlighted regardless of the real active tab. No financial maths touched.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

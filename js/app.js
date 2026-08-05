@@ -42,7 +42,18 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) clearBa
 function showPage(p){
   if(p!=='markets' && $('searchResults')){ $('searchResults').style.display='none'; if($('mktSearch')) $('mktSearch').value=''; if($('mktSearchX')) $('mktSearchX').style.display='none'; }
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('hidden', el.id!=='page-'+p));
-  document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on', b.dataset.page===p));
+  // .rail-nav__item shares this loop with .tabbar__item (desktop rail + mobile tabbar are one
+  // nav, just relaid out per breakpoint). aria-current has to be kept in sync alongside .on:
+  // css/layout.css's `.rail-nav__item[aria-current="page"]` rule lives in the `layout` @layer,
+  // which is declared after `components` (see CLAUDE.md's @layer order), so it beats
+  // `.rail-nav__item.on` from components.css regardless of source order or specificity — if
+  // aria-current were left on the markup's static "Home" button forever, the rail would show
+  // Home highlighted permanently no matter which tab .on actually landed on.
+  document.querySelectorAll('.tabbar__item, .rail-nav__item').forEach(b=>{
+    const active=b.dataset.page===p;
+    b.classList.toggle('on', active);
+    if(active) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
   window.scrollTo(0,0);
   // entrance animation plays once per page per session, not on every revisit
   const pg=$('page-'+p); if(pg && !pg.classList.contains('seen')) setTimeout(()=>pg.classList.add('seen'), 450);
@@ -68,10 +79,10 @@ function focusPageHeading(p){
   const id={home:'homeTitle',markets:'marketsTitle',portfolio:'pfTitle',insights:'insightsTitle',following:'followingTitle'}[p];
   const el=id&&$(id); if(el) el.focus({preventScroll:true});
 }
-document.querySelectorAll('.tabbar button').forEach(b=> b.onclick=()=>{
+document.querySelectorAll('.tabbar__item, .rail-nav__item').forEach(b=> b.onclick=()=>{
   haptic();
   const target=b.dataset.page;
-  const current=document.querySelector('.tabbar button.on')?.dataset.page;
+  const current=document.querySelector('.tabbar__item.on')?.dataset.page;
   if(!document.startViewTransition || current===target){ showPage(target); focusPageHeading(target); return; }
   const dir = TAB_ORDER.indexOf(target) > TAB_ORDER.indexOf(current) ? 'forward' : 'backward';
   const vt = document.startViewTransition({ update:()=>showPage(target), types:[dir] });
