@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.7.2'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.7.3'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -42,6 +42,13 @@ const V = 'pt-v9.7.2'; // ⚠ bump on EVERY deploy — semver epoch (renumbered 
 // `.rail-nav__item[aria-current="page"]` rule sits in a later @layer than
 // components.css's `.on` rule, the rail would have shown Home permanently
 // highlighted regardless of the real active tab. No financial maths touched.
+// v9.7.3 — Phase 5 vault audit fixes (js/portfolio.js, js/vault.js): exportBackup()
+// no longer includes pt_bk (was exporting the raw cloud-backup key + passcode
+// verifier alongside plaintext holdings); importBackup() no longer accepts a
+// bk field from a backup file at all. Passcode minimum raised 6→8 chars and
+// all-numeric passcodes rejected, enforced once in js/vault.js (passcodeError)
+// and applied to both first-time setup and vaultChangePass — PBKDF2 iteration
+// count (310,000) untouched. No financial maths touched.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

@@ -401,6 +401,118 @@ therefore the right fit here.
 
 Not part of any phase. Pick these off when convenient.
 
+### Phase 5 vault audit findings
+
+- **TP-1 — `exportBackup()` exported the raw cloud key.** [js/portfolio.js:1120](js/portfolio.js:1120)
+  The export object included `bk: lsGet('pt_bk')`. `pt_bk` is `{k, tag, salt}`: `k`
+  is the raw AES-256-GCM cloud-backup key (`crypto.subtle.exportKey('raw', key)`,
+  see [js/vault.js:185](js/vault.js:185)) and `tag` is the PBKDF2-310k passcode
+  verifier the Cloudflare Worker accepts as the *sole* authenticator for
+  `/restore` ([worker/src/index.js:138-143](worker/src/index.js:138)). Exporting
+  holdings in the clear is a deliberate feature (this phase's acceptance
+  criterion 3 is about *personal data* plaintext, not key material); exporting a
+  key that lets anyone holding the file impersonate this device to the cloud
+  and pull (and, with a guessed passcode, decrypt) the live backup is not.
+  **Fixed this session** — `bk` removed from the export object entirely; see the
+  fix log below for the import-side decision.
+
+- **TP-2 — plaintext PII can survive a partial setup/restore failure.**
+  [js/vault.js:76-91](js/vault.js:76) `doSetup()` — used directly on first setup
+  and by `cloudRestore()` after it seeds plaintext keys at
+  [js/vault.js:199-203](js/vault.js:199) — writes every `PRIVATE_KEYS` value to
+  `localStorage` unencrypted, then calls `saveVaultNow()`/`loadVaultData()`, and
+  only deletes the plaintext copies afterward at
+  [js/vault.js:90](js/vault.js:90). If `wrapKey`/`encrypt`/`decrypt`/the LS write
+  throws anywhere in between (quota, a WebCrypto error, a killed page), `doSetup`
+  rejects and the cleanup loop never runs. Both call sites swallow this into a UI
+  alert with no cleanup in the `catch` ([js/vault.js:483](js/vault.js:483) for
+  setup, [js/vault.js:462-465](js/vault.js:462) for restore). Full
+  holdings/lots/cash/goal data then sits unencrypted in `localStorage`, readable
+  by anyone with the device, until a later successful setup happens to overwrite
+  it. **Not fixed this session** — out of the three items scoped; needs a
+  `try/finally` around the plaintext window in `doSetup`. Accepted risk until then.
+
+- **TP-3 — the passcode minimum was weak and UI-only.** [js/vault.js:477](js/vault.js:477)
+  `if(a.length<6){ err('Use at least 6 characters.'); return; }` was the *only*
+  passcode-strength check anywhere: 6 characters, digits-only allowed (`123456`
+  passed), enforced in `boot()`'s setup handler, not in the crypto layer.
+  `window.vaultChangePass` ([js/vault.js:152-164](js/vault.js:152)) had no
+  strength check at all — it would happily rewrap the master key under a
+  1-character passcode. Combined with C-2 below, a weak passcode is the one
+  thing standing between an attacker with the KV backup ciphertext and an
+  offline-equivalent guessing attack. **Fixed this session** — minimum raised to
+  8 characters and digits-only rejected, enforced once in `js/vault.js` (a
+  shared `passcodeError()`) and called from both the setup handler and
+  `vaultChangePass`. The 310,000 PBKDF2 iteration count is untouched — changing
+  it would invalidate every existing wrap.
+
+- **C-1 — the passcode persists in the live DOM for the whole session
+  (CONDITIONAL — gated on an XSS primitive).** [js/vault.js:523-540](js/vault.js:523)
+  `tryUnlock()` reads the typed passcode from `$id('unlockPass').value`. The
+  failure path clears it (`$id('unlockPass').value=''` at
+  [js/vault.js:540](js/vault.js:540)), but the success path does not — it calls
+  `startApp()` ([js/vault.js:330-340](js/vault.js:330)), which only toggles the
+  `.locked`/`.unlocking` classes on `document.body`. The lock screen is hidden
+  purely by `body:not(.locked) .lock { display:none }`
+  ([css/components.css:742](css/components.css:742)); the `#unlockPass` node
+  stays attached to the DOM with the plaintext passcode still in its `.value`
+  for the rest of the tab's life. Not exploitable on its own — it requires an
+  existing script-execution primitive (XSS) to read — but once that
+  precondition holds, it turns a moment-of-typing exposure into a
+  standing one: any XSS payload can pull the passcode (and, from it, redo the
+  PBKDF2-310k unwrap) for as long as the tab stays open, not just at entry
+  time. **Not fixed — reconciliation only, this session.** Fix: clear
+  `$id('unlockPass').value` (and null out the local `typed`) immediately after
+  `unlockWithPass` succeeds, mirroring the existing failure-path clear.
+  *(This finding was dropped from the Backlog when it was first written up —
+  the slot below had taken its "C-1" label for a different, also-real finding.
+  Renumbered that one to C-2 and restored this one here; no code changed by
+  this reconciliation.)*
+
+- **C-2 — the `/restore` brute-force brake is per-isolate memory, not durable.**
+  [worker/src/index.js:99-100](worker/src/index.js:99)
+  `let rlN = 0, rlT = 0` are module-scope variables — one counter per Worker
+  isolate. The comment reasons about the legitimate owner ("fine for a
+  single-user API"), not an attacker: Cloudflare spins up a new isolate per PoP,
+  and under concurrent load within a PoP, so a distributed or merely parallel
+  requester gets a fresh 20-tries/hour budget per isolate, not 20/hour globally.
+  `/restore`'s only authentication is `tag`, a PBKDF2-310k value derived from the
+  passcode alone ([js/vault.js:169-174](js/vault.js:169)) — before TP-3's fix,
+  the (non-global) rate limit was the *only* real brake on an online guessing
+  attack against the KV-stored backup ciphertext. Should move to a KV- or
+  Durable-Object-backed counter keyed by IP or a fixed window. **Not fixed this
+  session** — `worker/` is a separately deployed Cloudflare Worker, outside the
+  three client-side fixes scoped for this session; partially mitigated in the
+  interim by TP-3 raising the passcode floor.
+
+- **Sharp edge — `vaultChangePass` strength validation lived in the UI layer.**
+  The length check lived in `js/portfolio.js:962`
+  (`if(n.length<6){ alert('Too short...'); return; }`, a `prompt()`-based flow),
+  not in `js/vault.js`, and it never ran for `vaultChangePass` at all — only for
+  the *initial* setup form at [js/vault.js:477](js/vault.js:477). Any other
+  future caller of `window.vaultChangePass` (it's a global) would silently skip
+  the invariant the crypto layer depends on. **Fixed this session** as part of
+  TP-3: the check now lives in `js/vault.js` next to `kekFromPass`, and
+  `js/portfolio.js`'s prompt flow just relays whatever error `vaultChangePass`
+  throws.
+
+- **Sharp edge — `pt_v_prf` goes stale after a cloud restore.**
+  [js/vault.js:188-206](js/vault.js:188) `cloudRestore()` calls `doSetup(pass)`
+  at line 204, which always generates a brand-new master key
+  ([js/vault.js:77](js/vault.js:77)) and writes a fresh `pt_v_pass`, but never
+  touches `pt_v_prf`. If this device already had Face ID enrolled (e.g. a second
+  restore, or restoring onto a device that previously held a different vault),
+  the old `pt_v_prf` still wraps the *previous* master key.
+  `window.vaultFaceEnabled()` ([js/vault.js:142](js/vault.js:142)) keeps
+  reporting Face ID as available, but `unlockWithFace()` will unwrap a key that
+  cannot decrypt the newly-restored vault data — `loadVaultData()`'s
+  `crypto.subtle.decrypt` throws a raw `OperationError` instead of falling back
+  to the passcode field the way every other Face ID failure mode in
+  `attemptFace()` does. **Not fixed this session** — out of the three items
+  scoped. Fix is for `cloudRestore()` to `LS.removeItem('pt_v_prf')` before
+  calling `doSetup`, so the device falls back to "no passkey enrolled" instead
+  of a broken one.
+
 - **Phase 2 regression: period high/low labels lost.** The old Chart.js hero had
   a `heroFx` plugin drawing the range's high and low as text on the chart
   (`lab(ma,true); lab(mi,false)`). `drawHeroChart()` has no equivalent — no

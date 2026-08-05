@@ -19,9 +19,18 @@ const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirme
 const APP_SCRIPTS=['js/boot.js','js/seed.js','js/demo.js','js/core.js','js/portfolio.js','js/api.js',
                    'js/explore.js','js/insights.js','js/sheets.js','js/app.js','js/tappable.js'];
 /* PUBLIC demo passcode — not secret, lives in source. It opens a fictional example portfolio
-   (js/demo.js) and can NEVER read or touch the real encrypted vault. Real passcodes are ≥6
+   (js/demo.js) and can NEVER read or touch the real encrypted vault. Real passcodes are ≥8
    chars, so this can never collide with a real one. */
 const DEMO_PASS='demo';
+/* Passcode strength floor — lives here, next to the crypto that depends on it, not in a UI
+   handler (Phase 5 audit, TP-3): a caller like vaultChangePass must not be able to skip it.
+   Only gates NEW/CHANGED passcodes — never re-checked on unlock, so existing ones keep working. */
+function passcodeError(p){
+  p=String(p||'');
+  if(p.length<8) return 'Use at least 8 characters.';
+  if(/^[0-9]+$/.test(p)) return 'Use letters or symbols too — not just numbers.';
+  return '';
+}
 let MK=null; // master key — memory only, gone when the page closes
 window.VAULT_DATA=null;
 const $id=i=>document.getElementById(i);
@@ -151,6 +160,7 @@ window.vaultFaceAvailable=async()=>{
 };
 window.vaultChangePass=async(oldp,newp)=>{
   if(window.DEMO_MODE) throw new Error('demo'); // never let the example portfolio touch the real vault
+  const pe=passcodeError(newp); if(pe) throw Object.assign(new Error(pe),{code:'weak'});
   const o=JSON.parse(LS.getItem('pt_v_pass'));
   const kek=await kekFromPass(oldp,ub64(o.salt));
   await unwrapMK(kek,o); // verify the old passcode
@@ -474,7 +484,7 @@ function boot(){
     $id('setupBtn').onclick = async () => {
       const a=$id('setPass1').value, b=$id('setPass2').value;
       if(a===DEMO_PASS){ enterDemo(); return; }   // never derives a real key
-      if(a.length<6){ err('Use at least 6 characters.'); return; }
+      const pe=passcodeError(a); if(pe){ err(pe); return; }
       if(a!==b){ err('Those don’t match.'); return; }
       const who = $id('setUser') ? $id('setUser').value.trim() : '';
       if(!who){ err('Choose a username.'); return; }

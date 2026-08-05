@@ -958,10 +958,9 @@ function openEdit(){
   };
   $('chgPass').onclick=async()=>{
     const o=prompt('Current passcode'); if(o==null) return;
-    const n=prompt('New passcode (min 6 characters)'); if(n==null) return;
-    if(n.length<6){ alert('Too short — use at least 6 characters.'); return; }
+    const n=prompt('New passcode (min 8 characters, not all numbers)'); if(n==null) return;
     try{ await vaultChangePass(o,n); alert('Passcode changed.'); }
-    catch(e){ alert('Current passcode was wrong.'); }
+    catch(e){ alert(e&&e.code==='weak' ? e.message : 'Current passcode was wrong.'); }
   };
   const paintCloud=()=>{ const b=lsGet('pt_bk'); $('cloudTgl').textContent = (b&&b.k) ? '☁️ Cloud backup: on' : '☁️ Cloud backup: off'; };
   paintCloud();
@@ -1117,7 +1116,7 @@ function speakBriefing(){
 function exportBackup(){
   const data={ app:'portfolio-tracker', v:1, exported:new Date().toISOString(),
     holdings:state.holdings, lots:state.lots, cash:state.cash, deposits:state.deposits, confirmed:state.confirmed, ccy:state.view.ccy, watch:state.watch,
-    goal:state.goal, targets:state.targets, push:lsGet('pt_push'), bk:lsGet('pt_bk'), alerts:lsGet('pt_alerts') };
+    goal:state.goal, targets:state.targets, push:lsGet('pt_push'), alerts:lsGet('pt_alerts') };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='portfolio-backup-'+dayStr(Date.now())+'.json';
@@ -1138,7 +1137,8 @@ function importBackup(file){
       if(d.goal&&(d.goal.amt>0||d.goal.fimo>0)) state.goal=d.goal;
       if(d.targets&&typeof d.targets==='object') state.targets=d.targets;
       if(d.push&&d.push.token) lsSet('pt_push', d.push); // keeps the report server's token — same account, no re-pairing
-      if(d.bk&&d.bk.k) lsSet('pt_bk', d.bk);            // keeps cloud backup armed too
+      // pt_bk (cloud key) is intentionally never imported — no longer exported (TP-1) and an
+      // untrusted file's bk would redirect future cloud uploads to an attacker's key.
       if(Array.isArray(d.alerts)) lsSet('pt_alerts', d.alerts);
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
