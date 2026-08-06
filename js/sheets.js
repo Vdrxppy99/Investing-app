@@ -61,11 +61,11 @@ async function openStockSheet(sym, name){
   const isIdx=sym.startsWith('^');
   const fmtP=v=>isIdx ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : fmtPx(v);
   const q=state.quotes[sym];
-  $('detailSheetHead').innerHTML = `<div>
+  $('detailSheetHead').innerHTML = `<div class="sheet__idrow">${badgeHtml(sym)}<div class="sheet__idcol">
       <div class="hsym sheet__title">${esc(sym.replace('-','.'))}</div>
       <div class="sheet__sub">${esc(name||'')}</div>
       <div id="ssPrice" class="sheet__price">${q?fmtP(q.price):'…'}</div>
-    </div><div class="sheet__headbtns"><button class="xbtn" id="watchBtn" aria-label="Toggle watchlist"></button><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>`;
+    </div></div><div class="sheet__headbtns"><button class="xbtn" id="watchBtn" aria-label="Toggle watchlist"></button><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>`;
   $('detailSheetBody').innerHTML = `
     <div class="chart-box chart-box--sheet"><canvas id="detailChart"></canvas><div id="detailMsg" class="chart-box__msg">Loading chart…</div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>

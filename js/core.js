@@ -53,7 +53,8 @@ const state = {
   // bench: 'off' | 'VOO' (S&P 500) | 'VT' (Total World) | 'QQQ' (Nasdaq 100) — migrates from the old boolean
   view: { acc:'all', metric: lsGet('pt_metric') || 'profit', range:'1M', ccy: lsGet('pt_ccy') || 'USD',
           bench: (function(){ const b=lsGet('pt_bench'); return (b==='VOO'||b==='VT'||b==='QQQ') ? b : (b===true ? 'VOO' : 'off'); })(),
-          sort: lsGet('pt_sort') || 'value', priv: !!lsGet('pt_priv') },
+          sort: lsGet('pt_sort') || 'value', priv: !!lsGet('pt_priv'),
+          moversView: 'gainers' }, // Daily Movers toggle (Home) — session-only, not persisted, same as .acc
   live:false, fetching:false
 };
 

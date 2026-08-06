@@ -801,11 +801,11 @@ function openDetail(sym){
   const er=(typeof FUND_META!=='undefined'&&FUND_META[sym])?FUND_META[sym].er:null;
   const accLines = Object.keys(r.accs).length>1
     ? `<div class="accbreak">${Object.entries(r.accs).map(([a,x])=>`<div>${esc(ACCOUNTS[a]||a)} — ${x.qty.toFixed(3).replace(/\.?0+$/,'')} sh · ${fmt(x.qty*p)} <span class="${cls(x.qty*p-x.cost)}">(${fmtSign(x.qty*p-x.cost)})</span></div>`).join('')}</div>` : '';
-  $('detailSheetHead').innerHTML = `<div>
+  $('detailSheetHead').innerHTML = `<div class="sheet__idrow">${badgeHtml(sym)}<div class="sheet__idcol">
       <div class="hsym sheet__title">${esc(sym.replace('-','.'))}</div>
       <div class="sheet__sub">${esc(NAMES[sym]||'')}</div>
       <div class="sheet__price">${fmtPx(p)} <span class="t-label ${cls(dp)}">${fmtPct(dp)} today</span></div>
-    </div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+    </div></div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `
     <div class="chart-box chart-box--sheet"><canvas id="detailChart"></canvas><div id="detailMsg" class="chart-box__msg"></div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>

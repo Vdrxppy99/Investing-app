@@ -66,6 +66,28 @@ function showPage(p){
   else $('miniBar').classList.toggle('show', window.scrollY>170);
   if(p==='markets' || p==='following') refreshMarkets(false);
   if(p==='insights') renderInsights();
+  // Bug fix (UPGRADE_PLAN.md): #mainChart is display:none whenever Portfolio isn't the
+  // active tab, so Lightweight Charts' autoSize sees a 0×0 container. When the tab becomes
+  // visible again, its ResizeObserver-driven recovery is racy — measured with Playwright
+  // (canvas.width/height against their own getBoundingClientRect()) a ~30-130ms window
+  // where the bitmap disagrees with its own CSS size (e.g. a 240px-tall box briefly getting
+  // a 720px-tall bitmap, a 3x mismatch), which reads as thickened/distorted line strokes
+  // until the library's own recovery finishes. This lives inside the vendor bundle's
+  // minified autoSize implementation — manually calling resize()/applyOptions() from here
+  // does not avoid it, only relocates it (confirmed: every manual nudge attempted, at every
+  // timing tried, reproduced an equivalent transient of its own instead of skipping it), so
+  // rather than fight the library's internal timing, the chart is simply not shown until it
+  // has reliably settled. --dur-chart-settle (css/tokens.css, 220ms) is the verified-safe
+  // margin — every measured recovery finished within ~130ms; the existing 200ms tab-slide
+  // (--dur-enter, css/tokens.css) covers most of that window anyway, so this mainly matters
+  // when transitions are off (prefers-reduced-motion, or a browser without View Transitions
+  // support).
+  if(p==='portfolio' && heroChart){
+    const mc=$('mainChart');
+    mc.classList.add('chart-settling');
+    const settleDur = parseFloat(cvar('--dur-chart-settle')) || 220;
+    setTimeout(()=>{ mc.classList.remove('chart-settling'); }, settleDur);
+  }
 }
 /* Tab switches use the View Transitions API (UPGRADE_PLAN.md Phase 3) — a directional
    slide matching the tabbar's left-to-right order, feature-detected so unsupported
@@ -229,38 +251,42 @@ function renderHealth(){
         <div class="hd">${oneLiner}</div></div>
     </div>`;
 }
-/* Movers left the Portfolio screen in R1 (DESIGN-TARGET.md — attribution
-   belongs on Home) and lands there for real in R4. Two pieces owed from R1
-   (UPGRADE_PLAN.md's R4 note) land here too, since this is that section's
-   front door: #moverTotal (the section header's trailing value, matching
-   every other Home "sec") and #moverNarrative, the "vs S&P 500 today" line
-   that also used to live on the Portfolio hero — same comparison formula as
-   maybeShowRecap() below (voo.price/voo.prev-1 vs dayPct), not reinvented. */
-function renderMover(){ // day-change attribution: which holdings drove today's move
-  const card=$('moverCard'); const totalEl=$('moverTotal'), narrEl=$('moverNarrative'); if(!card) return;
-  const rs=rows(state.view.acc);
-  const items=rs.map(r=>{
+/* Home v2 §1 — Daily Movers bar chart, replacing the old text-row attribution
+   list (moverTotal/moverNarrative retired with it: the new header — "Stay on
+   top" / "Your Daily Movers" — has no slot for a trailing $ total or the old
+   "vs S&P 500 today" sentence). gainers = pct>=0, losers = pct<0 — the same
+   >=0-is-pos convention cls() already uses elsewhere, so a portfolio where
+   every holding is flat at 0.00% renders all of them under Gainers (each at
+   the --mv-bar-min sliver, maxAbs being 0) rather than under neither view. */
+function renderMover(){
+  const body=$('moverBody'); if(!body) return;
+  const view=state.view.moversView;
+  const items=rows(state.view.acc).map(r=>{
     const p=priceOf(r.sym), pv=prevOf(r.sym); if(!(pv>0)||!(p>0)) return null;
-    return {sym:r.sym, pct:(p/pv-1)*100, impact:r.qty*(p-pv)};
-  }).filter(x=>x && Math.abs(x.pct)>=0.01).sort((a,b)=>Math.abs(b.impact)-Math.abs(a.impact));
-  if(!items.length){ card.style.display='none'; if(totalEl) totalEl.textContent=''; if(narrEl) narrEl.textContent=''; return; }
-  card.style.display='';
-  const tot=items.reduce((a,x)=>a+x.impact,0);
-  const totAbs=items.reduce((a,x)=>a+Math.abs(x.impact),0);
-  if(totalEl) totalEl.innerHTML=`<span class="${cls(tot)}">${fmtSign(tot)}</span>`;
-  if(narrEl){
-    const t=totals(state.view.acc);
-    const dayPct=(t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
-    const voo=state.quotes.VOO, sp=(voo&&voo.prev>0)?(voo.price/voo.prev-1)*100:null;
-    narrEl.textContent = sp!=null ? `${dayPct-sp>=0?'Ahead of':'Behind'} the S&P 500 today by ${Math.abs(dayPct-sp).toFixed(2)}%.` : '';
+    return {sym:r.sym, pct:(p/pv-1)*100};
+  }).filter(Boolean);
+  const pool = view==='losers' ? items.filter(x=>x.pct<0).sort((a,b)=>a.pct-b.pct)
+                                : items.filter(x=>x.pct>=0).sort((a,b)=>b.pct-a.pct);
+  const visible = pool.slice(0,5);
+  if(!visible.length){
+    body.innerHTML = `<p class="movers-empty t-caption muted">No ${view==='losers'?'losers':'gainers'} today.</p>`;
+    return;
   }
-  $('moverBody').innerHTML = items.slice(0,3).map(x=>{
-    const share = totAbs>0 ? Math.round(Math.abs(x.impact)/totAbs*100) : 0;
-    return `<div class="mrow" data-sym="${esc(x.sym)}">${badgeHtml(x.sym,true)}
-      <div class="mmid"><div class="msym">${esc((NAMES[x.sym]||x.sym.replace('-','.')).replace(/^Vanguard /,''))}</div><div class="mname">drove ${share}% of today's move</div></div>
-      <div class="mright"><span class="pctpill ${x.pct>=0?'up':'down'}">${fmtPct(x.pct)}</span><div class="msub">${fmtSign(x.impact)}</div></div></div>`;
+  const maxAbs = Math.max(...visible.map(x=>Math.abs(x.pct)));
+  body.innerHTML = visible.map(x=>{
+    const c=x.pct>=0?'pos':'neg';
+    const frac = maxAbs>0 ? Math.abs(x.pct)/maxAbs : 0;
+    return `<div class="mvcol" data-sym="${esc(x.sym)}" data-frac="${frac.toFixed(4)}">
+      <div class="mv-zone"><span class="mv-pct ${c}">${fmtPct(x.pct)}</span><div class="mv-bar ${c}"></div></div>
+      ${badgeHtml(x.sym,true)}
+      <span class="mv-tick">${esc(x.sym.replace('-','.'))}</span></div>`;
   }).join('');
-  $('moverBody').querySelectorAll('.mrow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
+  const barMax=parseFloat(cvar('--mv-bar-max'))||88, barMin=parseFloat(cvar('--mv-bar-min'))||6;
+  body.querySelectorAll('.mvcol').forEach(el=>{
+    const frac=parseFloat(el.dataset.frac)||0;
+    el.querySelector('.mv-bar').style.setProperty('--h', (barMin+frac*(barMax-barMin)).toFixed(1)+'px');
+    el.onclick=()=>openDetail(el.dataset.sym);
+  });
 }
 /* ============ HOME (R4) ============
    The glance screen. No new maths anywhere below — every figure is computed
@@ -357,7 +383,75 @@ function renderComingUp(){
   }).join('');
   body.querySelectorAll('.drow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
 }
+/* Home v2 §4 — Price highlights, the Empower pattern: top 3 holdings by
+   lifetime total return (r.cost>0 ? pl/r.cost*100 : 0 — the exact formula
+   holdingRow() in js/portfolio.js uses for the same figure on the Portfolio
+   tab), not today's move (that's §1's job). Only positive returns qualify as
+   a "highlight" — a portfolio where every holding is underwater says so
+   plainly instead of surfacing its least-bad loser as if it were one. */
+function renderPriceHighlights(){
+  const body=$('highlightBody'); if(!body) return;
+  const rs=rows(state.view.acc).filter(r=>r.qty*priceOf(r.sym)>0);
+  const top=rs.map(r=>{
+    const p=priceOf(r.sym), val=r.qty*p, pl=val-r.cost, plp=r.cost>0?pl/r.cost*100:0;
+    return {sym:r.sym, plp};
+  }).filter(x=>x.plp>0).sort((a,b)=>b.plp-a.plp).slice(0,3);
+  if(!top.length){
+    body.innerHTML=`<p class="t-caption muted">Every holding is down right now — no highlights to show.</p>`;
+    return;
+  }
+  body.innerHTML = top.map(x=>`<div class="mrow" data-sym="${esc(x.sym)}">${badgeHtml(x.sym,true)}
+      <div class="mmid"><div class="msym">${esc(x.sym.replace('-','.'))}</div><div class="mname">${esc((NAMES[x.sym]||x.sym.replace('-','.')).replace(/^Vanguard /,''))}</div></div>
+      <div class="mright"><span class="pctpill up">${fmtPct(x.plp)}</span></div></div>`).join('');
+  body.querySelectorAll('.mrow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
+}
 $('homeAllocStrip').onclick = openAllocSheet;
+/* Home v2 §5 — Portfolio insights: three .stat tiles, the exact module-tile
+   component js/insights.js's renderModGrid() built for Insights' #modGrid
+   (same markup/classes — deliberately not a second tile style), each opening
+   the Insights tab on tap by replaying the rail-nav/tabbar Insights button's
+   own click (haptic + view transition + focus included, not reimplemented).
+   No new maths: health grade uses renderHealth()'s own score/grade
+   thresholds above; XIRR/vs VOO use the same personalReturn()/spPathValue()
+   calls renderModGrid() (js/insights.js) already makes.
+   #moverNarrative — the "Ahead of/Behind the S&P 500 today" sentence — lived
+   on the old text-row movers (R4), was dropped when the Home v2 §1 bar-chart
+   header had no slot for it, and has now been deleted three times across
+   R1/R4/the movers session. It answers "did I beat the market today", which
+   nothing else on Home does — the vs-VOO tile beside it is a lifetime
+   figure, not a daily one — so it gets a permanent home here as this
+   section's lead line, next to the tile it's most related to. Same
+   dayPct/S&P comparison formula R4 used, not reinvented.
+   #moverTotal (the old header's $ total for today's movers) is NOT restored:
+   it duplicated #homeToday's day-dollar figure exactly (both sum the same
+   day-change across the same holdings), and the new bar-chart movers header
+   has no slot for a second copy of that number — genuinely redundant, not
+   lost like the narrative was. */
+function renderHomeInsights(){
+  const grid=$('homeInsights'); const narrEl=$('moverNarrative');
+  if(narrEl){
+    const t=totals(state.view.acc);
+    const dayPct=(t.value-t.day)>0 ? t.day/(t.value-t.day)*100 : 0;
+    const voo=state.quotes.VOO, sp=(voo&&voo.prev>0)?(voo.price/voo.prev-1)*100:null;
+    narrEl.textContent = sp!=null ? `${dayPct-sp>=0?'Ahead of':'Behind'} the S&P 500 today by ${Math.abs(dayPct-sp).toFixed(2)}%.` : '';
+  }
+  if(!grid) return;
+  const {score}=healthScore();
+  const grade=score>=85?'A':score>=75?'B':score>=65?'C':score>=50?'D':'F';
+  const rr=personalReturn('all');
+  const t=totals('all'), sp=spPathValue(), mine=t.value-cashFor('all');
+  const vsVoo=(sp && sp.value>0) ? (mine-sp.value)/sp.value*100 : null;
+  const tile=(label,value,tone,sub)=>
+    `<div class="stat press">`+
+    `<div class="stat__label">${esc(label)}</div>`+
+    `<div class="stat__value${tone?` ${tone}`:''}">${esc(value)}</div>`+
+    `<div class="stat__delta">${esc(sub)}</div></div>`;
+  grid.innerHTML =
+    tile('Health', grade, '', `${score}/100`) +
+    tile('XIRR', rr!=null?fmtPct(rr*100):'—', rr!=null?cls(rr*100):'', 'annualised') +
+    tile('vs VOO', vsVoo!=null?fmtPct(vsVoo):'—', vsVoo!=null?cls(vsVoo):'', 'same buys in VOO');
+  grid.querySelectorAll('.stat').forEach(el=> el.onclick=()=> document.querySelector('.tabbar__item[data-page="insights"]').click());
+}
 /* renderMover/renderGoal/renderIncome are still called here — renderIncome()
    still no-ops (see its own guard: #incomeCard was never rebuilt, Home's
    renderComingUp() covers that ground instead) while renderMover()/renderGoal()
@@ -366,7 +460,7 @@ $('homeAllocStrip').onclick = openAllocSheet;
    renderHomeCard()) is what actually paints the always-visible strips. */
 function renderAll(){
   renderMover(); renderGoal(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
-  renderHomeChrome(); renderHomeCard(); renderHomePr(); renderComingUp();
+  renderHomeChrome(); renderHomeCard(); renderHomePr(); renderComingUp(); renderPriceHighlights(); renderHomeInsights();
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-markets').classList.contains('hidden')) renderMarkets();
   if(!$('page-following').classList.contains('hidden')) renderFollowing();
@@ -377,11 +471,43 @@ $('benchBtn').onclick = ()=>{ // cycle: off → S&P 500 → Total World → Nasd
   if(next==='VT'||next==='QQQ') ensureBenchHistory(next).then(ok=>{ if(ok) renderChart(); });
   renderChart();
 };
+// Bug fix (UPGRADE_PLAN.md): these two toggles only ever synced the .on class, never
+// aria-selected — so index.html's hardcoded default (Profit / 1M) stayed
+// aria-selected="true" forever, and since css/components.css's `.seg__item[aria-selected=
+// "true"]` rule paints the identical solid-fill highlight as `.seg__item.on` (by design,
+// per that rule's own comment — the two mechanisms are meant to be interchangeable), the
+// default chip and whichever one the user actually picked both rendered lit at once. Same
+// class of bug as the rail-nav fix in commit 1b374e9 (a selection attribute the markup
+// hardcodes, never cleared by the code that sets a new selection) — verified by reading
+// getAttribute('aria-selected') across every chip after clicking, not by screenshot.
+const syncSel=(container,active)=>container.querySelectorAll('button').forEach(x=>{
+  x.classList.toggle('on',x===active); x.setAttribute('aria-selected', x===active?'true':'false');
+});
 $('metricSeg').querySelectorAll('button').forEach(b=>{
   b.classList.toggle('on', b.dataset.m===state.view.metric); // sync highlight to the saved/default metric
-  b.onclick=()=>{ state.view.metric=b.dataset.m; lsSet('pt_metric',b.dataset.m); $('metricSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderChart(); };
+  b.setAttribute('aria-selected', b.dataset.m===state.view.metric?'true':'false');
+  b.onclick=()=>{ state.view.metric=b.dataset.m; lsSet('pt_metric',b.dataset.m); syncSel($('metricSeg'),b); renderChart(); };
 });
-$('rangeSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{ state.view.range=b.dataset.r; $('rangeSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); renderChart(); });
+$('rangeSeg').querySelectorAll('button').forEach(b=> b.onclick=()=>{ state.view.range=b.dataset.r; syncSel($('rangeSeg'),b); renderChart(); });
+// Daily Movers gainers/losers toggle (Home v2 §1) — built with syncSel from the
+// start, the same fix metricSeg/rangeSeg needed above, so this isn't a fourth
+// instance of the bug syncSel's own comment describes.
+$('moverToggle').querySelectorAll('button').forEach(b=>{
+  b.classList.toggle('on', b.dataset.view===state.view.moversView);
+  b.setAttribute('aria-selected', b.dataset.view===state.view.moversView?'true':'false');
+  b.onclick=()=>{ state.view.moversView=b.dataset.view; syncSel($('moverToggle'),b); renderMover(); };
+});
+// Markets screener toggle (DESIGN-TARGET.md §2) — R3 collapsed the three screener
+// lists into one segmented card but never attached a click handler, so #screenSeg
+// has rendered since R3 without ever doing anything (test/active-state.spec.js now
+// covers this). No saved state (unlike moversView): the card always opens on
+// "Active", same as before this fix.
+$('screenSeg').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{
+    syncSel($('screenSeg'),b);
+    document.querySelectorAll('#page-markets [data-screen-panel]').forEach(p=>{ p.hidden = p.dataset.screenPanel!==b.dataset.screen; });
+  };
+});
 $('ccyBtn').onclick = ()=>{ state.view.ccy = state.view.ccy==='USD'?'EUR':'USD'; lsSet('pt_ccy',state.view.ccy); renderAll(); };
 /* privacy mode — mask YOUR dollar amounts (••••••), keep percentages + market prices */
 const EYE_OPEN = `<svg viewBox="0 0 24 24"><path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle cx="12" cy="12" r="3.2"/></svg>`;

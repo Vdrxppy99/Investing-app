@@ -182,20 +182,34 @@
 <div class="wrap">
 
 <!-- ═══════════════════ HOME ═══════════════════ -->
-<!-- DESIGN-TARGET.md §1 / five-tabs.html frame 1: the new landing tab — glance
-     screen with a greeting, one portfolio card (total, today's delta, a 1M
-     sparkline, the allocation strip, and the period-return pills carried over
-     from R1's hero — see #homePr's comment in js/insights.js), Today's movers
-     (with the "vs S&P 500 today" narrative that also left the R1 hero, as its
-     lead line), Coming up (dividend ex-dates), and Goal. No new maths: every
-     figure here is computed by js/app.js / js/portfolio.js / js/insights.js
-     exactly as before, just given a front door instead of being orphaned. -->
+<!-- DESIGN-TARGET.md "Home v2" (supersedes the R4/frame-1 composition below it in
+     that doc): Daily Movers — a bar chart, gainers/losers toggle, §1 — now leads
+     the screen, above the portfolio card. Then the portfolio card (total, today's
+     delta, a 1M sparkline, the allocation strip, and the period-return pills
+     carried over from R1's hero — see #homePr's comment in js/insights.js), Coming
+     up (dividend ex-dates), and Goal. No new maths: every figure here is computed
+     by js/app.js / js/portfolio.js / js/insights.js exactly as before, just given
+     a front door instead of being orphaned. -->
 <div id="page-home" class="page">
   <div class="appbar">
     <h1 class="t-title" id="homeTitle" tabindex="-1">Home</h1>
   </div>
   <div class="greet" id="homeGreet"></div>
   <p class="t-caption muted" id="homeCountdown"></p>
+
+  <div>
+    <div class="section__label"><span>Stay on top</span></div>
+    <section class="card" id="moverCard">
+      <div class="card__head">
+        <h2 class="card__title">Your Daily Movers</h2>
+        <div class="seg" id="moverToggle" role="tablist" aria-label="Movers view">
+          <button class="seg__item" data-view="gainers" role="tab" aria-selected="true">Gainers</button>
+          <button class="seg__item" data-view="losers" role="tab" aria-selected="false">Losers</button>
+        </div>
+      </div>
+      <div class="movers-chart" id="moverBody"></div>
+    </section>
+  </div>
 
   <section class="card" id="homeCard">
     <div class="hero__eyebrow">Portfolio</div>
@@ -207,15 +221,31 @@
   </section>
 
   <div class="stack">
-    <div>
-      <div class="section__label"><span>Today's movers</span><em id="moverTotal"></em></div>
-      <p class="t-caption muted" id="moverNarrative"></p>
-      <section class="card" id="moverCard"><div id="moverBody"></div></section>
-    </div>
-
     <div id="comingSection">
       <div class="section__label"><span>Coming up</span></div>
       <section class="card"><div id="comingBody"></div></section>
+    </div>
+
+    <!-- Home v2 §4 — the Empower pattern: top 3 holdings by lifetime total
+         return, not today's move (that's §1). Heading states a fact rather
+         than nudging a decision, per the brief ("reads as observation, not
+         recommendation"). -->
+    <div>
+      <div class="section__label"><span>Performance</span></div>
+      <section class="card"><div class="card__head"><h2 class="card__title">Best performers</h2></div><div id="highlightBody"></div></section>
+    </div>
+
+    <!-- Home v2 §5 — three .stat tiles (js/insights.js's #modGrid component,
+         css/components.css "6.7 Stat tile" — reused as-is, not a second tile
+         style), each opening Insights on tap. #moverNarrative is the "Ahead
+         of/Behind the S&P 500 today" line, restored here as this section's
+         lead line next to the vs-VOO tile it answers alongside (see the
+         comment above renderHomeInsights() in js/app.js for why it moved
+         here and why #moverTotal did not come with it). -->
+    <div>
+      <div class="section__label"><span>Portfolio insights</span></div>
+      <p class="t-caption muted" id="moverNarrative"></p>
+      <div class="grid-3" id="homeInsights"></div>
     </div>
 
     <div>
@@ -290,7 +320,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v9.7.5</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v9.9.0</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->

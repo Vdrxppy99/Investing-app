@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.7.5'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-v9.9.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -73,6 +73,51 @@ const V = 'pt-v9.7.5'; // ⚠ bump on EVERY deploy — semver epoch (renumbered 
 // test/export-import.spec.js: the export/import round-trip had zero prior coverage and
 // is the one path where a bug loses the whole portfolio; it also asserts the exported
 // JSON carries no `bk` key, the TP-1 regression guard. No financial maths touched.
+// v9.7.6 — three bug fixes (js/app.js, css/components.css), no new features. (1) Logo/
+// monogram stacking: css/components.css's crossfade rule read `.blogo img.on` — a
+// descendant-img selector that never matched, because badgeHtml() (js/core.js) has always
+// put .blogo directly ON the <img> itself (bug present since the rule's very first commit,
+// e6d8396 — not a CSP-refactor regression). opacity:0-until-.on never applied, so the logo
+// sat at opacity:1 from insertion and showed through/over the monogram on any logo with
+// transparent pixels. Fixed the selector to match the real markup (`.blogo`/`.blogo.on`);
+// verified pre-load opacity is 0 and post-load is 1, and that a row with the logo host
+// blocked still renders the monogram with no broken row. (2) Hero chart lines
+// thicken-then-snap-back after a Portfolio tab switch: measured (Playwright, canvas.width/
+// height vs their own getBoundingClientRect()) a genuine ~30-130ms window where Lightweight
+// Charts' autoSize/ResizeObserver recovery from a 0×0 (display:none) container produces a
+// non-uniform bitmap:CSS mismatch (e.g. bitmap height 720px for a 240px CSS box) — this
+// lives inside the vendor bundle's minified autoSize implementation; every manual resize()/
+// applyOptions() nudge attempted relocated the same transient rather than removing it, so
+// showPage() now veils #mainChart (opacity, not display — the box stays measurable) for a
+// verified-safe 220ms after Portfolio becomes visible, past every measured settle time.
+// (3) Two range chips lit at once: js/app.js's #metricSeg/#rangeSeg click handlers synced
+// only the .on class, never aria-selected, so index.html's hardcoded default (Profit/1M)
+// stayed aria-selected="true" forever — and since components.css's `[aria-selected="true"]`
+// rule paints the identical solid-fill highlight as `.on` by design, the default chip and
+// whichever one was actually clicked both rendered lit. Same class of bug as the rail-nav
+// fix in commit 1b374e9. Verified by reading aria-selected across every chip after
+// clicking: exactly one lit, every time. No financial maths touched.
+// v9.8.0 — Home v2 §1: Daily Movers bar chart (index.html, js/app.js, css/tokens.css,
+// css/components.css) replaces the old text-row "Today's movers" list and moves to the
+// top of Home, above the portfolio card. Divs and CSS, no chart library — up to five
+// columns on a shared baseline (--mv-zone bottom-anchors the % label + bar per column,
+// so every badge/ticker still lines up regardless of that column's own bar height), a
+// working gainers/losers toggle (#moverToggle, wired with the same syncSel fix
+// #metricSeg/#rangeSeg needed in v9.7.6 — built correct from the start, not a fourth
+// instance), bar height proportional to the largest absolute move in the visible set,
+// floored at --mv-bar-min so a near-zero move still shows a sliver. #moverTotal/
+// #moverNarrative retired with the old section — Home v2's header ("Stay on top" / "Your
+// Daily Movers") has no slot for them. Two smaller fixes alongside it: (1) badgeHtml()
+// now renders in the asset-detail sheet head (js/sheets.js openStockSheet, js/portfolio.js
+// openDetail) — both showed plain ticker text with no logo/monogram at all. (2) the 220ms
+// chart-settling veil added in v9.7.6 is now --dur-chart-settle (css/tokens.css), read via
+// parseFloat(cvar(...)) like --dur-data already was, instead of a literal in js/app.js.
+// Added test/active-state.spec.js: a regression guard for the "hardcoded active state never
+// cleared" bug class fixed three times now (rail-nav, commit 1b374e9; #metricSeg/#rangeSeg,
+// v9.7.6; and this session's moverToggle, built correct from the start) — asserts exactly
+// one element lit (.on class OR aria-current/aria-selected) across tabbar, rail-nav,
+// #rangeSeg, #metricSeg and #moverToggle after every possible click. No financial maths
+// touched.
 // ⚠ adding a new js/css file to the app? It MUST be added here too (and V bumped),
 //   or offline/first-load installs will silently miss it.
 const CORE = ['./', './index.html', './manifest.webmanifest',

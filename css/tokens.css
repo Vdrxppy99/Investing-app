@@ -89,6 +89,11 @@
     --dur-shimmer: 1400ms;
     --dur-spin: 700ms;
     --dur-stagger: 160ms;   /* typing-dot offset; a loop phase, not a transition */
+    /* Chart-recovery settle margin (js/app.js showPage) — a one-shot delay guarding
+       against Lightweight Charts' post-resize bitmap glitch, not an enter/exit
+       either, so it lives with the loop durations above rather than forcing a 5th
+       transition duration into DESIGN.md §10's fixed four. */
+    --dur-chart-settle: 220ms;
 
     /* ── Fixed dimensions that recur structurally ────────────────────────── */
     --tap: 44px;            /* minimum tap target — a11y floor */
@@ -122,6 +127,11 @@
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --bottom-clear: calc(var(--tabbar-h) + var(--fab-size) + var(--fab-gap) + var(--s-5) + var(--safe-bottom));
     --heat-cell-min: 20px;
+    /* Home v2 §1 — Daily Movers bar chart. Max is the leader's height in the
+       visible set; min is the visible-sliver floor a near-zero (or, edge case,
+       every-mover-flat) move still renders at, so a 0.00% bar is never invisible. */
+    --mv-bar-max: 88px;
+    --mv-bar-min: 6px;
   }
 
   /* ═══ DARK — the default and the design target (DESIGN-TARGET.md) ═════════

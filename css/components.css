@@ -643,6 +643,11 @@
      read via ResizeObserver — it must NOT force width/height like the rule
      above, or it fights the library's own pixel-exact canvas dimensions. */
   .chart #mainChart { position: absolute; inset: 0; }
+  /* js/app.js showPage(): veils the hero chart for a fixed window right after Portfolio
+     becomes visible again, while Lightweight Charts' own autoSize recovery from a 0×0
+     (display:none) container is still settling. opacity, not visibility/display — the
+     canvas keeps a real box the whole time, so this never itself triggers another resize. */
+  #mainChart.chart-settling { opacity: 0; }
   .chart__readout {
     display: flex;
     align-items: baseline;
@@ -1065,9 +1070,17 @@
   #benchBtn.on { background: var(--primary-tint); color: var(--primary); }
 
   /* core.js adds .on to a logo <img> once it has actually loaded, so a broken
-     remote logo never leaves a half-painted tile. */
-  .blogo img { opacity: 0; transition: opacity var(--dur-micro) var(--ease-out); }
-  .blogo img.on { opacity: 1; }
+     remote logo never leaves a half-painted tile. Bug (present since this rule's very
+     first commit, e6d8396 — not a CSP-refactor regression): badgeHtml() (js/core.js) has
+     always put the .blogo class directly ON the <img> itself, never on a wrapper — so
+     ".blogo img.on" asks for a DESCENDANT img inside a .blogo ancestor, which never
+     exists, and never matched. opacity:0 was therefore never applied; the logo sat at
+     its default opacity:1 from the instant it was inserted, painting over the monogram
+     tile behind it as soon as any pixels decoded — visible as both rendering "stacked"
+     whenever the fetched logo has transparent regions (most favicons do). Fixed by
+     matching the actual markup: .blogo IS the img. */
+  .blogo { opacity: 0; transition: opacity var(--dur-micro) var(--ease-out); }
+  .blogo.on { opacity: 1; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1183,6 +1196,57 @@
   .neg, .down { color: var(--loss); }
   .pctpill.pos, .prpill.pos, .daypill.pos { background: var(--gain-tint); color: var(--gain); }
   .pctpill.neg, .prpill.neg, .daypill.neg { background: var(--loss-tint); color: var(--loss); }
+
+  /* ── Daily Movers — Home v2 §1. Divs and CSS, no chart library. Up to five
+     columns sharing one baseline: .mv-zone is a fixed-height box per column
+     (--mv-bar-max) with its content bottom-anchored, so the % label sits right
+     above its own bar and every column's badge/ticker still lines up below it
+     regardless of that bar's actual height. .mv-bar's own height is set via
+     --h, a datum written with el.style.setProperty() after insertion (js/app.js
+     renderMover) — never a literal style= — proportional to the largest
+     absolute move in the visible set, floored at --mv-bar-min so a near-zero
+     (or, edge case, every-mover-flat) move still renders a visible sliver. */
+  .movers-chart { display: flex; gap: var(--s-2); }
+  .movers-empty { width: 100%; text-align: center; padding: var(--s-4) 0; }
+  .mvcol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-2);
+    flex: 1 1 0;
+    min-width: 0;
+    cursor: pointer;
+  }
+  .mv-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: var(--mv-bar-max);
+    width: 100%;
+  }
+  .mv-pct {
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums lining;
+    margin-bottom: var(--s-1);
+  }
+  .mv-bar {
+    width: var(--s-7);
+    height: var(--h, var(--mv-bar-min));
+    border-radius: var(--r-tile) var(--r-tile) 0 0;
+  }
+  .mv-bar.pos { background: linear-gradient(180deg, var(--gain) 0%, var(--gain-tint) 100%); }
+  .mv-bar.neg { background: linear-gradient(180deg, var(--loss) 0%, var(--loss-tint) 100%); }
+  .mv-tick {
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-muted);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   /* Bars: share-of-whole and ranked magnitude. */
   .wbar {
@@ -1510,9 +1574,14 @@
   .ebtns .btn { flex: 1 1 auto; }
 
   /* Sheet chrome emitted by sheets.js/portfolio.js — head content lives inside
-     the real .sheet__head element now (index.html), so no wrapping class is
-     needed here beyond what .sheet__head already provides. */
+     the real .sheet__head element now (index.html). .sheet__idrow is the one
+     wrapping class beyond that: badgeHtml()'s tile plus the title/sub/price
+     stack, as .sheet__head's own first flex child (DESIGN-TARGET.md's Logos
+     rule — every asset surface, including the detail sheets, gets the real
+     logo, not a bare ticker). */
   #watchBtn.on { color: var(--primary); }
+  .sheet__idrow { display: flex; align-items: center; gap: var(--row-gap); min-width: 0; }
+  .sheet__idcol { min-width: 0; flex: 1 1 auto; }
   .xbtn {
     display: inline-grid;
     place-items: center;
