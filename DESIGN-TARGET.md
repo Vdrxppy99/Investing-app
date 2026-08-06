@@ -172,3 +172,77 @@ Microsoft without knowing it. Treat it as a headline feature, not a footnote.
    both themes and light mode is unforgiving about spacing.
 7. Text inputs are never below 16px — iOS Safari zooms the viewport otherwise,
    which is an instant "this is a web page in a wrapper" tell.
+
+---
+
+# Home v2 — owner brief, August 2026
+
+Supersedes the Home section above. Frame 1 of `five-tabs.html` remains valid for
+type, colour and spacing; this changes what is on the screen and in what order.
+
+Screen order, top to bottom:
+
+1. Daily Movers (bar chart)
+2. Upcoming — dividends AND earnings
+3. Your Portfolio — value, delta, sparkline, allocation strip
+4. Price highlights
+5. Portfolio insights
+6. Goal
+
+## 1. Daily Movers — replaces the current text-row movers
+
+A bar chart, not a list. Reference: the owner's Delta screenshot.
+
+- Section label `STAY ON TOP` above a title `Your Daily Movers`, per the
+  established `.sec` component.
+- Top-right: a two-state segmented toggle, gainers ↗ / losers ↙. Both states
+  must work — the current build shows gainers only.
+- One card. Inside it, up to five vertical bars sharing a common baseline.
+- Each column, top to bottom: signed percentage label, the bar, a circular
+  logo, the ticker.
+- Bar height is proportional to the largest absolute move in the visible set,
+  so the leader always fills the column and the rest scale against it. A bar
+  with a near-zero move still renders a visible sliver plus its label.
+- Fill: a vertical gradient from the semantic colour at the top fading downward,
+  rounded top corners only.
+- Colour: `--gain` for the gainers view, `--loss` for losers. The sign is always
+  printed, so colour is never the sole carrier.
+- Built with divs and CSS. Do not add a chart library for this.
+
+## 2. Upcoming — dividends and earnings
+
+The current section shows dividend ex-dates only. Earnings move a price far more
+than a distribution does, so both belong here, merged into one date-sorted list.
+
+- Each row: logo, `SYMBOL · event`, the date, and a day-count chip.
+- Dividend row: "Dividend · ex-div 18 Sep", estimated amount as the subtitle.
+- Earnings row: "Q3 2026 earnings · 2 Sep".
+- ETFs have no earnings. A portfolio that is mostly ETFs will show mostly
+  dividends, and that is correct — do not invent earnings rows to fill space.
+- If no free earnings source proves workable, ship the dividend half and say so
+  plainly. Never display a fabricated or guessed date.
+
+## 3-6
+
+- **Your Portfolio** — unchanged from Home v1.
+- **Price highlights** — the Empower pattern: the holdings currently performing
+  best. Top three by total return, each with logo, ticker, name, return %.
+  Label it so it reads as observation, not recommendation.
+- **Portfolio insights** — three compact tiles pulled from the Insights tab:
+  health grade, XIRR, and vs-VOO. Tapping any of them opens the Insights tab.
+  No new maths.
+- **Goal** — unchanged from Home v1.
+
+## Logos
+
+Every asset surface — movers, upcoming, holdings rows, price highlights, asset
+detail — uses the real company or fund logo, with the ticker monogram as
+fallback only. A monogram where a logo should be is the single strongest
+"unfinished" signal left in the app.
+
+`badgeHtml()` in `js/core.js` already fetches logos. The bug is that the
+fallback monogram is not hidden once the real logo loads, so both render
+stacked. Fix the mechanism, then apply it everywhere.
+
+Logos must be cached, and their absence must never break a row — the app is
+offline-first and the logo host is third-party.
