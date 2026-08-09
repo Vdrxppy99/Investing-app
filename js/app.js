@@ -66,28 +66,6 @@ function showPage(p){
   else $('miniBar').classList.toggle('show', window.scrollY>170);
   if(p==='markets' || p==='following') refreshMarkets(false);
   if(p==='insights') renderInsights();
-  // Bug fix (UPGRADE_PLAN.md): #mainChart is display:none whenever Portfolio isn't the
-  // active tab, so Lightweight Charts' autoSize sees a 0×0 container. When the tab becomes
-  // visible again, its ResizeObserver-driven recovery is racy — measured with Playwright
-  // (canvas.width/height against their own getBoundingClientRect()) a ~30-130ms window
-  // where the bitmap disagrees with its own CSS size (e.g. a 240px-tall box briefly getting
-  // a 720px-tall bitmap, a 3x mismatch), which reads as thickened/distorted line strokes
-  // until the library's own recovery finishes. This lives inside the vendor bundle's
-  // minified autoSize implementation — manually calling resize()/applyOptions() from here
-  // does not avoid it, only relocates it (confirmed: every manual nudge attempted, at every
-  // timing tried, reproduced an equivalent transient of its own instead of skipping it), so
-  // rather than fight the library's internal timing, the chart is simply not shown until it
-  // has reliably settled. --dur-chart-settle (css/tokens.css, 220ms) is the verified-safe
-  // margin — every measured recovery finished within ~130ms; the existing 200ms tab-slide
-  // (--dur-enter, css/tokens.css) covers most of that window anyway, so this mainly matters
-  // when transitions are off (prefers-reduced-motion, or a browser without View Transitions
-  // support).
-  if(p==='portfolio' && heroChart){
-    const mc=$('mainChart');
-    mc.classList.add('chart-settling');
-    const settleDur = parseFloat(cvar('--dur-chart-settle')) || 220;
-    setTimeout(()=>{ mc.classList.remove('chart-settling'); }, settleDur);
-  }
 }
 /* Tab switches use the View Transitions API (UPGRADE_PLAN.md Phase 3) — a directional
    slide matching the tabbar's left-to-right order, feature-detected so unsupported

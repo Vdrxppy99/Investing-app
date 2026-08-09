@@ -246,3 +246,29 @@ stacked. Fix the mechanism, then apply it everywhere.
 
 Logos must be cached, and their absence must never break a row — the app is
 offline-first and the logo host is third-party.
+
+---
+
+# Home v3 — section order
+
+Supersedes the ordering in Home v2. Content of each section is unchanged; only
+the sequence moves.
+
+The problem with v2: Daily Movers sat above the portfolio value. The total is
+the reason the app gets opened — it is the headline, and everything else is
+commentary on it.
+
+The order below zooms out in time as you scroll: where you stand now, why it
+moved today, what has done well, how you are doing overall, what is coming,
+where you are headed.
+
+1. **Your Portfolio** — total, today's delta, sparkline, allocation strip.
+2. **Daily Movers** — the bar chart. It explains the number directly above it,
+   which is why it belongs second rather than first.
+3. **Price highlights** — best performers. Same holdings, longer horizon.
+4. **Portfolio insights** — health grade, XIRR, vs-VOO, with the
+   "Ahead of / Behind the S&P 500" narrative as the lead line.
+5. **Upcoming** — dividends and earnings. The first forward-looking section.
+6. **Goal** — the Monte Carlo projection. Longest horizon, so it closes.
+
+Section content, components and copy stay exactly as built. This is a reorder.

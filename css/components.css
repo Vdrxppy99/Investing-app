@@ -639,16 +639,11 @@
   }
   .chart--short { max-height: 170px; }
   .chart canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
-  /* Lightweight Charts owns #mainChart's own internal canvas sizing (autoSize);
-     this only gives the plain div it's mounted in a sized, positioned box to
-     read via ResizeObserver — it must NOT force width/height like the rule
-     above, or it fights the library's own pixel-exact canvas dimensions. */
+  /* js/portfolio.js drives #mainChart's size explicitly (own ResizeObserver + chart.resize()),
+     not Lightweight Charts' autoSize; this only gives the plain div it's mounted in a sized,
+     positioned box to measure — it must NOT force width/height like the rule above, or it
+     fights the library's own pixel-exact canvas dimensions. */
   .chart #mainChart { position: absolute; inset: 0; }
-  /* js/app.js showPage(): veils the hero chart for a fixed window right after Portfolio
-     becomes visible again, while Lightweight Charts' own autoSize recovery from a 0×0
-     (display:none) container is still settling. opacity, not visibility/display — the
-     canvas keeps a real box the whole time, so this never itself triggers another resize. */
-  #mainChart.chart-settling { opacity: 0; }
   .chart__readout {
     display: flex;
     align-items: baseline;

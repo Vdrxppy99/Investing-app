@@ -657,12 +657,14 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers){
    css/tokens.css via cvar(), never a literal hex, so the theme toggle repaints
    it exactly like every other chart (renderAll() already destroys and rebuilds
    this chart on every call, theme change included). */
-let heroChart=null, heroSeries=null, heroBenchSeries=null, heroMarkersApi=null, heroData=null; // heroData: {times,labels,data} — index-aligned, used by updateChartLive() + scrub
+let heroChart=null, heroSeries=null, heroBenchSeries=null, heroMarkersApi=null, heroData=null, heroResizeObs=null, heroPendingObs=null; // heroData: {times,labels,data} — index-aligned, used by updateChartLive() + scrub
 function drawHeroChart(times, labels, data, msgEl, bench, markers){
   const LC = window.LightweightCharts;
   if(!LC){ if(msgEl) msgEl.textContent='Connect to the internet once to load the chart library.'; return null; }
   if(msgEl) msgEl.textContent = labels.length<2 ? 'Chart appears after the first online price update.' : '';
   const el=$('mainChart');
+  if(heroPendingObs){ heroPendingObs.disconnect(); heroPendingObs=null; }
+  if(heroResizeObs){ heroResizeObs.disconnect(); heroResizeObs=null; }
   if(heroChart){ heroChart.remove(); heroChart=null; heroSeries=null; heroBenchSeries=null; heroMarkersApi=null; }
   el.innerHTML='';
   if(labels.length<2) return null;
@@ -672,12 +674,36 @@ function drawHeroChart(times, labels, data, msgEl, bench, markers){
   el.setAttribute('role','img');
   { const chg = data[0] ? (data[data.length-1]/data[0]-1)*100 : 0;
     el.setAttribute('aria-label', `Portfolio chart, ${labels.length} points, ${chg>=0?'up':'down'} ${Math.abs(chg).toFixed(1)}% over the period.`); }
+  // #mainChart is display:none on every tab but Portfolio, and renderAll() draws this
+  // chart unconditionally at boot — so the very first draw, before the user has ever
+  // opened Portfolio, would otherwise happen against a 0×0 container. Measured (canvas
+  // bitmap width/height vs the canvas's own getBoundingClientRect, sampled every animation
+  // frame): creating a chart against 0×0 and resizing it later, once the tab opens, leaves
+  // a brief window where the bitmap scales non-uniformly (one axis's ratio to its own CSS
+  // size doesn't match the other) — a real, visible line distortion, not merely blurriness.
+  // Never creating the chart against 0×0 in the first place removes that window outright:
+  // if the container has no size yet, wait for the container's own first real size instead
+  // of asking Lightweight Charts to recover from zero.
+  const rect = el.getBoundingClientRect();
+  if(rect.width<=0 || rect.height<=0){
+    heroPendingObs = new ResizeObserver(entries => {
+      const box = entries[0] && entries[0].contentRect;
+      if(!box || box.width<=0 || box.height<=0) return;
+      heroPendingObs.disconnect(); heroPendingObs=null;
+      drawHeroChart(times, labels, data, msgEl, bench, markers);
+    });
+    heroPendingObs.observe(el);
+    return null;
+  }
   const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid'),
         card=cvar('--card'), faint=cvar('--faint');
   const priceFormatter = v => state.view.priv ? '' :
     new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
+  // NOT autoSize: managing size ourselves (this measured rect at creation, then the
+  // ResizeObserver below for every later change) gives one deterministic size transition
+  // instead of relying on the vendor bundle's own internal autoSize/ResizeObserver timing.
   const chart=LC.createChart(el, {
-    autoSize:true,
+    width: rect.width, height: rect.height,
     layout:{ background:{type:LC.ColorType.Solid,color:'transparent'}, textColor:mut,
              fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif", fontSize:10,
              attributionLogo:false }, // Apache-2.0 permits removing TradingView's built-in chart-corner logo; see vendor/lightweight-charts.standalone.production.js license header
@@ -698,6 +724,15 @@ function drawHeroChart(times, labels, data, msgEl, bench, markers){
     handleScroll:false, handleScale:false,
     localization:{ priceFormatter },
   });
+  // Guard against 0×0: #mainChart is display:none on every tab but Portfolio, so a resize
+  // fired while hidden would just re-confirm zero — skip it and let the next real resize
+  // (when the tab becomes visible) size the chart correctly instead.
+  heroResizeObs = new ResizeObserver(entries => {
+    const box = entries[0] && entries[0].contentRect;
+    if(!box || box.width<=0 || box.height<=0) return;
+    chart.resize(box.width, box.height);
+  });
+  heroResizeObs.observe(el);
   el.style.touchAction='pan-y'; // horizontal drag scrubs, vertical swipe still scrolls the page
 
   const series = chart.addSeries(LC.AreaSeries, {

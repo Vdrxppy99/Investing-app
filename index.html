@@ -210,6 +210,15 @@
   <div class="greet" id="homeGreet"></div>
   <p class="t-caption muted" id="homeCountdown"></p>
 
+  <section class="card" id="homeCard">
+    <div class="hero__eyebrow">Portfolio</div>
+    <div class="t-hero-sm hero__total" id="homeTotal">&mdash;</div>
+    <div class="hero__delta" id="homeToday"></div>
+    <svg width="304" height="62" viewBox="0 0 304 62" id="homeSpark" class="home-spark" aria-hidden="true"></svg>
+    <button class="allocstrip home-alloc" id="homeAllocStrip" aria-label="Allocation breakdown"></button>
+    <div class="rail" id="homePr"></div>
+  </section>
+
   <div>
     <h2 class="section__label"><span>Stay on top</span></h2>
     <section class="card" id="moverCard">
@@ -224,21 +233,7 @@
     </section>
   </div>
 
-  <section class="card" id="homeCard">
-    <div class="hero__eyebrow">Portfolio</div>
-    <div class="t-hero-sm hero__total" id="homeTotal">&mdash;</div>
-    <div class="hero__delta" id="homeToday"></div>
-    <svg width="304" height="62" viewBox="0 0 304 62" id="homeSpark" class="home-spark" aria-hidden="true"></svg>
-    <button class="allocstrip home-alloc" id="homeAllocStrip" aria-label="Allocation breakdown"></button>
-    <div class="rail" id="homePr"></div>
-  </section>
-
   <div class="stack">
-    <div id="comingSection">
-      <h2 class="section__label"><span>Coming up</span></h2>
-      <section class="card"><div id="comingBody"></div></section>
-    </div>
-
     <!-- Home v2 §4 — the Empower pattern: top 3 holdings by lifetime total
          return, not today's move (that's §1). Heading states a fact rather
          than nudging a decision, per the brief ("reads as observation, not
@@ -259,6 +254,11 @@
       <h2 class="section__label"><span>Portfolio insights</span></h2>
       <p class="t-caption muted" id="moverNarrative"></p>
       <div class="grid-3" id="homeInsights"></div>
+    </div>
+
+    <div id="comingSection">
+      <h2 class="section__label"><span>Coming up</span></h2>
+      <section class="card"><div id="comingBody"></div></section>
     </div>
 
     <div>
@@ -333,7 +333,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.140</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.141</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->

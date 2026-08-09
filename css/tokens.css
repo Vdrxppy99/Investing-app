@@ -89,11 +89,6 @@
     --dur-shimmer: 1400ms;
     --dur-spin: 700ms;
     --dur-stagger: 160ms;   /* typing-dot offset; a loop phase, not a transition */
-    /* Chart-recovery settle margin (js/app.js showPage) — a one-shot delay guarding
-       against Lightweight Charts' post-resize bitmap glitch, not an enter/exit
-       either, so it lives with the loop durations above rather than forcing a 5th
-       transition duration into DESIGN.md §10's fixed four. */
-    --dur-chart-settle: 220ms;
 
     /* ── Fixed dimensions that recur structurally ────────────────────────── */
     --tap: 44px;            /* minimum tap target — a11y floor */
