@@ -20,7 +20,7 @@ struct PortfolioApp: App {
         WindowGroup {
             WebScreen(url: Self.url)
                 .ignoresSafeArea(.container, edges: .bottom)
-                .background(Color(red: 0.043, green: 0.059, blue: 0.051))  // #0b0f0d
+                .background(Color(red: 0.043, green: 0.059, blue: 0.090))  // #0B0F17 — Phase 1 canvas retarget
                 .preferredColorScheme(.dark)
         }
     }
