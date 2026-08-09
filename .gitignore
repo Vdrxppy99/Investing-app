@@ -19,3 +19,6 @@ node_modules/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Xcode build products — regenerated every build, was bloating every diff
+native/build/
