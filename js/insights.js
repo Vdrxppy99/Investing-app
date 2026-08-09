@@ -8,7 +8,7 @@ const centerTxt = { id:'centerTxt', afterDraw(c){
   ctx.font="600 10px Inter,-apple-system,sans-serif"; ctx.fillStyle=cvar('--mut'); ctx.fillText(o.l2, cx, cy+13);
   ctx.restore();
 }};
-if(window.Chart) Chart.register(centerTxt);
+// registered by ensureChartJs() (js/boot.js) once Chart.js actually loads — it's lazy now.
 function renderGainsTable(){
   const rs=rows('all');
   // dividends actually received per fund (recorded reinvestment lots) — replaces the old
@@ -86,6 +86,8 @@ function renderDrawdown(){
   const cur=dd[dd.length-1], worst=Math.min(...dd);
   const ddBase=`Worst this year <b class="neg">${worst.toFixed(1)}%</b> · now <b class="${cur<-0.05?'neg':'pos'}">${cur<-0.05?cur.toFixed(1)+'%':'at the peak'}</b>`;
   $('ddStat').innerHTML=ddBase;
+  el.setAttribute('role','img');
+  el.setAttribute('aria-label', `Drawdown chart, past year. Worst: ${worst.toFixed(1)}%. Now: ${cur<-0.05?cur.toFixed(1)+'% below peak':'at the peak'}.`);
   const ddChart=new Chart(el,{type:'line',data:{labels,datasets:[{data:dd,borderColor:cvar('--red'),
       backgroundColor:`rgba(${cvar('--red-rgb')},.11)`,fill:true,pointRadius:0,borderWidth:1.8,tension:0.35,cubicInterpolationMode:'monotone'}]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
@@ -176,6 +178,8 @@ function renderWorthChart(){
     }
   }
   const shown=ds.filter(d=>d.data.some(v=>v>0));
+  el.setAttribute('role','img');
+  el.setAttribute('aria-label', `Asset worth over the past year by category. Current: ${shown.map(d=>`${d.label} ${cfmt(d.data[d.data.length-1])}`).join(', ')}.`);
   const worthChart=new Chart(el,{type:'line',data:{labels:days,datasets:shown},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
@@ -356,10 +360,10 @@ function renderModGrid(){
   const r=riskStats();
   const pe=portfolioPE();
   const tile=(mod,label,value,tone,sub)=>
-    `<div class="stat press" data-mod="${mod}">`+
+    `<button type="button" class="stat press" data-mod="${mod}">`+
     `<div class="stat__label">${esc(label)}</div>`+
     `<div class="stat__value${tone?` ${tone}`:''}">${esc(value)}</div>`+
-    `<div class="stat__delta">${esc(sub)}</div></div>`;
+    `<div class="stat__delta">${esc(sub)}</div></button>`;
   grid.innerHTML =
     tile('perf', 'XIRR', rr!=null?fmtPct(rr*100):'—', rr!=null?cls(rr*100):'', 'annualised') +
     tile('perf', 'vs VOO', vsVoo!=null?fmtPct(vsVoo):'—', vsVoo!=null?cls(vsVoo):'', 'same buys in VOO') +
@@ -435,7 +439,7 @@ function renderMoreList(){
 /* ---- sheets for content that used to render inline — same render functions,
    invoked once their target elements exist inside the open sheet. ---- */
 function openPerfSheet(){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Performance</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Performance</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `
     <div id="perfBody"></div>
     <div class="card">
@@ -445,21 +449,21 @@ function openPerfSheet(){
     </div>
     <div class="tablewrap"><table class="table" id="gainsTable"></table></div>`;
   showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
-  renderPerf(); renderDrawdown(); renderGainsTable();
+  renderPerf(); ensureChartJs().catch(()=>{}).then(renderDrawdown); renderGainsTable();
   setTimeout(ensureChartsSized,150);
 }
 function openContribSheet(){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Contributions</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Contributions</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `
     <div class="t-caption muted" id="contribSub"></div>
     <div class="scrubro" id="contribRO"></div>
     <div class="chart chart--short"><canvas id="contribChart"></canvas></div>`;
   showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
-  renderContribChart();
+  ensureChartJs().catch(()=>{}).then(renderContribChart);
   setTimeout(ensureChartsSized,150);
 }
 function openProjSheet(){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Where this is headed</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Where this is headed</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `
     <div class="seg" id="projSeg" role="tablist" aria-label="Projection years">
       <button class="seg__item" data-y="5" role="tab" aria-selected="${projYears===5}">5y</button>
@@ -477,27 +481,27 @@ function openProjSheet(){
     $('projSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
     renderProjection();
   });
-  renderProjection();
+  ensureChartJs().catch(()=>{}).then(renderProjection);
   setTimeout(ensureChartsSized,150);
 }
 function openCoachSheet(){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Next moves</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Next moves</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `<div class="grid-2" id="coachGrid"></div>`;
   showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
   renderCoach();
 }
 function openLookSheet(){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Stocks you indirectly own</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Stocks you indirectly own</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `<div class="t-caption muted" id="lookSub"></div><div id="lookList"></div>`;
   showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
   renderLook(); ensureLookQuotes();
 }
 function openWorthSheet(){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Asset worth · 1Y</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Asset worth · 1Y</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `<div class="scrubro" id="worthRO"></div>
     <div class="chart chart--short"><canvas id="worthChart"></canvas></div><div class="dlegend" id="worthLegend"></div>`;
   showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
-  renderWorthChart();
+  ensureChartJs().catch(()=>{}).then(renderWorthChart);
   setTimeout(ensureChartsSized,150);
 }
 
@@ -769,10 +773,10 @@ function renderHeatmap(){
   // standing rule is that everything fits the width — so drop the decimal, not
   // the column. The year total keeps its decimal; it has a wider track.
   const dp=window.matchMedia('(max-width: 480px)').matches?0:1;
-  let html='<div class="heatmap-wrap"><table class="heatmap"><thead><tr><th></th>'+MN.map(m=>`<th scope="col">${m}</th>`).join('')+'<th scope="col">Yr</th></tr></thead><tbody>';
+  let html='<div class="heatmap-wrap"><table class="heatmap"><caption class="sr">Monthly returns by year</caption><thead><tr><th><span class="sr">Year</span></th>'+MN.map(m=>`<th scope="col">${m}</th>`).join('')+'<th scope="col">Yr</th></tr></thead><tbody>';
   for(const y of [...years].sort().reverse()){
     let yr=1, any=false;
-    html+=`<tr><td class="y" scope="row">${y}</td>`;
+    html+=`<tr><th class="y" scope="row">${y}</th>`;
     for(let m=1;m<=12;m++){
       const k=y+'-'+String(m).padStart(2,'0');
       if(ret[k]==null){ html+='<td></td>'; continue; }
@@ -799,6 +803,8 @@ function renderContribChart(){
   const cum=[]; let running=0; for(const v of data){ running+=v; cum.push(running); } // all-time running total
   const show=labels.slice(-24), sdata=data.slice(-24), scum=cum.slice(-24);
   const compact=v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
+  el.setAttribute('role','img');
+  el.setAttribute('aria-label', `Contributions chart, last ${show.length} months. Total deposited: ${fmt(cum[cum.length-1])}. Last month added: ${fmt(data[data.length-1])}.`);
   const contribChart=new Chart(el,{data:{labels:show,datasets:[
       {type:'bar',label:'That month',data:sdata,backgroundColor:cvar('--brand'),borderRadius:3,yAxisID:'y'},
       {type:'line',label:'Total deposited',data:scum,borderColor:CAT[3],borderWidth:1.8,pointRadius:0,pointHoverRadius:3,tension:0.35,cubicInterpolationMode:'monotone',yAxisID:'y1'}]},
@@ -921,6 +927,8 @@ function renderProjection(){
     {label:scen[1][0], data:data[1], borderColor:cvar('--brand'), borderWidth:2.2, pointRadius:0, fill:false, tension:0.2, cubicInterpolationMode:'monotone'}
   ];
   if(goal && goal<data[2][N]*1.4) ds.push({label:'Goal', data:labels.map(()=>goal), borderColor:cvar('--warn'), borderDash:[6,5], borderWidth:1.2, pointRadius:0, fill:false});
+  el.setAttribute('role','img');
+  el.setAttribute('aria-label', `Projection chart, ${projYears} years, no future deposits. In ${projYears} years: ${fmt(data[1][N])} at 7%/yr, range ${cfmt(data[0][N])} to ${cfmt(data[2][N])}.`);
   const projChart=new Chart(el,{type:'line',data:{labels,datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:500},
       plugins:{legend:{display:false},tooltip:{enabled:false}},

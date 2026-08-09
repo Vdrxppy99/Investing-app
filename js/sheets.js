@@ -9,30 +9,58 @@ const EXPLAIN = {
   'Invested':['Invested','Your cost basis: the total you paid for the shares you still hold in this account.']
 };
 function openInfoSheet(title, html){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">${title}</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `<div class="infobody">${html}</div>`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
+}
+/* Root landmarks made inert while a sheet is modal — with everything else
+   unreachable, Tab naturally stays inside the open sheet (no hand-rolled
+   keydown trap needed), matching the guidance for hand-rolled overlays that
+   can't use native <dialog>. #globalControls is the demo badge/minibar/FAB/
+   assistant cluster (index.html) — also real, focusable chrome, also behind
+   the scrim while a sheet is open. */
+const INERT_ROOTS = '.shell, .tabbar, #globalControls';
+function anyOverlayOpen(){
+  return !$('detail').classList.contains('hidden') || !$('editModal').classList.contains('hidden');
 }
 /* animated close for any overlay — entrance had a spring, exit no longer just vanishes.
    Skips the animation when reduced-motion is on, or when a swipe-dismiss already moved the sheet. */
 function hideOverlay(id){
   const ov=$(id); if(!ov || ov.classList.contains('hidden') || ov.classList.contains('closing')) return;
   const sh=ov.querySelector('.sheet');
+  const finish=()=>{
+    if(!anyOverlayOpen()) document.querySelectorAll(INERT_ROOTS).forEach(el=>{ el.inert=false; });
+    const opener=ov._opener; ov._opener=null;
+    if(opener && typeof opener.focus==='function' && document.body.contains(opener)) opener.focus({preventScroll:true});
+  };
   if(matchMedia('(prefers-reduced-motion: reduce)').matches || (sh && sh.style.transform)){
-    ov.classList.add('hidden'); return;
+    ov.classList.add('hidden'); finish(); return;
   }
   ov.classList.add('closing');
-  ov._hideT=setTimeout(()=>{ ov.classList.remove('closing'); ov.classList.add('hidden'); }, 190);
+  ov._hideT=setTimeout(()=>{ ov.classList.remove('closing'); ov.classList.add('hidden'); finish(); }, 190);
 }
 /* opening a sheet must cancel any in-flight close — otherwise a rapid close→reopen
    leaves the .closing animation (and its pending hide timer) on the sheet you just opened,
-   which then flickers out and vanishes. Every open site goes through this. */
+   which then flickers out and vanishes. Every open site goes through this.
+
+   Also does the sheet's share of focus management: records the opener so hideOverlay
+   can return focus to it, inerts the rest of the document so focus can't leave the
+   sheet, and derives the dialog's accessible name from whatever .sheet__title the
+   caller already rendered into the head (every open site sets the head's innerHTML
+   before calling this, so the title text is always current by the time this reads it). */
 function showOverlay(id){
   const ov=$(id); if(!ov) return;
   clearTimeout(ov._hideT);
   ov.classList.remove('closing','hidden');
+  const dialog=ov.querySelector('.sheet');
+  if(dialog){
+    const titleEl=dialog.querySelector('.sheet__title');
+    if(titleEl) dialog.setAttribute('aria-label', titleEl.textContent.trim());
+  }
+  ov._opener=document.activeElement;
+  document.querySelectorAll(INERT_ROOTS).forEach(el=>{ el.inert=true; });
 }
 /* in-app replacements for native alert()/confirm() — they match the design system
    (and never say "localhost says…"). Vault flows keep native dialogs: they run pre-unlock. */
@@ -49,7 +77,7 @@ function showConfirm(title, msg, yesLabel, onYes){
 }
 function explainStat(key){ const e=EXPLAIN[key]; if(e) openInfoSheet(e[0], `<p>${e[1]}</p>`); }
 function openListSheet(title, bodyHtml, note){
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">${title}</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">${title}</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `${bodyHtml}${note?`<div class="inc-note">${note}</div>`:''}`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
@@ -62,7 +90,7 @@ async function openStockSheet(sym, name){
   const fmtP=v=>isIdx ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : fmtPx(v);
   const q=state.quotes[sym];
   $('detailSheetHead').innerHTML = `<div class="sheet__idrow">${badgeHtml(sym)}<div class="sheet__idcol">
-      <div class="hsym sheet__title">${esc(sym.replace('-','.'))}</div>
+      <h2 class="hsym sheet__title">${esc(sym.replace('-','.'))}</h2>
       <div class="sheet__sub">${esc(name||'')}</div>
       <div id="ssPrice" class="sheet__price">${q?fmtP(q.price):'…'}</div>
     </div></div><div class="sheet__headbtns"><button class="xbtn" id="watchBtn" aria-label="Toggle watchlist"></button><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>`;
@@ -95,6 +123,8 @@ async function openStockSheet(sym, name){
     if(!$('ssPrice')) return; // sheet was closed or replaced meanwhile
     const closes=d.c, labels=d.t.map(dayStr);
     $('ssPrice').innerHTML = `${fmtP(d.price)} <span style="font-size:14px" class="${cls(d.price-d.prev)}">${fmtPct(d.prev>0?(d.price/d.prev-1)*100:0)} today</span>`;
+    await ensureChartJs().catch(()=>{});
+    if(!$('detailChart')) return; // sheet closed or replaced while Chart.js was loading
     detailChart=drawChart('detailChart', labels, closes, $('detailMsg'));
     wireDetailScrub(detailChart, labels, closes, 'detailRO');
     const hi=Math.max(...closes), lo=Math.min(...closes);

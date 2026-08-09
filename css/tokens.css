@@ -101,6 +101,15 @@
                                (info badges, inline text links) that can't take --tap
                                without breaking their layout — still a real minimum. */
     --rail: 240px;          /* desktop nav rail */
+    --lock-box-min-h: 620px; /* UPGRADE_PLAN.md Phase 4 CLS fix — js/vault.js's boot()
+                               decides which lock__step to show (existing vault vs
+                               first-run setup vs Face ID) asynchronously; every step
+                               starts hidden until that resolves, so .lock__box grows
+                               from ~273px (logo/title/sub only) to as much as ~628px
+                               (the first-run setup form) once one is revealed. Measured
+                               via a layout-shift observer logging the exact moment,
+                               not guessed — this was 0.153 of a 0.16 total lock-screen
+                               CLS, the single largest shift on the page. */
     --content-max: 1080px;
     --content-max-wide: 1200px;
     --side-col: 320px;
@@ -185,6 +194,12 @@
     --primary-edge: #443A99;
     --primary-tint: rgba(124, 108, 255, 0.14);
     --on-primary: #ffffff;
+    /* --primary itself measures 4.04:1 as small text on --surface-2 (tabbar/rail
+       active state) and 3.94:1 on --primary-tint (chip--primary, #benchBtn.on) —
+       both fail WCAG AA's 4.5:1 floor for normal-size text. Same problem
+       --primary-fill was created for above, one step lighter instead of darker
+       since these sit on dark backgrounds, not white. Measured 5.06:1 / 4.94:1. */
+    --primary-text: #9082FF;
 
     /* Secondary — attention, goals, and warnings (one hue doing both, so there
        is no fourth colour to justify; brass is the finance convention). */
@@ -262,6 +277,9 @@
     --primary-edge: #3A2B99;
     --primary-tint: rgba(79, 61, 196, 0.10);
     --on-primary: #ffffff;
+    /* Light theme's --primary already clears 4.5:1 on both --surface-2 and
+       --primary-tint (~6.4:1) — no separate step needed here. */
+    --primary-text: var(--primary);
 
     --secondary: #8a6110;
     --secondary-tint: rgba(138, 97, 16, 0.10);

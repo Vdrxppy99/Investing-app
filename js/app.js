@@ -29,7 +29,7 @@ function wirePTR(){
 let haptEl=null;
 function haptic(){
   try{
-    if(!haptEl){ haptEl=document.createElement('input'); haptEl.type='checkbox'; haptEl.setAttribute('switch',''); haptEl.style.position='fixed'; haptEl.style.left='-99px'; haptEl.style.opacity='0'; haptEl.style.pointerEvents='none'; document.body.appendChild(haptEl); }
+    if(!haptEl){ haptEl=document.createElement('input'); haptEl.type='checkbox'; haptEl.setAttribute('switch',''); haptEl.setAttribute('aria-hidden','true'); haptEl.tabIndex=-1; haptEl.style.position='fixed'; haptEl.style.left='-99px'; haptEl.style.opacity='0'; haptEl.style.pointerEvents='none'; document.body.appendChild(haptEl); }
     haptEl.click();
   }catch(e){}
 }
@@ -114,7 +114,10 @@ document.querySelectorAll('.tabbar__item, .rail-nav__item').forEach(b=> b.onclic
    Markets and Following were one 'Explore' page pre-R3; each needs its own listener now
    that they're separate elements. */
 ['page-markets','page-following'].forEach(id=> $(id).addEventListener('click', e=>{
-  const el=e.target.closest('.mrow, .idx-card');
+  // .krow (js/explore.js renderMarkets' #sectorRow) had data-sym/data-name from its
+  // first commit but no handler anywhere, wired or delegated — looked tappable, did
+  // nothing, for everyone, not just keyboard users (UPGRADE_PLAN.md Phase 4).
+  const el=e.target.closest('.mrow, .idx-card, .krow');
   if(el && el.dataset.sym) openStockSheet(el.dataset.sym, el.dataset.name||'');
 }));
 $('page-insights').addEventListener('click', e=>{ // look-through rows now live here too
@@ -143,7 +146,7 @@ function wireSheetDrag(sheetId, closeFn){
   });
 }
 wireSheetDrag('detailSheet', closeDetail);
-wireSheetDrag('editSheet', ()=>$('editModal').classList.add('hidden'));
+wireSheetDrag('editSheet', ()=>hideOverlay('editModal'));
 wireSearch(); wirePTR();
 /* #divTitle lived on #incomeCard, which left the Portfolio screen in R1 (see
    renderIncome's comment) — no trigger element for openDivSheet exists until
@@ -169,43 +172,162 @@ function ringSvg(pct, color, r){
    frame shows a progress bar, not a ring — the ring stays defined in
    css/components.css since healthScore()'s .hscore ring still uses it) with
    the percentage moved out to #goalPct, the "sec" header's trailing value,
-   matching every other Home section (#moverTotal, #homePr). Same underlying
-   math as before — totals(), personalReturn(), the monthly-compounding ETA
-   loop — none of it changed. */
-function renderGoalForm(prefill){ // shared by first-time setup and "Change goal" (prefilled — never lose the number)
+   matching every other Home section (#moverTotal, #homePr).
+   Phase 6: the deterministic "compound today's money at your trailing return"
+   ETA is gone. state.goal now carries a target `year`, required to ask a
+   probability question at all ("82% chance of reaching $X by 2045" needs a
+   "by"). Existing saved goals from before this phase have amt but no year —
+   renderGoal() below treats that the same as "goal set, date missing" and
+   asks for one, rather than guessing. */
+function renderGoalForm(prefillAmt, prefillYear){ // shared by first-time setup and "Change goal" (prefilled — never lose the numbers)
   const body=$('goalBody'); const pctEl=$('goalPct'); if(!body) return;
   if(pctEl) pctEl.textContent='';
+  const nowYear=new Date().getFullYear();
   body.innerHTML=`<div class="goalset">
-    <p class="t-caption muted">Set a target and track your progress with a projected finish date based on your real return.</p>
-    <input id="goalInput" type="number" inputmode="decimal" placeholder="Target amount, e.g. 100000" aria-label="Goal amount"${prefill>0?` value="${prefill}"`:''}>
-    <button class="btn pri btn--full" id="goalSave">${prefill>0?'Update goal':'Set goal'}</button>
-    ${prefill>0?'<div class="ebtns"><button class="btn sec" id="goalCancel">Cancel</button><button class="btn warn" id="goalRemove">Remove goal</button></div>':''}</div>`;
-  $('goalSave').onclick=()=>{ const v=+$('goalInput').value; if(v>0){ state.goal={amt:v}; lsSet('pt_goal',state.goal); renderGoal(); if(typeof renderProjection==='function' && !$('page-insights').classList.contains('hidden')) renderProjection(); } };
+    <p class="t-caption muted">Set a target and target year to see your odds of getting there.</p>
+    <input id="goalInput" type="number" inputmode="decimal" placeholder="Target amount, e.g. 100000" aria-label="Goal amount"${prefillAmt>0?` value="${prefillAmt}"`:''}>
+    <input id="goalYearInput" type="number" inputmode="numeric" step="1" placeholder="Target year, e.g. ${nowYear+15}" aria-label="Target year"${prefillYear>0?` value="${prefillYear}"`:''}>
+    <button class="btn pri btn--full" id="goalSave">${prefillAmt>0?'Update goal':'Set goal'}</button>
+    ${prefillAmt>0?'<div class="ebtns"><button class="btn sec" id="goalCancel">Cancel</button><button class="btn warn" id="goalRemove">Remove goal</button></div>':''}</div>`;
+  $('goalSave').onclick=()=>{
+    const v=+$('goalInput').value, y=Math.round(+$('goalYearInput').value)||0;
+    if(v>0){ state.goal={amt:v, year:y>0?y:undefined}; lsSet('pt_goal',state.goal); renderGoal(); if(typeof renderProjection==='function' && !$('page-insights').classList.contains('hidden')) renderProjection(); }
+  };
   const gc=$('goalCancel'); if(gc) gc.onclick=renderGoal;
   const gr=$('goalRemove'); if(gr) gr.onclick=()=>{ state.goal=null; lsSet('pt_goal',null); renderGoal(); };
+}
+/* Contribution rate the projection assumes: the average monthly cost of your own
+   real (non-dividend) buys, spread over the calendar span they cover. Needs at
+   least two distinct purchase months to mean anything as a "rate" rather than a
+   single data point — with fewer, the projection runs with $0/mo and says so. */
+function deriveMonthlyContribution(){
+  const buys=(state.lots||[]).filter(l=>!l.div && l.date);
+  if(!buys.length) return null;
+  const months=new Set(buys.map(l=>l.date.slice(0,7)));
+  if(months.size<2) return null;
+  const dates=buys.map(l=>new Date(l.date+'T12:00:00')).sort((a,b)=>a-b);
+  const first=dates[0], last=dates[dates.length-1];
+  const spanMonths=Math.max(1,(last.getFullYear()-first.getFullYear())*12+(last.getMonth()-first.getMonth())+1);
+  const total=buys.reduce((a,l)=>a+l.cost,0);
+  return total/spanMonths;
+}
+let mcWorker=null, mcReqId=0, goalCalcKey=null, goalCalcResult=null;
+function getMcWorker(){
+  if(mcWorker===null && window.Worker){
+    try{ mcWorker=new Worker('js/monte-carlo-worker.js'); }catch(_){ mcWorker=false; }
+  }
+  return mcWorker||null;
+}
+function runProbabilisticGoal(params){
+  const worker=getMcWorker();
+  if(!worker) return Promise.resolve(runMonteCarloProjection(params)); // no Worker support: same pure function, main thread
+  const reqId=++mcReqId;
+  return new Promise(res=>{
+    const handler=e=>{ if(e.data.reqId!==reqId) return; worker.removeEventListener('message',handler); res(e.data.result); };
+    worker.addEventListener('message',handler);
+    worker.postMessage(Object.assign({reqId},params));
+  });
 }
 function renderGoal(){
   const body=$('goalBody'); const pctEl=$('goalPct'); if(!body) return;
   const t=totals('all');
   if(!state.goal || !(state.goal.amt>0)){ renderGoalForm(0); return; }
-  const goal=state.goal.amt, pctRaw=t.value/goal, remain=goal-t.value;
-  const rr=personalReturn('all'); const r=(rr!=null&&rr>0.005)?Math.min(rr,0.15):0.08; // cap optimism
-  let eta='';
-  if(remain>0){
-    // months for TODAY'S money alone to compound to the goal — no future deposits assumed (owner request)
-    const rm=Math.pow(1+r,1/12)-1; let v=t.value, m=0;
-    while(v<goal && m<720){ v=v*(1+rm); m++; }
-    const yr=new Date(); yr.setMonth(yr.getMonth()+m);
-    eta = (m<720 && t.value>0) ? yr.toLocaleDateString([],{month:'short',year:'numeric'}) : '—';
-  } else { eta='Reached'; }
-  if(pctEl) pctEl.textContent=(pctRaw*100).toFixed(0)+'%';
+  const goal=state.goal.amt, year=state.goal.year, pctRaw=t.value/goal;
+  if(pctEl) pctEl.textContent=(Math.min(999,pctRaw*100)).toFixed(0)+'%';
+  const bar=`<div class="goalbar"><i style="--w:${(Math.min(1,pctRaw)*100).toFixed(1)}%"></i></div>`;
+  const editLink=`<a href="#" id="goalEdit">Change goal</a>`;
+  if(t.value>=goal){
+    body.innerHTML=`<div class="stack stack--tight">
+      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span class="pos">Reached</span></div>
+      ${bar}<p class="t-caption muted">🎉 Goal reached. ${editLink}</p></div>`;
+    $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
+    return;
+  }
+  const nowYear=new Date().getFullYear();
+  if(!(year>0)){
+    body.innerHTML=`<div class="stack stack--tight">
+      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>—</span></div>
+      ${bar}<p class="t-caption muted">Set a target year to see your odds of getting there. ${editLink}</p></div>`;
+    $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
+    return;
+  }
+  if(year<=nowYear){
+    body.innerHTML=`<div class="stack stack--tight">
+      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>—</span></div>
+      ${bar}<p class="t-caption muted">Target year ${year} has passed — update it to see a projection. ${editLink}</p></div>`;
+    $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
+    return;
+  }
+  const years=year-nowYear;
+  const contrib=deriveMonthlyContribution();
   body.innerHTML=`<div class="stack stack--tight">
-    <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>${eta}</span></div>
-    <div class="goalbar"><i></i></div>
-    <p class="t-caption muted">${remain>0?fmt(remain)+' to go — every new buy pulls that date closer. ':fmt(-remain)+' past target. '}<a href="#" id="goalEdit">Change goal</a></p>
-  </div>`;
-  body.querySelector('.goalbar > i').style.setProperty('--w', (Math.min(1,pctRaw)*100).toFixed(1)+'%');
-  $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal); };
+    <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>Calculating…</span></div>
+    ${bar}<p class="t-caption muted">Running 10,000 simulated paths… ${editLink}</p></div>`;
+  $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
+  const params={
+    v0:t.value, years, monthlyContribution:contrib||0, goal,
+    meanReal:0.07, sdReal:0.12, meanInfl:0.02, sdInfl:0.008,
+    paths:10000, seed:20260101,
+  };
+  const key=`${goal}|${year}|${Math.round(t.value/50)*50}|${(contrib||0).toFixed(2)}`;
+  const apply=result=>{
+    if(!$('goalBody')||!state.goal||state.goal.amt!==goal||state.goal.year!==year) return; // stale by the time it resolves
+    const pct=(result.probabilityOfGoal*100).toFixed(0);
+    const contribNote=contrib>0
+      ? `${fmt(contrib)}/mo, from your own buy history`
+      : `no future deposits (not enough purchase history to estimate a rate)`;
+    body.innerHTML=`<div class="stack stack--tight">
+      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>${year}</span></div>
+      ${bar}
+      <p class="big-n" style="margin-top:2px">${pct}%<span style="font-size:14px;font-weight:500;color:var(--mut)"> chance by ${year}</span></p>
+      <div class="chart-box chart-box--sheet"><div id="goalFan"></div></div>
+      <p class="t-caption muted">Assumes 7% ± 12%/yr real return, 2% ± 0.8%/yr inflation, ${contribNote}. Pre-tax. Not advice. ${editLink}</p>
+    </div>`;
+    $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
+    drawGoalFan(result.fan, goal, nowYear);
+  };
+  if(key===goalCalcKey && goalCalcResult){ apply(goalCalcResult); return; }
+  runProbabilisticGoal(params).then(result=>{ goalCalcKey=key; goalCalcResult=result; apply(result); });
+}
+let goalFanChart=null;
+function drawGoalFan(fan, goal, y0){
+  const LC=window.LightweightCharts;
+  const el=$('goalFan'); if(!el||!LC) return;
+  if(goalFanChart){ goalFanChart.remove(); goalFanChart=null; }
+  el.innerHTML='';
+  const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid');
+  const priceFormatter=v=>state.view.priv?'':cfmt(v);
+  const chart=LC.createChart(el,{
+    autoSize:true,
+    layout:{ background:{type:LC.ColorType.Solid,color:'transparent'}, textColor:mut,
+             fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif", fontSize:10, attributionLogo:false },
+    grid:{ vertLines:{visible:false}, horzLines:{color:grid} },
+    rightPriceScale:{ visible:true, borderVisible:false, scaleMargins:{top:0.14,bottom:0.06} },
+    leftPriceScale:{ visible:false },
+    timeScale:{ visible:true, borderVisible:false, fixLeftEdge:true, fixRightEdge:true, rightOffset:0,
+      tickMarkFormatter:t=>String(t.year) },
+    handleScroll:false, handleScale:false,
+    localization:{ priceFormatter },
+  });
+  const asTime=y=>({ year:y0+y, month:1, day:1 });
+  const p90=chart.addSeries(LC.LineSeries,{ color:mut, lineWidth:1, lineStyle:LC.LineStyle.Dashed,
+    crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false });
+  p90.setData(fan.years.map((y,i)=>({time:asTime(y), value:fan.p90[i]})));
+  const p10=chart.addSeries(LC.LineSeries,{ color:mut, lineWidth:1, lineStyle:LC.LineStyle.Dashed,
+    crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false });
+  p10.setData(fan.years.map((y,i)=>({time:asTime(y), value:fan.p10[i]})));
+  const p50=chart.addSeries(LC.AreaSeries,{ lineColor:brand, lineWidth:2,
+    topColor:`rgba(${brandRgb},.18)`, bottomColor:`rgba(${brandRgb},0)`,
+    crosshairMarkerVisible:true, crosshairMarkerRadius:3.5,
+    crosshairMarkerBackgroundColor:brand, priceLineVisible:false, lastValueVisible:false });
+  p50.setData(fan.years.map((y,i)=>({time:asTime(y), value:fan.p50[i]})));
+  if(goal>0){
+    const goalLine=chart.addSeries(LC.LineSeries,{ color:cvar('--warn'), lineWidth:1.2, lineStyle:LC.LineStyle.Dashed,
+      crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false });
+    goalLine.setData(fan.years.map(y=>({time:asTime(y), value:goal})));
+  }
+  chart.timeScale().setVisibleLogicalRange({ from:0, to:fan.years.length-1 });
+  goalFanChart=chart;
 }
 function healthScore(){
   const rs=rows('all'), t=totals('all'), inv=Math.max(1,t.value-cashFor('all'));
@@ -276,10 +398,10 @@ function renderMover(){
   body.innerHTML = visible.map(x=>{
     const c=x.pct>=0?'pos':'neg';
     const frac = maxAbs>0 ? Math.abs(x.pct)/maxAbs : 0;
-    return `<div class="mvcol" data-sym="${esc(x.sym)}" data-frac="${frac.toFixed(4)}">
+    return `<button type="button" class="mvcol" data-sym="${esc(x.sym)}" data-frac="${frac.toFixed(4)}">
       <div class="mv-zone"><span class="mv-pct ${c}">${fmtPct(x.pct)}</span><div class="mv-bar ${c}"></div></div>
       ${badgeHtml(x.sym,true)}
-      <span class="mv-tick">${esc(x.sym.replace('-','.'))}</span></div>`;
+      <span class="mv-tick">${esc(x.sym.replace('-','.'))}</span></button>`;
   }).join('');
   const barMax=parseFloat(cvar('--mv-bar-max'))||88, barMin=parseFloat(cvar('--mv-bar-min'))||6;
   body.querySelectorAll('.mvcol').forEach(el=>{
@@ -356,30 +478,48 @@ function renderHomeCard(){
   renderHomeSpark();
   renderAllocStrip('homeAllocStrip');
 }
-/* "Coming up" duplicates renderIncome()'s (js/portfolio.js) "upcoming" loop
-   rather than refactoring it into a shared helper — same math, a second
-   presentation surface (#incomeCard still doesn't exist; this doesn't touch
-   it), not new maths, and not worth the risk of reshaping code that already
-   works to avoid ~8 duplicated lines. */
+/* "Coming up" merges two independent feeds — dividend ex-dates (duplicating
+   renderIncome()'s (js/portfolio.js) "upcoming" loop rather than refactoring
+   it into a shared helper: same math, a second presentation surface, not
+   worth reshaping code that already works to avoid ~8 duplicated lines) and
+   confirmed earnings dates (state.earnings, populated by ensureEarnings() in
+   js/portfolio.js via the Worker's /earnings proxy — worker/src/earnings.js).
+   Earnings only ever contributes a row when the source's own confirmDate is
+   set — an unconfirmed/estimated date is never shown (DESIGN-TARGET.md §2:
+   "never display a guessed or approximated date"), so ETFs and any stock
+   without an officially-announced date simply don't appear here, same as
+   they wouldn't in the dividend loop if they paid none. Either feed can be
+   empty or stale on its own (a Worker/EarningsWhispers hiccup doesn't touch
+   state.divs) — the merge just sorts whatever's actually present. */
 function renderComingUp(){
   const sec=$('comingSection'); const body=$('comingBody'); if(!body) return;
+  const now=Date.now(), horizon=now+180*86400e3;
   const upcoming=[];
   for(const r of rows(state.view.acc)){
-    const d=state.divs[r.sym]; if(!d||!d.list||!d.list.length) continue;
-    const yr=d.list.filter(e=>e[0]>Date.now()-370*86400e3);
-    for(const e of yr){
-      const next=e[0]+31557600000; // same payout, one year later
-      if(next>Date.now() && next<Date.now()+180*86400e3) upcoming.push({sym:r.sym, when:next, est:r.qty*e[1]});
+    const d=state.divs[r.sym];
+    if(d && d.list && d.list.length){
+      const yr=d.list.filter(e=>e[0]>now-370*86400e3);
+      for(const e of yr){
+        const next=e[0]+31557600000; // same payout, one year later
+        if(next>now && next<horizon) upcoming.push({sym:r.sym, when:next, kind:'div', est:r.qty*e[1]});
+      }
+    }
+    const ed=state.earnings[r.sym];
+    if(ed && !ed.none && ed.date){
+      const when=Date.parse(ed.date+'T00:00:00Z');
+      if(when>now && when<horizon) upcoming.push({sym:r.sym, when, kind:'earn', q:ed.q, qy:ed.qy});
     }
   }
   upcoming.sort((a,b)=>a.when-b.when);
-  if(!upcoming.length){ if(sec) sec.style.display='none'; ensureDivs(); return; }
+  if(!upcoming.length){ if(sec) sec.style.display='none'; ensureDivs(); ensureEarnings(); return; }
   if(sec) sec.style.display='';
   body.innerHTML = upcoming.slice(0,3).map(u=>{
-    const days=Math.max(0,Math.ceil((u.when-Date.now())/86400000));
-    return `<div class="drow" data-sym="${esc(u.sym)}">${badgeHtml(u.sym,true)}
-      <div class="mmid"><div class="msym">Dividend · ex-div ${new Date(u.when).toLocaleDateString([],{month:'short',day:'numeric'})}</div><div class="mname">estimated ${fmt(u.est)}</div></div>
-      <div class="mright"><span class="chip chip--primary">${days}d</span></div></div>`;
+    const days=Math.max(0,Math.ceil((u.when-now)/86400000));
+    const dateStr=new Date(u.when).toLocaleDateString([],{month:'short',day:'numeric'});
+    const title = u.kind==='earn' ? `Q${u.q} ${u.qy} earnings · ${dateStr}` : `Dividend · ex-div ${dateStr}`;
+    return `<button type="button" class="drow" data-sym="${esc(u.sym)}">${badgeHtml(u.sym,true)}
+      <div class="mmid"><div class="msym">${title}</div>${u.kind==='div'?`<div class="mname">estimated ${fmt(u.est)}</div>`:''}</div>
+      <div class="mright"><span class="chip chip--primary">${days}d</span></div></button>`;
   }).join('');
   body.querySelectorAll('.drow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
 }
@@ -400,9 +540,9 @@ function renderPriceHighlights(){
     body.innerHTML=`<p class="t-caption muted">Every holding is down right now — no highlights to show.</p>`;
     return;
   }
-  body.innerHTML = top.map(x=>`<div class="mrow" data-sym="${esc(x.sym)}">${badgeHtml(x.sym,true)}
+  body.innerHTML = top.map(x=>`<button type="button" class="mrow" data-sym="${esc(x.sym)}">${badgeHtml(x.sym,true)}
       <div class="mmid"><div class="msym">${esc(x.sym.replace('-','.'))}</div><div class="mname">${esc((NAMES[x.sym]||x.sym.replace('-','.')).replace(/^Vanguard /,''))}</div></div>
-      <div class="mright"><span class="pctpill up">${fmtPct(x.plp)}</span></div></div>`).join('');
+      <div class="mright"><span class="pctpill up">${fmtPct(x.plp)}</span></div></button>`).join('');
   body.querySelectorAll('.mrow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));
 }
 $('homeAllocStrip').onclick = openAllocSheet;
@@ -442,10 +582,10 @@ function renderHomeInsights(){
   const t=totals('all'), sp=spPathValue(), mine=t.value-cashFor('all');
   const vsVoo=(sp && sp.value>0) ? (mine-sp.value)/sp.value*100 : null;
   const tile=(label,value,tone,sub)=>
-    `<div class="stat press">`+
+    `<button type="button" class="stat press">`+
     `<div class="stat__label">${esc(label)}</div>`+
     `<div class="stat__value${tone?` ${tone}`:''}">${esc(value)}</div>`+
-    `<div class="stat__delta">${esc(sub)}</div></div>`;
+    `<div class="stat__delta">${esc(sub)}</div></button>`;
   grid.innerHTML =
     tile('Health', grade, '', `${score}/100`) +
     tile('XIRR', rr!=null?fmtPct(rr*100):'—', rr!=null?cls(rr*100):'', 'annualised') +

@@ -17,7 +17,7 @@ const ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
    so it cannot share core's copy). Adding a key? Change BOTH lists + exportBackup(). */
 const PRIVATE_KEYS=['pt_holdings','pt_lots','pt_cash','pt_deposits','pt_confirmed','pt_goal','pt_targets','pt_push','pt_bk','pt_alerts'];
 const APP_SCRIPTS=['js/boot.js','js/seed.js','js/demo.js','js/core.js','js/portfolio.js','js/api.js',
-                   'js/explore.js','js/insights.js','js/sheets.js','js/app.js','js/tappable.js'];
+                   'js/explore.js','js/insights.js','js/sheets.js','js/monte-carlo.js','js/app.js','js/tappable.js'];
 /* PUBLIC demo passcode — not secret, lives in source. It opens a fictional example portfolio
    (js/demo.js) and can NEVER read or touch the real encrypted vault. Real passcodes are ≥8
    chars, so this can never collide with a real one. */
@@ -194,7 +194,7 @@ window.vaultCloudKeys=async(pass)=>{
   const key=await cloudKeyOf(km,salt);
   return { k:b64(await crypto.subtle.exportKey('raw',key)), tag:await cloudTagOf(km), salt:b64(salt) };
 };
-const PUSH_URL_V='https://portfolio-push.vdrxppy99.workers.dev'; // duplicated from api.js — this file loads alone, pre-unlock
+const PUSH_URL_V='https://portfolio-push.portfolio-push.workers.dev'; // duplicated from api.js — this file loads alone, pre-unlock
 async function cloudRestore(pass){
   const km=await cloudKm(pass);
   const tag=await cloudTagOf(km);

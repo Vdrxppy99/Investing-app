@@ -13,6 +13,7 @@
    and the ET wall-clock window check below picks whichever is correct that day. */
 import { sendWebPush } from './webpush.js';
 import { handleQuoteProxy, fetchQuote } from './quotes.js';
+import { handleEarningsProxy } from './earnings.js';
 import { checkAlerts } from './alerts.js';
 import { etNow, tradingDay, money, signed, pctS, ORIGINS } from './shared.js';
 
@@ -132,6 +133,7 @@ export default {
     const path = new URL(req.url).pathname;
     if (req.method === 'GET') {
       if (path === '/q') return handleQuoteProxy(req, cors);
+      if (path === '/earnings') return handleEarningsProxy(req, env, cors);
       return new Response('portfolio-push ok', { headers: cors });
     }
     if (req.method !== 'POST') return j({ error: 'method not allowed' }, 405, cors);

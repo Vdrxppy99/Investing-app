@@ -148,7 +148,7 @@
   .chip--gain { background: var(--gain-tint); color: var(--gain); }
   .chip--loss { background: var(--loss-tint); color: var(--loss); }
   .chip--attn { background: var(--secondary-tint); color: var(--secondary); }
-  .chip--primary { background: var(--primary-tint); color: var(--primary); }
+  .chip--primary { background: var(--primary-tint); color: var(--primary-text); }
 
   /* ── 6.5 List row — the workhorse ────────────────────────────────────────
      Divided by a bottom hairline rather than being a bordered card each. That
@@ -291,6 +291,7 @@
   .search input {
     flex: 1;
     min-width: 0;
+    align-self: stretch;
     background: none;
     border: none;
     color: var(--text);
@@ -479,7 +480,7 @@
     transition: color var(--dur-micro) var(--ease-out);
   }
   .tabbar__item svg { width: 24px; height: 24px; }
-  .tabbar__item[aria-current="page"] { color: var(--primary); }
+  .tabbar__item[aria-current="page"] { color: var(--primary-text); }
 
   /* ── 6.14 Progress bar ───────────────────────────────────────────────────── */
   .bar {
@@ -750,7 +751,9 @@
   .lock__box {
     width: 100%;
     max-width: 360px;
+    min-height: var(--lock-box-min-h);
     display: grid;
+    align-content: center;
     gap: var(--s-4);
     text-align: center;
   }
@@ -766,7 +769,18 @@
     letter-spacing: var(--tr-title);
     font-weight: var(--w-bold);
   }
-  .lock__sub { font-size: var(--t-caption); color: var(--text-muted); }
+  /* min-height reserves 2 lines up front — vault.js's boot sequence swaps this
+     text (showStep()) from a 1-line placeholder ("Unlocking") to whatever the
+     real first-paint state turns out to be, and "Create a passcode to encrypt
+     this device" wraps to 2 lines at this width. Measured, not guessed: this
+     exact swap was the single largest CLS source on the lock screen (0.153 of
+     a 0.16 total), traced via a layout-shift observer logging #lockSub's text
+     at the moment of the shift — nothing to do with the Inter font swap or
+     Chart.js, both suspected first. .lock__box is grid-centered (place-items:
+     center) in a fixed full-viewport container, so ANY height change here
+     repositions the whole box, not just this line — hence the shift's
+     reported source was "lock__box", one level up. */
+  .lock__sub { min-height: calc(var(--lh-caption) * 2); font-size: var(--t-caption); line-height: var(--lh-caption); color: var(--text-muted); }
 
   /* Each step is a state of the same box, never a separate screen. */
   .lock__step { display: grid; gap: var(--s-3); }
@@ -1063,11 +1077,11 @@
     font-weight: var(--w-bold);
   }
   .tabbar__item.on,
-  .rail-nav__item.on { color: var(--primary); }
+  .rail-nav__item.on { color: var(--primary-text); }
   .rail-nav__item.on { background: var(--primary-tint); }
 
   /* Benchmark toggle: an active ghost button. */
-  #benchBtn.on { background: var(--primary-tint); color: var(--primary); }
+  #benchBtn.on { background: var(--primary-tint); color: var(--primary-text); }
 
   /* core.js adds .on to a logo <img> once it has actually loaded, so a broken
      remote logo never leaves a half-painted tile. Bug (present since this rule's very
@@ -1597,11 +1611,19 @@
      (js/sheets.js, js/portfolio.js) all build a title + optional subtitle +
      optional price inside .sheet__head; these replace what used to be a run
      of one-off inline font-size/color styles per call site. */
-  .sheet__title { font-size: var(--t-heading); font-weight: var(--w-bold); }
+  /* Now an <h2> for heading-list navigation — margin explicitly zeroed since
+     the UA default h2 margin doesn't exist on a <div> and would otherwise
+     push the sheet header row's layout around. */
+  .sheet__title { margin: 0; font-size: var(--t-heading); font-weight: var(--w-bold); }
   .sheet__sub { color: var(--text-muted); font-size: var(--t-caption); margin-top: var(--s-1); }
   .sheet__price { font-size: var(--t-title); font-weight: var(--w-bold); margin-top: var(--s-2); }
   .sheet__headbtns { display: flex; gap: var(--s-2); align-items: flex-start; }
   .chart-box--sheet { height: 180px; }
+  /* Phase 6 goal fan chart — Lightweight Charts (js/app.js drawGoalFan()), same
+     "size the plain mount div via ResizeObserver, don't force it" contract as
+     .chart #mainChart above; must NOT get width/height:100% !important like the
+     Chart.js canvas rule does, or it fights the library's own pixel-exact canvas. */
+  .chart-box--sheet #goalFan { position: absolute; inset: 0; }
   .chart-box__msg {
     position: absolute;
     inset: 0;
@@ -1621,9 +1643,13 @@
   .et { font-size: var(--t-heading); font-weight: var(--w-bold); margin-top: var(--s-2); }
   .eb { font-size: var(--t-caption); color: var(--text-muted); margin-top: var(--s-1); max-width: 34ch; }
 
-  /* Allocation legend rows, market rows, and the assorted value/label spans. */
+  /* Allocation legend rows, market rows, and the assorted value/label spans.
+     .alg (#allocLegend only — #worthLegend's are plain, non-interactive swatches)
+     is a <button> now for keyboard operability; it never had an explicit display,
+     relying on a <div>'s block default, so a button's inline-block default would
+     lay dot+ticker+percent rows side by side instead of stacked without this. */
   .alg, .alp { font-size: var(--t-caption); }
-  .alg { color: var(--text-muted); }
+  .alg { display: block; width: 100%; text-align: left; color: var(--text-muted); }
   .alp { font-weight: var(--w-bold); }
   .mark { flex: 1; min-width: 0; }
   .mpx { font-size: var(--t-label); font-weight: var(--w-bold); }
@@ -2141,12 +2167,23 @@
      and colour are data, set as custom properties after insertion (uiSetFill's
      convention), never an inline `style=`. */
   .allocstrip {
+    position: relative;
     display: flex;
     width: 100%;
     height: 7px;
     border-radius: var(--r-input);
     overflow: hidden;
     gap: 2px;
+  }
+  /* The bar reads best thin — WCAG 2.2 AA's 24px tap-target floor (2.5.8) is met
+     with an invisible ::before instead of growing the visible strip, same
+     technique as .cq below. */
+  .allocstrip::before {
+    content: '';
+    position: absolute;
+    inset: 50% 0 auto 0;
+    height: var(--tap-sm);
+    transform: translateY(-50%);
   }
   .allocstrip > i {
     display: block;
@@ -2229,6 +2266,18 @@
   #accChips, #homePr, #worthLegend, .aipanel__chips {
     flex-wrap: wrap;
     overflow-x: visible;
+  }
+  /* Bare text buttons ("All" / "Main Account" / "Brokerage") had no padding, so
+     their hit area was just the glyph line-height (~17px) — under WCAG 2.2 AA's
+     24px minimum (2.5.8). Same padding+negative-margin expansion as #tgtEditLnk/
+     #goalEdit above: grows the tappable box, keeps the visible text in place. */
+  #accChips button {
+    display: inline-block;
+    padding: var(--s-2) var(--s-1);
+    margin: calc(-1 * var(--s-2)) calc(-1 * var(--s-1));
+    min-height: var(--tap-sm);
+    min-width: var(--tap-sm);
+    text-align: center;
   }
 
   /* Tables fit the width instead of scrolling: tighter gutters, smaller numerals,
@@ -2433,7 +2482,17 @@
     overflow: visible;
   }
 
-  .heatmap td.y {
+  /* .y is a <th scope="row"> (the year), not a <td> — same cell box as the data
+     <td>s (height/padding/etc, otherwise inherited from .heatmap th's center
+     alignment and padding:0) plus the original left-aligned/faint treatment. */
+  .heatmap th.y {
+    height: var(--heat-cell-min);
+    min-width: var(--heat-cell-min);
+    padding: var(--s-1) 0;
+    border-radius: var(--r-input);
+    font-size: var(--t-micro);
+    line-height: var(--lh-micro);
+    white-space: nowrap;
     color: var(--text-faint);
     font-weight: var(--w-semibold);
     text-align: left;

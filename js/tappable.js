@@ -57,26 +57,14 @@
       return;
     }
 
-    // ── Ideas on Explore: the screener rows beside them open a stock sheet, so
-    //    these looked identical and did nothing. Same row markup, same handler.
-    const idea = e.target.closest("#ideaList .mrow");
-    if (idea) {
-      const sym = idea.getAttribute("data-sym");
-      const name = idea.getAttribute("data-name") || "";
-      if (sym && typeof window.openStockSheet === "function") {
-        try { window.openStockSheet(sym, name); } catch (_) {}
-      }
-      return;
-    }
-
-    // ── Watchlist rows, for the same reason.
-    const watch = e.target.closest("#watchList .mrow");
-    if (watch) {
-      const sym = watch.getAttribute("data-sym");
-      if (sym && typeof window.openStockSheet === "function") {
-        try { window.openStockSheet(sym, watch.getAttribute("data-name") || ""); } catch (_) {}
-      }
-    }
+    // #ideaList and #watchList rows used to be wired here too ("same row markup,
+    // same handler" as the comment above once said) — removed (UPGRADE_PLAN.md
+    // Phase 4): both live inside #page-markets/#page-following, which js/app.js's
+    // page-level delegation (`.closest('.mrow, .idx-card')`) already covers via
+    // the generic .mrow selector. Both listeners fired on every click (neither
+    // calls stopPropagation, and click bubbles from the row through #page-markets/
+    // #page-following up to document), so every tap called openStockSheet() twice —
+    // confirmed by instrumenting the call count, not assumed from reading the code.
   });
 
   // Press feedback for these rows lives in css/components.css (.tappable-fb rule) —

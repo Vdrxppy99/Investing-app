@@ -15,7 +15,7 @@ const EXTERNAL_HOSTS = [
   'api.allorigins.win',
   'corsproxy.io',
   'api.frankfurter.dev',
-  'portfolio-push.vdrxppy99.workers.dev',
+  'portfolio-push.portfolio-push.workers.dev',
 ];
 
 async function blockExternalNetwork(page) {

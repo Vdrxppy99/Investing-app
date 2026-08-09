@@ -6,7 +6,7 @@
   "compatibility_date": "2026-06-01",
   "workers_dev": true,
   "kv_namespaces": [
-    { "binding": "KV", "id": "425224ee89044fe0b40254e84365552f" }
+    { "binding": "KV", "id": "a33332cb954a44c8a8556118bcf6a88c" }
   ],
   // Workers AI (free daily allocation) powers the in-app "Ask" assistant — see /ask in src/index.js
   "ai": { "binding": "AI" },

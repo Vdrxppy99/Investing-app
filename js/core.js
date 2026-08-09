@@ -46,6 +46,7 @@ const state = {
   history:  lsGet('pt_history')  || JSON.parse(JSON.stringify(SEED_HISTORY)),   // sym -> {t:[ms], c:[close], ts:fetchedAt, range}
   intraday: lsGet('pt_intraday') || {},   // sym -> {t:[ms], c:[price], ts:fetchedAt} (5-min bars, today)
   divs:     lsGet('pt_divs')     || {},
+  earnings: lsGet('pt_earnings') || {},   // sym -> {date:'YYYY-MM-DD', q, qy, ts} | {none:true, ts} — confirmed dates only, see fetchEarnings()
   goal:     lsGet('pt_goal')     || null,   // savings target { amt }   // sym -> {list:[[ms,perShare]], ts} distribution history
   targets:  lsGet('pt_targets')  || null,   // target mix { sym: pct } — drives the drift view in Allocation
   watch:    lsGet('pt_watch')    || [],     // followed symbols [{sym,name}]
@@ -176,7 +177,7 @@ function spark(sym){ // 30-day mini price line for a holding row
   const min=Math.min(...pts), max=Math.max(...pts), rng=(max-min)||1, W=54, H=22;
   const d=pts.map((p,i)=>`${i?'L':'M'}${(i/(pts.length-1)*W).toFixed(1)} ${(H-2-(p-min)/rng*(H-4)).toFixed(1)}`).join('');
   const up=pts[pts.length-1]>=pts[0];
-  return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${d}" fill="none" stroke="${up?'var(--green)':'var(--red)'}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/></svg>`;
+  return `<svg class="spark" aria-hidden="true" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${d}" fill="none" stroke="${up?'var(--green)':'var(--red)'}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/></svg>`;
 }
 function benchSym(){ return state.view.bench==='VT' ? 'VT' : state.view.bench==='QQQ' ? 'QQQ' : 'VOO'; }
 function benchName(){ return state.view.bench==='VT' ? 'World (VT)' : state.view.bench==='QQQ' ? 'Nasdaq 100 (QQQ)' : 'S&P 500'; }

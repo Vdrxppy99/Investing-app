@@ -1,6 +1,42 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-v9.9.0'; // ⚠ bump on EVERY deploy — semver epoch (renumbered from the old v10.x line): MAJOR redesign · MINOR features · PATCH fixes
+const V = 'pt-2.6.140'; // ⚠ bump on EVERY deploy — this is NOT semver, see below
+// ── VERSION SCHEME — PROUD.NORMAL.SHAME (as of this line; do NOT "correct" it back
+// to semver) ────────────────────────────────────────────────────────────────────
+// First number: releases the owner is genuinely proud of. Second: normal feature
+// releases. Third: bug fixes and small things he'd rather not admit to. None of the
+// three numbers means MAJOR/MINOR/PATCH — a big third-number jump is not a crisis,
+// it just means a lot of small embarrassing things got fixed. See CHANGELOG.md's
+// entry for this version for the full rationale. All history below this line, back
+// through v9.x/v8.x/etc., was written under the OLD semver-ish scheme and is left
+// as-is — do not renumber past entries to fit the new one.
+// v9.11.0 — UPGRADE_PLAN.md Phase 6 (final): the deterministic goal ETA (js/app.js
+// renderGoal(), "compound today's money at your trailing return") is replaced by a
+// parametric Monte Carlo projection — 10,000 paths, seeded deterministically
+// (js/monte-carlo.js runMonteCarloProjection()), real return N(7%,12%)/yr and
+// inflation N(2%,0.8%)/yr drawn independently per path per year, contributions
+// derived from the portfolio's own non-dividend lot history (js/app.js
+// deriveMonthlyContribution()) added in fixed nominal dollars and deflated back to
+// today's dollars by that path's own realized inflation. state.goal gains a
+// required `year` field (js/app.js renderGoalForm()) — existing goals with only
+// `amt` render a "set a target year" prompt rather than guessing one. Runs in a new
+// Worker (js/monte-carlo-worker.js) so 10k paths never touch the main thread — the
+// v9.10.3 session measured worst interaction at 104-160ms against the 200ms INP
+// target and this does not regress it (main-thread dispatch measured, not assumed;
+// see CHANGELOG.md). Home's #goalCard now shows "N% chance by <year>" plus a
+// p10/p50/p90 fan chart (Lightweight Charts, already loaded for the hero chart —
+// Chart.js is not pulled back onto this path) and states its own assumptions
+// (return/inflation means+SDs, the derived contribution rate or its absence,
+// pre-tax) inline rather than showing a bare percentage. Edge cases each render
+// their own message instead of throwing: no goal, goal already reached, target
+// year in the past, and too little purchase history to derive a contribution rate
+// (fewer than 2 distinct purchase months) — all covered in test/monte-carlo.spec.js
+// (engine, pure Node, no browser) plus this session's manual browser verification.
+// US-domiciled holdings: projection is explicitly pre-tax, no German investment tax
+// modeled (Vorabpauschale/Teilfreistellung/Sparerpauschbetrag do not apply and are
+// not implemented — see UPGRADE_PLAN.md Phase 6). No existing financial maths
+// touched; golden master figures (test/golden) don't cover goal/projection state at
+// all, verified unchanged.
 // v9.4.0 — UPGRADE_PLAN.md Phase R1: Portfolio screen rebuilt on DESIGN-TARGET.md
 // (indigo brand, hairline cards, allocation strip, holdings grouped by asset
 // class), plus the real .sheet__head/.sheet__body scroll fix for #detailSheet
@@ -125,13 +161,17 @@ const CORE = ['./', './index.html', './manifest.webmanifest',
   './css/tokens.css', './css/base.css', './css/components.css', './css/layout.css',
   './js/i18n.js', './js/icons.js', './js/ui.js', './js/tappable.js',
   './js/vault.js', './js/boot.js', './js/seed.js', './js/demo.js', './js/core.js', './js/portfolio.js', './js/api.js',
-  './js/explore.js', './js/insights.js', './js/sheets.js', './js/app.js',
+  './js/explore.js', './js/insights.js', './js/sheets.js', './js/monte-carlo.js', './js/monte-carlo-worker.js', './js/app.js',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png',
-  // Chart.js is vendored now rather than fetched from a CDN. Loading it remotely
-  // meant the app could not chart at all offline, however well the SW behaved.
-  './vendor/chart.umd.min.js',
-  // Lightweight Charts — Portfolio hero chart only (js/portfolio.js), same offline reasoning.
+  // Lightweight Charts — Portfolio hero chart only (js/portfolio.js), needed on first
+  // paint, so it's still precached. Vendored not CDN'd, so the app can chart offline.
   './vendor/lightweight-charts.standalone.production.js'];
+  // vendor/chart.umd.min.js is deliberately NOT in CORE (Phase 4): it's
+  // lazy-loaded on first use (js/boot.js ensureChartJs()) rather than fetched on
+  // every install whether or not it's ever needed. The fetch handler below still
+  // caches it at runtime the first time it's actually requested — same offline
+  // guarantee after first use, just not paid for on installs that never open a
+  // chart-needing sheet.
 
 self.addEventListener('install', e => {
   self.skipWaiting();

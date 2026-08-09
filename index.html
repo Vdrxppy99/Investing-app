@@ -22,7 +22,7 @@
   style-src-attr 'unsafe-inline';
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' https://www.google.com https://*.gstatic.com https://assets.parqet.com;
-  connect-src 'self' https://portfolio-push.vdrxppy99.workers.dev https://query1.finance.yahoo.com https://query2.finance.yahoo.com https://stooq.com https://api.frankfurter.dev https://api.allorigins.win https://corsproxy.io;
+  connect-src 'self' https://portfolio-push.portfolio-push.workers.dev https://query1.finance.yahoo.com https://query2.finance.yahoo.com https://stooq.com https://api.frankfurter.dev https://api.allorigins.win https://corsproxy.io;
   worker-src 'self';
   manifest-src 'self';
   base-uri 'self';
@@ -34,15 +34,21 @@
 <title>My Portfolio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<!-- Vendored, not CDN. Loading this remotely meant the app could not chart at
-     all offline, which contradicts the offline requirement. 200 KB, cached by
-     the service worker like everything else. -->
-<script src="vendor/chart.umd.min.js" defer></script>
+<!-- chart.umd.min.js (~200KB) is NOT loaded here (UPGRADE_PLAN.md Phase 4) — it's
+     only needed once a holding sheet or the Insights tab opens, not on first
+     paint, so js/boot.js's ensureChartJs() injects it lazily on first actual
+     use instead. Still vendored, not CDN, for the same offline reason as
+     Lightweight Charts below; no longer in sw.js's CORE precache, since
+     precaching it would fetch it on every install regardless of whether it's
+     ever used, defeating the point — it's cached at runtime on first fetch by
+     sw.js's existing generic cache-first-then-network handler instead, same
+     as any other shell asset, just populated lazily rather than upfront. -->
 <!-- Portfolio hero chart only (js/portfolio.js) — first-class range/scrub/marker
-     primitives Chart.js has no equivalent for. Every other chart in the app
-     (holding detail, drawdown, worth, contributions, dividends) still uses
-     Chart.js above; this is additive, not a replacement. Vendored for the same
-     offline reason as chart.umd.min.js. ~192KB, cached by the service worker. -->
+     primitives Chart.js has no equivalent for, and needed immediately (it's the
+     Portfolio tab's own chart, not gated behind a sheet), so this one stays a
+     blocking load. Every other chart in the app (holding detail, drawdown, worth,
+     contributions) uses Chart.js, lazy-loaded as above. Vendored for the same
+     offline reason. ~192KB, cached by the service worker. -->
 <script src="vendor/lightweight-charts.standalone.production.js" defer></script>
 <!-- Layered stylesheet. Load order IS the cascade order; @layer makes
      specificity structural rather than a race. See DESIGN.md. -->
@@ -138,8 +144,13 @@
   </div>
 </div>
 
+<!-- Persistent floating chrome — none of nav/main/header/footer fits a demo-mode
+     exit badge, a scroll-triggered value bar, a pull-to-refresh spinner and the
+     assistant FAB/panel, so this is the "region" landmark's actual last-resort
+     case (axe "region": page content must be contained by *some* landmark). -->
+<div id="globalControls" role="region" aria-label="Global controls">
 <!-- Demo badge — a designed product affordance, not a construction sign. -->
-<button id="demoBadge" class="demobadge press" aria-label="Exit the example portfolio">
+<button id="demoBadge" class="demobadge press" aria-label="Example data — exit">
   <svg aria-hidden="true"><use href="#i-eye"/></svg><span>Example data</span>
   <svg aria-hidden="true"><use href="#i-x"/></svg>
 </button>
@@ -164,6 +175,7 @@
     <button id="aiSend" class="iconbtn" aria-label="Send"><svg aria-hidden="true"><use href="#i-send"/></svg></button>
   </div>
 </div>
+</div>
 
 <div class="shell">
 
@@ -179,7 +191,7 @@
   <span class="rail-nav__spacer"></span>
 </nav>
 
-<div class="wrap">
+<main class="wrap">
 
 <!-- ═══════════════════ HOME ═══════════════════ -->
 <!-- DESIGN-TARGET.md "Home v2" (supersedes the R4/frame-1 composition below it in
@@ -187,9 +199,10 @@
      the screen, above the portfolio card. Then the portfolio card (total, today's
      delta, a 1M sparkline, the allocation strip, and the period-return pills
      carried over from R1's hero — see #homePr's comment in js/insights.js), Coming
-     up (dividend ex-dates), and Goal. No new maths: every figure here is computed
-     by js/app.js / js/portfolio.js / js/insights.js exactly as before, just given
-     a front door instead of being orphaned. -->
+     up (dividend ex-dates merged with confirmed earnings dates — §2 of Home v2,
+     see renderComingUp() in js/app.js), and Goal. No new maths: every figure here
+     is computed by js/app.js / js/portfolio.js / js/insights.js exactly as before,
+     just given a front door instead of being orphaned. -->
 <div id="page-home" class="page">
   <div class="appbar">
     <h1 class="t-title" id="homeTitle" tabindex="-1">Home</h1>
@@ -198,7 +211,7 @@
   <p class="t-caption muted" id="homeCountdown"></p>
 
   <div>
-    <div class="section__label"><span>Stay on top</span></div>
+    <h2 class="section__label"><span>Stay on top</span></h2>
     <section class="card" id="moverCard">
       <div class="card__head">
         <h2 class="card__title">Your Daily Movers</h2>
@@ -215,14 +228,14 @@
     <div class="hero__eyebrow">Portfolio</div>
     <div class="t-hero-sm hero__total" id="homeTotal">&mdash;</div>
     <div class="hero__delta" id="homeToday"></div>
-    <svg width="304" height="62" viewBox="0 0 304 62" id="homeSpark" class="home-spark"></svg>
+    <svg width="304" height="62" viewBox="0 0 304 62" id="homeSpark" class="home-spark" aria-hidden="true"></svg>
     <button class="allocstrip home-alloc" id="homeAllocStrip" aria-label="Allocation breakdown"></button>
     <div class="rail" id="homePr"></div>
   </section>
 
   <div class="stack">
     <div id="comingSection">
-      <div class="section__label"><span>Coming up</span></div>
+      <h2 class="section__label"><span>Coming up</span></h2>
       <section class="card"><div id="comingBody"></div></section>
     </div>
 
@@ -231,7 +244,7 @@
          than nudging a decision, per the brief ("reads as observation, not
          recommendation"). -->
     <div>
-      <div class="section__label"><span>Performance</span></div>
+      <h2 class="section__label"><span>Performance</span></h2>
       <section class="card"><div class="card__head"><h2 class="card__title">Best performers</h2></div><div id="highlightBody"></div></section>
     </div>
 
@@ -243,13 +256,13 @@
          comment above renderHomeInsights() in js/app.js for why it moved
          here and why #moverTotal did not come with it). -->
     <div>
-      <div class="section__label"><span>Portfolio insights</span></div>
+      <h2 class="section__label"><span>Portfolio insights</span></h2>
       <p class="t-caption muted" id="moverNarrative"></p>
       <div class="grid-3" id="homeInsights"></div>
     </div>
 
     <div>
-      <div class="section__label"><span>Goal</span><em id="goalPct"></em></div>
+      <h2 class="section__label"><span>Goal</span><em id="goalPct"></em></h2>
       <section class="card" id="goalCard"><div id="goalBody"></div></section>
     </div>
   </div>
@@ -320,7 +333,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v9.9.0</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.140</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->
@@ -344,7 +357,7 @@
 
   <div class="stack">
     <div>
-      <div class="section__label">Indices</div>
+      <h2 class="section__label">Indices</h2>
       <div class="tiles" id="idxRow"><div class="skel skel--tile"></div><div class="skel skel--tile"></div><div class="skel skel--tile"></div></div>
     </div>
 
@@ -366,7 +379,7 @@
     </section>
 
     <div>
-      <div class="section__label">Sectors today</div>
+      <h2 class="section__label">Sectors today</h2>
       <section class="card"><div id="sectorRow"></div></section>
     </div>
 
@@ -391,12 +404,12 @@
 
   <div class="stack">
     <div id="watchWrap">
-      <div class="section__label">Watchlist</div>
+      <h2 class="section__label">Watchlist</h2>
       <section class="card"><div id="watchList"></div></section>
     </div>
 
     <div>
-      <div class="section__label">Stocks you already own</div>
+      <h2 class="section__label">Stocks you already own</h2>
       <p class="t-caption muted">Held indirectly through your ETFs — your look-through.</p>
       <section class="card"><div id="followLookList"></div></section>
     </div>
@@ -433,14 +446,14 @@
       <div class="dlegend" id="sectorLegend"></div>
     </div>
 
-    <div class="section__label">More</div>
+    <h2 class="section__label">More</h2>
     <div class="card" id="moreList"></div>
   </div>
 
   <p class="t-caption faint foot">P/E and fee figures are estimates from published fund data. Risk is computed from your real price history. Not financial advice.</p>
 </div>
 
-</div><!-- /wrap -->
+</main><!-- /wrap -->
 </div><!-- /shell -->
 
 <nav class="tabbar" aria-label="Sections">

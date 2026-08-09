@@ -68,7 +68,7 @@ function holdingRow(r){
   const tick = (was!=null && p!==was) ? (p>was ? ' tick-up' : ' tick-down') : '';
   lastShownPx[r.sym] = p;
   const avg = r.qty>0 ? r.cost/r.qty : 0;
-  return `<div class="hrow${tick}" data-sym="${esc(r.sym)}">
+  return `<button type="button" class="hrow${tick}" data-sym="${esc(r.sym)}">
     ${badgeHtml(r.sym)}
     <div class="hmid">
       <div class="hsym"><span class="hname">${esc((NAMES[r.sym]||r.sym.replace('-','.')).replace(/^Vanguard /,''))}</span> <span class="htick">${esc(r.sym.replace('-','.'))}</span></div>
@@ -78,7 +78,7 @@ function holdingRow(r){
     <div class="hright">
       <div class="hval">${fmt(val)}</div>
       <div class="hpl ${cls(pl)}">${fmtPct(plp)}</div>
-    </div></div>`;
+    </div></button>`;
 }
 function renderList(){
   const rs = rows(state.view.acc); // pre-sorted by value
@@ -92,7 +92,7 @@ function renderList(){
     for(const r of rs) groups[assetGroupOf(r.sym)].push(r);
     $('holdList').innerHTML = ['ETFs','Stocks'].filter(g=>groups[g].length).map(g=>{
       const gtot = groups[g].reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
-      return `<div class="section__label">${g} &middot; ${groups[g].length}<em>${fmt(gtot)}</em></div>` + groups[g].map(holdingRow).join('');
+      return `<h2 class="section__label">${g} &middot; ${groups[g].length}<em>${fmt(gtot)}</em></h2>` + groups[g].map(holdingRow).join('');
     }).join('');
     $('holdList').querySelectorAll('.hrow').forEach(el=> el.onclick = ()=>openDetail(el.dataset.sym));
   }
@@ -131,7 +131,7 @@ function renderAllocStrip(id){
 }
 function openAllocSheet(){
   if($('allocStrip').disabled) return;
-  $('detailSheetHead').innerHTML = `<div class="hsym sheet__title">Allocation</div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
+  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Allocation</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `<div class="alloc"><div class="alloc__donut"><canvas id="allocChart"></canvas></div>
     <div id="allocLegend"></div></div>
     <div id="allocClasses"></div>
@@ -139,7 +139,7 @@ function openAllocSheet(){
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
   $('detailX').focus({preventScroll:true});
-  renderAlloc();
+  ensureChartJs().catch(()=>{}).then(renderAlloc);
 }
 let allocChart=null;
 const ASSET_CLASSES = { 'US stocks':['VOO','VTI','VXF'], 'International':['VXUS'], 'Dividend':['VYM'], 'Berkshire':['BRK-B'] };
@@ -151,6 +151,8 @@ function renderAlloc(){
   const tot = rs.reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
   if(!tot || !window.Chart) return;
   const centerOpt = { l1: rs.length+' funds', l2: fmt(tot).replace(/[.,]\d\d(\s|$)/,'$1') };
+  el.setAttribute('role','img');
+  el.setAttribute('aria-label', `Allocation donut chart. ${rs.map(r=>`${r.sym.replace('-','.')} ${(r.qty*priceOf(r.sym)/tot*100).toFixed(1)}%`).join(', ')}.`);
   allocChart = new Chart(el,{type:'doughnut',
     data:{labels:rs.map(r=>r.sym.replace('-','.')), datasets:[{data:rs.map(r=>r.qty*priceOf(r.sym)), backgroundColor:rs.map(r=>colorOf(r.sym)), borderWidth:2, borderColor:cvar('--card'), hoverOffset:5}]},
     options:{responsive:true, maintainAspectRatio:false, cutout:'72%',
@@ -158,7 +160,7 @@ function renderAlloc(){
         callbacks:{label:c=>c.label+': '+fmt(c.parsed)+' ('+(c.parsed/tot*100).toFixed(1)+'%)'}}}}});
   $('allocLegend').innerHTML = rs.map(r=>{
     const v=r.qty*priceOf(r.sym);
-    return `<div class="alg"><span class="dot" style="${bstyle(colorOf(r.sym))}"></span>${esc(r.sym.replace('-','.'))}<span class="alp">${(v/tot*100).toFixed(1)}%</span></div>`;
+    return `<button type="button" class="alg"><span class="dot" style="${bstyle(colorOf(r.sym))}"></span>${esc(r.sym.replace('-','.'))}<span class="alp">${(v/tot*100).toFixed(1)}%</span></button>`;
   }).join('');
   $('allocClasses').innerHTML = Object.entries(ASSET_CLASSES).map(([k,syms])=>{
     const v = rs.filter(r=>syms.includes(r.sym)).reduce((a,r)=>a+r.qty*priceOf(r.sym),0);
@@ -271,6 +273,31 @@ async function ensureDivs(){
   lsSet('pt_divs',state.divs); lsSet('pt_goal',state.goal);
   if(res.some(r=>r.status==='fulfilled'&&r.value===true)){ renderIncome(); if(typeof renderComingUp==='function') renderComingUp(); }
 }
+let earningsFetching=false;
+/* One batched call to the Worker's /earnings proxy (worker/src/earnings.js) rather than
+   per-symbol requests — it does its own KV caching, so this only reaches EarningsWhispers
+   for symbols this edge hasn't seen in 24h. A network failure here (Worker down, offline)
+   just leaves the stale symbols stale — dividends are fetched separately and unaffected. */
+async function fetchEarnings(syms){
+  try{
+    const r=await fetch(PUSH_URL+'/earnings?syms='+encodeURIComponent(syms.join(',')),{cache:'no-store'});
+    if(!r.ok) return false;
+    const j=await r.json();
+    for(const s of syms) state.earnings[s]={ ...(j[s]||{none:true}), ts:Date.now() };
+    return true;
+  }catch(e){ return false; }
+}
+async function ensureEarnings(){
+  if(earningsFetching) return;
+  const TTL=24*3600e3;
+  const stale=uniqSyms().filter(s=>{const e=state.earnings[s]; return !e||!e.ts||Date.now()-e.ts>TTL;});
+  if(!stale.length) return;
+  earningsFetching=true;
+  const ok=await fetchEarnings(stale);
+  earningsFetching=false;
+  lsSet('pt_earnings',state.earnings);
+  if(ok && typeof renderComingUp==='function') renderComingUp();
+}
 /* Dividends left the Portfolio screen in R1 (DESIGN-TARGET.md — they belong on
    Home, built in R4). #incomeCard no longer exists here; this no-ops until R4
    gives it a new home, rather than being deleted — the forecasting maths below
@@ -320,6 +347,8 @@ function renderIncome(){
       const k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');
       labels.push(dt.toLocaleDateString([],{month:'short'})); data.push(byMonth[k]||0);
     }
+    cal.setAttribute('role','img');
+    cal.setAttribute('aria-label', `Dividend forecast by month, next 12 months, total ${fmt(fwd)}.`);
     const calChart=new Chart(cal,{type:'bar',data:{labels,datasets:[{data,backgroundColor:cvar('--brand'),borderRadius:3}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
         tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>'~'+fmt(c.parsed.y)}}},
@@ -328,7 +357,7 @@ function renderIncome(){
     attachScrubAny(calChart, i=>{ const ro=$('divRO'); if(!ro) return;
       ro.textContent = i==null ? '' : `${labels[i]} · ~${fmt(data[i])} expected`; });
   }
-  ensureDivs();
+  ensureDivs(); ensureEarnings();
 }
 /* dividends deep dive — tap the Dividends card title */
 function openDivSheet(){
@@ -534,7 +563,7 @@ const scrubLine = { id:'scrubLine',
     }
     g.restore();
   }};
-if(window.Chart) Chart.register(scrubLine);
+// registered by ensureChartJs() (js/boot.js) once Chart.js actually loads — it's lazy now.
 function attachScrubAny(c, onMove){ // onMove(i) with index, onMove(null) when released
   const el=c.canvas;
   el.style.touchAction='pan-y'; // horizontal drag scrubs, vertical swipe still scrolls the page
@@ -578,6 +607,12 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers){
   const orphan = Chart.getChart(el); if(orphan) orphan.destroy();
   if(labels.length<2) return null;
   const up = data.length>1 ? data[data.length-1]>=data[0] : true;
+  // Canvas has no text alternative of its own — role="img" + a start/end/direction
+  // summary covers both call sites (holding detail, stock sheet) since they share
+  // this one draw function.
+  const chg = data[0] ? (data[data.length-1]/data[0]-1)*100 : 0;
+  el.setAttribute('role','img');
+  el.setAttribute('aria-label', `Price chart, ${labels.length} points, ${up?'up':'down'} ${Math.abs(chg).toFixed(1)}% from ${fmt(data[0])} to ${fmt(data[data.length-1])} over the period.`);
   const rgb = up?cvar('--green-rgb'):cvar('--red-rgb');
   const solid = up?cvar('--green'):cvar('--red');
   const ctx=el.getContext('2d');
@@ -631,6 +666,12 @@ function drawHeroChart(times, labels, data, msgEl, bench, markers){
   if(heroChart){ heroChart.remove(); heroChart=null; heroSeries=null; heroBenchSeries=null; heroMarkersApi=null; }
   el.innerHTML='';
   if(labels.length<2) return null;
+  // Lightweight Charts owns everything under #mainChart and rebuilds it on every redraw
+  // (el.innerHTML='' above), so the label lives on this stable container, not on any
+  // canvas it creates internally.
+  el.setAttribute('role','img');
+  { const chg = data[0] ? (data[data.length-1]/data[0]-1)*100 : 0;
+    el.setAttribute('aria-label', `Portfolio chart, ${labels.length} points, ${chg>=0?'up':'down'} ${Math.abs(chg).toFixed(1)}% over the period.`); }
   const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid'),
         card=cvar('--card'), faint=cvar('--faint');
   const priceFormatter = v => state.view.priv ? '' :
@@ -802,7 +843,7 @@ function openDetail(sym){
   const accLines = Object.keys(r.accs).length>1
     ? `<div class="accbreak">${Object.entries(r.accs).map(([a,x])=>`<div>${esc(ACCOUNTS[a]||a)} — ${x.qty.toFixed(3).replace(/\.?0+$/,'')} sh · ${fmt(x.qty*p)} <span class="${cls(x.qty*p-x.cost)}">(${fmtSign(x.qty*p-x.cost)})</span></div>`).join('')}</div>` : '';
   $('detailSheetHead').innerHTML = `<div class="sheet__idrow">${badgeHtml(sym)}<div class="sheet__idcol">
-      <div class="hsym sheet__title">${esc(sym.replace('-','.'))}</div>
+      <h2 class="hsym sheet__title">${esc(sym.replace('-','.'))}</h2>
       <div class="sheet__sub">${esc(NAMES[sym]||'')}</div>
       <div class="sheet__price">${fmtPx(p)} <span class="t-label ${cls(dp)}">${fmtPct(dp)} today</span></div>
     </div></div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
@@ -859,16 +900,22 @@ function openDetail(sym){
   if(state.view.range==='1D' && ih && ih.t && ih.t.length>1){
     const labels=[], closes=[];
     for(let i=0;i<ih.t.length;i++) if(ih.c[i]!=null){ labels.push(new Date(ih.t[i]).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); closes.push(ih.c[i]); }
-    detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
-    wireDetailScrub(detailChart, labels, closes, 'detailRO');
+    ensureChartJs().catch(()=>{}).then(()=>{
+      if(!$('detailChart')) return; // sheet closed or replaced while Chart.js was loading
+      detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
+      wireDetailScrub(detailChart, labels, closes, 'detailRO');
+    });
   } else if(h && h.t && h.t.length>1){
     const cut=rangeCutoff(state.view.range==='1D' ? '1W' : state.view.range);
     const labels=[], closes=[];
     for(let i=0;i<h.t.length;i++){ if(h.c[i]==null) continue; const d=dayStr(h.t[i]); if(d>=cut){ labels.push(d); closes.push(h.c[i]); } }
     const today=dayStr(Date.now());
     if(labels.length && labels[labels.length-1]===today) closes[closes.length-1]=p; else { labels.push(today); closes.push(p); }
-    detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
-    wireDetailScrub(detailChart, labels, closes, 'detailRO');
+    ensureChartJs().catch(()=>{}).then(()=>{
+      if(!$('detailChart')) return; // sheet closed or replaced while Chart.js was loading
+      detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
+      wireDetailScrub(detailChart, labels, closes, 'detailRO');
+    });
   } else if($('detailMsg')) $('detailMsg').textContent='Price chart appears after the first online update.';
 }
 function closeDetail(){ hideOverlay('detail'); setTimeout(()=>{ if(detailChart && $('detail').classList.contains('hidden')){ detailChart.destroy(); detailChart=null; } }, 200); }
@@ -882,7 +929,7 @@ function openEdit(){
     <td><input data-i="${i}" data-f="qty" type="number" step="any" value="${h.qty}"></td>
     <td><input data-i="${i}" data-f="cost" type="number" step="any" value="${h.cost}"></td>
     <td><button class="del" data-i="${i}">✕</button></td></tr>`).join('');
-  $('editSheetHead').innerHTML = `<div class="hsym sheet__title">Edit holdings</div><button class="xbtn" id="editX" aria-label="Close">✕</button>`;
+  $('editSheetHead').innerHTML = `<h2 class="hsym sheet__title">Edit holdings</h2><button class="xbtn" id="editX" aria-label="Close">✕</button>`;
   $('editSheetBody').innerHTML = `
     <div class="buybox">
       <div class="buytitle">Record a purchase</div>

@@ -365,7 +365,25 @@ The Empower feature. Turns the app from reporting into planning, and it is the
 one feature gap that is purely a matter of doing the work — no licence, no
 paid data feed.
 
-**Skills:** `finance-assistant` (Monte Carlo FIRE, Scenario Lab)
+**Skills:** `modern-web-guidance`, `test-driven-development`,
+`lightweight-charts`
+
+*(An earlier draft named a `finance-assistant` skill. It was never installed —
+do not try to load it. The model it would have supplied is specified inline
+below instead.)*
+
+**The model, specified so no external skill is needed:**
+
+- 10,000 paths. Annual real return drawn from a normal distribution, mean 7%,
+  standard deviation 12%. Inflation mean 2%, standard deviation 0.8%.
+- Seed the generator deterministically so the same inputs give the same fan
+  every run. A projection that changes when you reopen the tab is not credible.
+- Inputs: current portfolio value, the existing goal amount and target date,
+  and the user's actual contribution rate derived from deposit history.
+- Outputs: probability of reaching the goal by the target date, and the 10th,
+  50th and 90th percentile paths for the fan chart.
+- These are US-domiciled holdings in a US account. Do not implement German
+  investment tax. Ship the projection pre-tax and say so in the UI.
 
 **Work:**
 
@@ -389,11 +407,15 @@ therefore the right fit here.
 
 **Acceptance criteria:**
 
-- [ ] Monte Carlo runs in a Worker; main thread never blocks > 50 ms
-- [ ] assumptions visible in the UI
-- [ ] US tax lot / qualified-dividend treatment correct, or projection is
-      explicitly pre-tax with a note saying so
-- [ ] Phase 0 suite green
+- [x] Monte Carlo runs in a Worker; main thread never blocks > 50 ms — measured
+      0.5ms synchronous dispatch (`postMessage` call itself) and zero Long Tasks
+      on the main thread for the full 10,000-path run (`PerformanceObserver`,
+      `type:'longtask'`, browser-verified, not assumed)
+- [x] assumptions visible in the UI — Home goal card states real return, inflation,
+      derived (or absent) contribution rate, and pre-tax, inline under the fan chart
+- [x] US tax lot / qualified-dividend treatment correct, or projection is
+      explicitly pre-tax with a note saying so — pre-tax, stated in the UI
+- [x] Phase 0 suite green — 37/37, `npx playwright test`
 
 ---
 

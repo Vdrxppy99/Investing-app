@@ -1,6 +1,6 @@
 'use strict';
 /* ============ DATA FETCHING (browser-side, multiple fallbacks) ============ */
-const PUSH_URL='https://portfolio-push.vdrxppy99.workers.dev'; // our own Cloudflare Worker (worker/ in this repo)
+const PUSH_URL='https://portfolio-push.portfolio-push.workers.dev'; // our own Cloudflare Worker (worker/ in this repo)
 /* Yahoo requests go through OUR worker first (/q — origin-locked, edge-cached, no third
    party sees them); direct + public proxies stay as fallbacks. Non-Yahoo URLs (stooq CSV,
    frankfurter FX) return null here — the worker only whitelists Yahoo — so they skip it. */

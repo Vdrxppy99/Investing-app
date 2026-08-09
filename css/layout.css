@@ -97,13 +97,16 @@
   .rail > * { scroll-snap-align: start; flex: 0 0 auto; }
 
   .section__label {
+    /* Now an <h2> for heading-list navigation — margin explicitly zeroed
+       first, since the UA default h2 margin (top and bottom) doesn't exist
+       on a <div> and would otherwise add unwanted top space here. */
+    margin: 0 0 var(--s-3);
     font-size: var(--t-micro);
     line-height: var(--lh-micro);
     letter-spacing: var(--tr-micro);
     text-transform: uppercase;
     font-weight: var(--w-bold);
     color: var(--text-faint);
-    margin-bottom: var(--s-3);
   }
 
   /* ── Hero — deliberately has NO card around it ───────────────────────────

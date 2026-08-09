@@ -28,6 +28,15 @@
     font-size: var(--t-body);
     line-height: var(--lh-body);
     font-weight: var(--w-medium);
+    /* index.html loads Inter with &display=swap: the page renders in the
+       fallback (system sans-serif) immediately, then reflows once Inter
+       loads — a real, measured CLS source (UPGRADE_PLAN.md Phase 4; 0.16
+       at first load, over the 0.1 "good" threshold). font-size-adjust
+       scales whichever fallback is showing to Inter's own x-height, so
+       the swap no longer resizes text — Baseline since 2024-07-25;
+       degrades to the pre-existing swap-shift in unsupported browsers,
+       not worse than today. */
+    font-size-adjust: from-font;
     -webkit-font-smoothing: antialiased;
 
     /* NON-NEGOTIABLE, and a base rule rather than sprinkled per-selector:
