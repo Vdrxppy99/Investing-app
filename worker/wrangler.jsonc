@@ -3,6 +3,9 @@
   // Deploy: npx wrangler deploy --config worker/wrangler.jsonc   (from the repo root)
   "name": "portfolio-push",
   "main": "src/index.js",
+  // Pinned so a multi-account login never guesses wrong again (2026-08-09) — this is the
+  // account that actually owns the live Worker + KV namespace below.
+  "account_id": "3b4163052dd785ff22b6262ec3e37278",
   "compatibility_date": "2026-06-01",
   "workers_dev": true,
   "kv_namespaces": [

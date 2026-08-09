@@ -3,20 +3,23 @@
      · price breaking out of its usual trading band (mean ± 2σ of the last 60 daily closes —
        the "usually sits $95–$105, now at $108" signal)
      · big day move (±2% — the original mover alert)
+     · confirmed earnings report due tomorrow for a directly-held stock (opt-in, off by
+       default — Settings → Earnings-day alerts; snap.earningsAlerts)
    Runs on the 20-minute cron ("*&#47;20 13-21 * * 1-5" — see wrangler.jsonc), gated to
    10:00–15:55 ET so the daily open/close reports keep the morning/evening story.
    ONE push per run (top alert headlines, others tagged on), and per-symbol cooldowns in
    KV 'alerts' stop the same story repeating: ATH/ATL 3 trading days, band 5, mover 1.
    Wording rule (owner): plain finance speak with real dollar amounts — never stats jargon. */
 import { fetchQuote } from './quotes.js';
+import { fetchEarningsFor } from './earnings.js';
 import { sendWebPush } from './webpush.js';
 import { etNow, tradingDay, money, signed } from './shared.js';
 
 const MOVE_PCT = 2;                                    // single-holding day move that counts as "big"
 const PORT_MOVE = 450;                                 // whole-portfolio day $ swing that earns a heads-up (~1.6% at $28k — a genuinely big day, not a normal ~$280 wiggle)
 const SD_MULT = 2;                                     // band width = mean ± 2σ
-const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1, tgt: 1, pbig: 1, divsoon: 60 }; // days before the same alert may repeat
-const PRIORITY = { 'm$': 8, mg: 7, tgt: 7, pbig: 6, atl: 5, ath: 4, dv: 4, divsoon: 4, lo: 3, hi: 2, mv: 1 }; // milestones/targets top, then big portfolio day, lows, dividends, bands, movers
+const COOLDOWN = { ath: 3, atl: 3, hi: 5, lo: 5, mv: 1, dv: 1, 'm$': 1, mg: 1, tgt: 1, pbig: 1, divsoon: 60, erns: 1 }; // days before the same alert may repeat
+const PRIORITY = { 'm$': 8, mg: 7, tgt: 7, pbig: 6, atl: 5, ath: 4, dv: 4, divsoon: 4, erns: 4, lo: 3, hi: 2, mv: 1 }; // milestones/targets top, then big portfolio day, lows, dividends/earnings, bands, movers
 const DIV_LEAD_DAYS = 4; // remind this many days before the estimated ex-dividend date
 const UA = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', 'Accept': 'application/json' };
 const money0 = v => '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
@@ -79,11 +82,12 @@ export async function checkAlerts(env, force) {
   const sent = await env.KV.get('alerts', 'json') || {};   // {"VOO:ath":"2026-07-20", ...}
   const ok = key => force || !sent[key] || daysApart(et.date, sent[key]) >= COOLDOWN[key.split(':')[1]];
 
-  const found = [], evaluated = [], contribs = [];
+  const found = [], evaluated = [], contribs = [], priceMap = {};
   let total = +snap.cash || 0, priced = 0, portDay = 0;
   for (const h of snap.holdings) {
     const q = await fetchQuote(h.sym);
     if (!q || !(q.price > 0) || !(q.prev > 0)) continue;
+    priceMap[h.sym] = q.price;
     total += h.qty * q.price; priced++; portDay += h.qty * (q.price - q.prev);
     const name = h.sym.replace('-', '.');
     const dayUsd = h.qty * (q.price - q.prev);
@@ -195,10 +199,29 @@ export async function checkAlerts(env, force) {
     await env.KV.put('divs', JSON.stringify(dvs)); // one write per day
   }
 
+  /* ---- earnings tomorrow: confirmed report date for a directly-held stock, one day out.
+     Opt-in (Settings → Earnings-day alerts, snap.earningsAlerts) and off by default — the
+     brief's noise bar: this only fires for a CONFIRMED date (fetchEarningsFor already drops
+     unconfirmed estimates), once, the day before, for stocks the owner actually holds. ETFs
+     come back null from the source and are silently skipped, same as the /earnings route. */
+  if (snap.earningsAlerts) {
+    const tomorrow = new Date(Date.parse(et.date + 'T12:00:00Z') + 864e5).toISOString().slice(0, 10);
+    const earn = await fetchEarningsFor(env, syms);
+    for (const h of snap.holdings) {
+      const e = earn[h.sym];
+      if (!e || e.date !== tomorrow || !ok(`${h.sym}:erns`)) continue;
+      const name = h.sym.replace('-', '.');
+      const stake = h.qty * (priceMap[h.sym] || 0);
+      found.push({ sym: h.sym, name, type: 'erns', p: PRIORITY.erns, impact: stake,
+        title: `${name} reports earnings tomorrow`,
+        body: `Q${e.q} ${e.qy} results are due — expect a bigger move than usual. Your stake: ${money(stake)}.` });
+    }
+  }
+
   if (!found.length) return { skip: 'nothing notable', evaluated };
   found.sort((a, z) => z.p - a.p || z.impact - a.impact);
   const top = found[0];
-  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg', 'tgt', 'pbig', 'divsoon'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
+  const extras = found.slice(1, 3).map(a => ['mv', 'm$', 'mg', 'tgt', 'pbig', 'divsoon', 'erns'].includes(a.type) ? a.title.replace(' today', '') : `${a.name} ${({ ath: 'at an all-time high', atl: 'at an all-time low', hi: 'above its usual range', lo: 'below its usual range', dv: 'paying a dividend' })[a.type]}`);
   const body = top.body + (extras.length ? ` · Also: ${extras.join(', ')}` : '');
   const res = await sendWebPush(env, sub, JSON.stringify({ title: top.title, body, tag: 'alert' }), 'alert');
   if (res.status === 404 || res.status === 410) { await env.KV.delete('sub'); return { error: 'subscription expired — re-enable in the app', status: res.status }; }

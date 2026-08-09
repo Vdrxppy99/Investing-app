@@ -35,13 +35,12 @@ async function fetchOne(sym) {
   } catch (_) { return null; }
 }
 
-export async function handleEarningsProxy(req, env, cors) {
-  if (!ORIGINS.includes(req.headers.get('origin') || '')) return new Response('forbidden', { status: 403, headers: cors });
-  const raw = (new URL(req.url).searchParams.get('syms') || '').toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
-  const syms = [...new Set(raw)].filter(s => SYM_RE.test(s)).slice(0, MAX_SYMS);
-  if (!syms.length) return new Response('{}', { status: 200, headers: { ...cors, 'content-type': 'application/json' } });
+/* KV-cached lookup, shared by the CORS-gated client route below and alerts.js's
+   server-side earnings-tomorrow check (which has no origin header to check). */
+export async function fetchEarningsFor(env, syms) {
+  const clean = [...new Set(syms)].filter(s => SYM_RE.test(s)).slice(0, MAX_SYMS);
   const out = {};
-  await Promise.all(syms.map(async sym => {
+  await Promise.all(clean.map(async sym => {
     const key = `earn:${sym}`;
     const cached = await env.KV.get(key, 'json'); // null only when the key has never been set — {d:...} once cached, hit or miss
     if (cached) { out[sym] = cached.d; return; }
@@ -49,5 +48,13 @@ export async function handleEarningsProxy(req, env, cors) {
     out[sym] = data;
     await env.KV.put(key, JSON.stringify({ d: data }), { expirationTtl: TTL });
   }));
+  return out;
+}
+
+export async function handleEarningsProxy(req, env, cors) {
+  if (!ORIGINS.includes(req.headers.get('origin') || '')) return new Response('forbidden', { status: 403, headers: cors });
+  const raw = (new URL(req.url).searchParams.get('syms') || '').toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
+  if (!raw.length) return new Response('{}', { status: 200, headers: { ...cors, 'content-type': 'application/json' } });
+  const out = await fetchEarningsFor(env, raw);
   return new Response(JSON.stringify(out), { status: 200, headers: { ...cors, 'content-type': 'application/json' } });
 }

@@ -128,9 +128,17 @@ repo root.
 
 ## Data
 
-- All personal data lives in the browser's `localStorage` — nothing leaves
-  the device except ticker-only price lookups and an opt-in encrypted backup.
-  Back up manually via ⚙︎ → Export backup.
+- All personal data lives in the browser's `localStorage`. By default nothing
+  leaves the device except ticker-only price/earnings lookups. Turning on
+  **Daily reports** (⚙︎, opt-in) additionally syncs share quantities per
+  ticker, total cash, total deposits, your goal amount, and any custom
+  price/earnings alert settings to the Worker's KV store — the Worker needs
+  those numbers to decide what a report or alert should say. That data sits
+  in KV as plaintext; only the push message it produces, in transit to your
+  phone, is end-to-end encrypted (RFC 8291) — the relay (Apple/Google) can't
+  read it, but the Worker itself can read what it stored. Turning reports off
+  deletes the stored subscription. Manual backups (⚙︎ → Export backup) and
+  the opt-in encrypted cloud backup are separate and unaffected by this.
 - Prices: Yahoo Finance's free `v8/finance/chart` endpoint (direct, then via
   the Worker's `/q` CORS proxy as fallback), frankfurter.dev for USD→EUR.
   `js/api.js` still has a stooq fallback wired in for delayed quotes, but per

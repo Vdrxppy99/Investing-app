@@ -1005,6 +1005,8 @@ function openEdit(){
     <div style="font-size:12.5px;font-weight:700;margin-top:18px">Daily reports</div>
     <div class="ebtns"><button class="btn sec" id="pushTgl"></button><button class="btn sec" id="pushTest" style="display:none">Send test now</button></div>
     <div style="color:var(--mut);font-size:11.5px;margin-top:6px;line-height:1.55">Lock-screen notification at US market open (~15:35) and close (~22:15) with your day's dollars and biggest movers — even while the app is closed. Notifications are end-to-end encrypted.</div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px"><input type="checkbox" id="earningsTgl"> 📅 Earnings-day alerts</label>
+    <div style="color:var(--mut);font-size:11.5px;margin-top:4px;line-height:1.55">Off by default. When on, a heads-up the day before a directly-held stock's confirmed earnings report — index funds don't report earnings, so this never fires for them.</div>
     `}
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">`;
   showOverlay('editModal');
@@ -1079,6 +1081,11 @@ function openEdit(){
   $('pushTest').onclick=()=>{
     if(!(lsGet('pt_push')||{}).on){ toast('Turn on Daily reports first, then tap Send test.', true); return; }
     $('pushTest').disabled=true; pushTest().finally(()=>{ $('pushTest').disabled=false; });
+  };
+  $('earningsTgl').checked=!!(lsGet('pt_push')||{}).earnings;
+  $('earningsTgl').onchange=()=>{
+    const p=lsGet('pt_push')||{}; p.earnings=$('earningsTgl').checked; lsSet('pt_push',p);
+    if(typeof pushSyncNow==='function') pushSyncNow();
   };
   } // end real-mode-only security/reports wiring
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };

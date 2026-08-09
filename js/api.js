@@ -229,6 +229,7 @@ function pushSnapshot(){
            cash:(+state.cash.main||0)+(+state.cash.brok||0), prices,
            goal:(state.goal&&state.goal.amt>0)?+state.goal.amt:0, dep:+state.deposits||0, // for milestone alerts (user-approved)
            alerts:(lsGet('pt_alerts')||[]).filter(a=>a&&a.sym&&a.at>0),                    // custom price alerts
+           earningsAlerts:!!(lsGet('pt_push')||{}).earnings,                               // opt-in, off by default — Settings toggle
            ts:Date.now() };
 }
 function pushSyncNow(){ // immediate snapshot sync — used when a price alert is set/removed
