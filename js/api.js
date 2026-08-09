@@ -285,7 +285,13 @@ async function pushEnable(){
   }
   // check the current state first; iOS only shows a prompt from 'default' — from 'denied' it silently returns denied
   let perm = Notification.permission;
-  if(perm==='default'){ try{ perm = await Notification.requestPermission(); }catch(e){} }
+  if(perm==='default'){
+    // iOS shows this system prompt exactly once ever — warn BEFORE asking, since a "Don't Allow"
+    // here can only be undone by deleting and re-adding the Home Screen app.
+    const proceed = confirm('iOS only asks for notification permission once.\n\nOn the next prompt, choose “Allow.” If you choose “Don’t Allow” by mistake, the only fix is deleting this app from your Home Screen and adding it again.\n\nContinue?');
+    if(!proceed) return false;
+    try{ perm = await Notification.requestPermission(); }catch(e){}
+  }
   if(perm==='denied'){
     alert('iOS is blocking notifications for this app, so it can’t ask again.\n\nFix it here:\niPhone Settings → Notifications → My Portfolio → turn ON “Allow Notifications”.\n(If it’s not listed there, look under Settings → Apps → My Portfolio → Notifications.)\n\nThen come back and tap “Turn on reports” again.');
     return false;
