@@ -98,11 +98,11 @@ function totals(acc){
 }
 function rate(){ return state.view.ccy==='EUR' ? state.fx.rate : 1; }
 /* fmtPx = always-visible market prices (public info); fmt = YOUR money — masked in privacy mode */
-function fmtPx(v){ return new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy}).format(v*rate()); }
+function fmtPx(v){ return new Intl.NumberFormat(appLocale(),{style:'currency',currency:state.view.ccy}).format(v*rate()); }
 function fmt(v){ return state.view.priv ? '••••••' : fmtPx(v); }
 function fmtSign(v){ return (v>=0?'+':'−') + fmt(Math.abs(v)); }
 function fmtPct(v){ return (v>=0?'+':'−') + Math.abs(v).toFixed(2) + '%'; }
-function cfmt(v){ return state.view.priv?'••••':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact',maximumFractionDigits:1}).format(v*rate()); }
+function cfmt(v){ return state.view.priv?'••••':new Intl.NumberFormat(appLocale(),{style:'currency',currency:state.view.ccy,notation:'compact',maximumFractionDigits:1}).format(v*rate()); }
 function cls(v){ return v>=0?'pos':'neg'; }
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function skel(n){ // shimmer placeholder rows — premium apps never show spinners for lists

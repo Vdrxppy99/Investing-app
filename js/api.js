@@ -138,7 +138,7 @@ async function refreshAll(force){
   const qres = await Promise.allSettled(syms.map(fetchQuote));
   const quotesOk = qres.some(r=>r.status==='fulfilled' && r.value===true);
   // phase 1 renders only the light surfaces — the heavy charts rebuild once, in phase 2
-  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); renderHeader(); renderList(); renderMover(); renderStale(); setStatus(); }
+  if(quotesOk){ state.live=true; lsSet('pt_quotes', state.quotes); renderLiveSurfaces(); renderStale(); setStatus(); }
   // PHASE 2 — heavy history + FX refresh quietly behind the already-live screen
   const hjobs = syms.filter(s=>{
     const h=state.history[s];
@@ -182,7 +182,7 @@ async function refreshQuotesOnly(){
   // nothing moved (market closed, repeated closes) → skip the DOM/chart work entirely
   if(qDirty){
     lsSet('pt_quotes', state.quotes);
-    renderHeader(); renderList(); renderMover(); updateChartLive();
+    renderLiveSurfaces(); updateChartLive();
   }
   setStatus();
   if(state.view.range==='1D') ensureIntraday(); // refresh the 5-min bars too (throttled inside)

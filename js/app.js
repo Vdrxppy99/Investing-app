@@ -267,6 +267,27 @@ function renderGoal(){
   if(key===goalCalcKey && goalCalcResult){ apply(goalCalcResult); return; }
   runProbabilisticGoal(params).then(result=>{ goalCalcKey=key; goalCalcResult=result; apply(result); });
 }
+/* The live-tick-safe half of the goal card: patches the "$X of $Y" figure and the
+   progress bar's width in place from the current live total, without touching (or
+   re-triggering) the Monte Carlo simulation renderGoal() above owns. Safe to call
+   before any goal exists or while the card is mid-calculation/showing "reached"/"set
+   a year" — .goalrow/.goalbar just aren't there yet in some of those states, so this
+   quietly no-ops. "Materially changed" — goal amount, target year, monthly
+   contribution rate, or the portfolio value crossing the $50 band `key` above already
+   rounds to — still only reaches the simulation through a full renderGoal() call
+   (renderAll(), or saving the goal-edit form): that's the SAME tolerance the code
+   already chose for when a re-simulate is worth it, just evaluated at full-render
+   frequency instead of every 10s poll tick, which is what makes it safe to call from
+   there at all. */
+function renderGoalProgress(){
+  const body=$('goalBody'); if(!body || !state.goal || !(state.goal.amt>0)) return;
+  const goal=state.goal.amt, t=totals('all'), pctRaw=t.value/goal;
+  const pctEl=$('goalPct'); if(pctEl) pctEl.textContent=(Math.min(999,pctRaw*100)).toFixed(0)+'%';
+  const amtEl=body.querySelector('.goalrow span:first-child');
+  if(amtEl) amtEl.textContent=`${fmt(t.value)} of ${fmt(goal)}`;
+  const barEl=body.querySelector('.goalbar i');
+  if(barEl) barEl.style.setProperty('--w', (Math.min(1,pctRaw)*100).toFixed(1)+'%');
+}
 let goalFanChart=null;
 function drawGoalFan(fan, goal, y0){
   const LC=window.LightweightCharts;
@@ -309,6 +330,13 @@ function drawGoalFan(fan, goal, y0){
 }
 function healthScore(){
   const rs=rows('all'), t=totals('all'), inv=Math.max(1,t.value-cashFor('all'));
+  // Every metric below divides by inv (clamped to 1 so it never divides by zero) and
+  // treats "no evidence of a problem" as "no problem" — with rs empty that's backwards:
+  // no holdings scored Diversification and Cost efficiency a perfect 100 ("no concentrated
+  // bets" / an average fee of nothing) and Cash deployed a perfect 100 whenever cash was
+  // also 0. A portfolio that doesn't exist isn't healthy; it's unmeasured. Caught in a
+  // bug-hunt session, live-reproduced as a B/84 grade on an empty demo portfolio.
+  if(!rs.length) return {score:null, metrics:null};
   const metrics=[];
   // 1. Diversification — broad index funds ARE diversification; only single companies count as concentration
   const singles=rs.filter(r=>!DIVERSIFIED_FUNDS.has(r.sym)).map(r=>({sym:r.sym, w:r.qty*priceOf(r.sym)/inv})).sort((a,b)=>b.w-a.w);
@@ -341,6 +369,15 @@ function healthScore(){
    openHealthSheet(), unchanged. */
 function renderHealth(){
   const {score,metrics}=healthScore();
+  if(score==null){
+    $('healthBody').innerHTML=`
+    <div class="hsplit">
+      <div class="hscore">${ringSvg(0, cvar('--mut'), 40)}<div class="rt"><b>—</b></div></div>
+      <div class="hgrade"><div class="hg">Portfolio health</div>
+        <div class="hd">Add a holding to see your portfolio's health check.</div></div>
+    </div>`;
+    return;
+  }
   const grade=score>=85?'A':score>=75?'B':score>=65?'C':score>=50?'D':'F';
   const weakest=metrics.filter(m=>m.tip).sort((a,b)=>a.v-b.v)[0];
   const oneLiner=weakest?weakest.tip:'Diversification, global mix, cost and cash deployment are all strong — nothing is holding the grade down.';
@@ -409,13 +446,13 @@ function marketCountdownText(){
   const todayTrading = dow>=1 && dow<=5 && isTrading(today);
   if(todayTrading && nowMin>=570 && nowMin<960){
     const left=960-nowMin;
-    return `Markets close in ${Math.floor(left/60)}h ${left%60}m`;
+    return window.t`Markets close in ${Math.floor(left/60)}h ${left%60}m`;
   }
   let d=new Date(today);
   if(!(todayTrading && nowMin<570)) do{ d.setUTCDate(d.getUTCDate()+1); }while(!isTrading(d));
   const daysAhead=Math.round((d-today)/86400000);
   const left = 570-nowMin + daysAhead*1440;
-  return `Markets open in ${Math.floor(left/60)}h ${left%60}m`;
+  return window.t`Markets open in ${Math.floor(left/60)}h ${left%60}m`;
 }
 function renderHomeChrome(){
   const g=$('homeGreet'), c=$('homeCountdown');
@@ -493,7 +530,7 @@ function renderComingUp(){
   if(sec) sec.style.display='';
   body.innerHTML = upcoming.slice(0,3).map(u=>{
     const days=Math.max(0,Math.ceil((u.when-now)/86400000));
-    const dateStr=new Date(u.when).toLocaleDateString([],{month:'short',day:'numeric'});
+    const dateStr=new Date(u.when).toLocaleDateString(appLocale(),{month:'short',day:'numeric'});
     const title = u.kind==='earn' ? `Q${u.q} ${u.qy} earnings · ${dateStr}` : `Dividend · ex-div ${dateStr}`;
     return `<button type="button" class="drow" data-sym="${esc(u.sym)}">${badgeHtml(u.sym,true)}
       <div class="mmid"><div class="msym">${title}</div>${u.kind==='div'?`<div class="mname">estimated ${fmt(u.est)}</div>`:''}</div>
@@ -555,7 +592,7 @@ function renderHomeInsights(){
   }
   if(!grid) return;
   const {score}=healthScore();
-  const grade=score>=85?'A':score>=75?'B':score>=65?'C':score>=50?'D':'F';
+  const grade=score!=null?(score>=85?'A':score>=75?'B':score>=65?'C':score>=50?'D':'F'):'—';
   const rr=personalReturn('all');
   const t=totals('all'), sp=spPathValue(), mine=t.value-cashFor('all');
   const vsVoo=(sp && sp.value>0) ? (mine-sp.value)/sp.value*100 : null;
@@ -565,20 +602,43 @@ function renderHomeInsights(){
     `<div class="stat__value${tone?` ${tone}`:''}">${esc(value)}</div>`+
     `<div class="stat__delta">${esc(sub)}</div></button>`;
   grid.innerHTML =
-    tile('Health', grade, '', `${score}/100`) +
+    tile('Health', grade, '', score!=null?`${score}/100`:'not enough data') +
     tile('XIRR', rr!=null?fmtPct(rr*100):'—', rr!=null?cls(rr*100):'', 'annualised') +
     tile('vs VOO', vsVoo!=null?fmtPct(vsVoo):'—', vsVoo!=null?cls(vsVoo):'', 'same buys in VOO');
   grid.querySelectorAll('.stat').forEach(el=> el.onclick=()=> document.querySelector('.tabbar__item[data-page="insights"]').click());
 }
-/* renderMover/renderGoal/renderIncome are still called here — renderIncome()
-   still no-ops (see its own guard: #incomeCard was never rebuilt, Home's
-   renderComingUp() covers that ground instead) while renderMover()/renderGoal()
-   now paint Home for real. renderAlloc() likewise no-ops unless the allocation
-   sheet is open — renderAllocStrip() (called from renderList() and
-   renderHomeCard()) is what actually paints the always-visible strips. */
+/* Every surface that shows a figure derived from live quotes (state.quotes) — on
+   ANY tab — belongs in this one list. refreshAll()'s fast quotes-only phase and
+   refreshQuotesOnly()'s 10-60s market-hours poll both repaint through here instead
+   of each keeping their own hand-written subset, which is how Home's hero card
+   (#homeTotal/#homeToday) went stale in the first place: it was added to renderAll()
+   but never to either partial-render path, so Portfolio's header kept ticking while
+   Home's sat frozen at its last full render. A new live surface only needs to be
+   added HERE to reach every refresh path.
+   The FULL renderGoal() is deliberately NOT here even though it also reads
+   totals(all) — on a cache miss it dispatches a 10,000-path Monte Carlo run to a
+   Worker (see its own comment), which is not something a 10s poll tick should be
+   triggering. renderGoalProgress() is its split-off cheap half (see its own
+   comment) — patches the goal card's live figures in place, never touches the
+   simulation — so the goal card doesn't have the exact bug this fix exists for. */
+function renderLiveSurfaces(){
+  renderHeader(); renderList(); renderMover();
+  renderHomeCard(); renderHomePr(); renderPriceHighlights(); renderHomeInsights();
+  renderGoalProgress();
+}
+/* The FULL renderGoal/renderIncome are still called here — renderIncome() still
+   no-ops (see its own guard: #incomeCard was never rebuilt, Home's renderComingUp()
+   covers that ground instead) while renderGoal() paints Home's goal card for real,
+   simulation included (renderGoalProgress(), in renderLiveSurfaces() above, already
+   kept the figures live between full renders — this re-render is what a materially
+   changed input actually reaches the simulation through). renderAlloc() likewise
+   no-ops unless the allocation sheet is open — renderAllocStrip() (called from
+   renderList() and renderHomeCard(), both in renderLiveSurfaces() above) is what
+   actually paints the always-visible strips. */
 function renderAll(){
-  renderMover(); renderGoal(); renderStale(); renderHeader(); renderChips(); renderList(); renderChart(); renderAlloc(); renderIncome(); setStatus();
-  renderHomeChrome(); renderHomeCard(); renderHomePr(); renderComingUp(); renderPriceHighlights(); renderHomeInsights();
+  renderLiveSurfaces();
+  renderGoal(); renderStale(); renderChips(); renderChart(); renderAlloc(); renderIncome(); setStatus();
+  renderHomeChrome(); renderComingUp();
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-markets').classList.contains('hidden')) renderMarkets();
   if(!$('page-following').classList.contains('hidden')) renderFollowing();
@@ -644,7 +704,15 @@ $('themeBtn').onclick = ()=>{
   const t = document.documentElement.dataset.theme==='dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = t; lsSet('pt_theme', t);
   $("themeBtn").innerHTML = t==="dark" ? `<svg viewBox='0 0 24 24'><path d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/></svg>` : `<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>`;
-  document.querySelector('meta[name=theme-color]').setAttribute('content', t==='dark' ? '#0b0f0d' : '#f3f7f4');
+  // index.html now ships a light AND a dark theme-color <meta>, picked automatically by
+  // prefers-color-scheme for the pre-JS/launch-screen case — but an explicit in-app
+  // toggle must win over the OS signal once the user has actually chosen, so both tags
+  // get overwritten to the SAME value: whichever --canvas just became active. cvar()
+  // reads it live off :root, so this can never hold a value that disagrees with
+  // css/tokens.css (the single source of truth CLAUDE.md requires) the way the old
+  // hardcoded #0b0f0d/#f3f7f4 pair did.
+  const themeColor = cvar('--canvas');
+  document.querySelectorAll('meta[name=theme-color]').forEach(m=>m.setAttribute('content', themeColor));
   renderAll(); // charts re-read the tokens
 };
 function animateTotal(){ // one-time count-up on launch
@@ -726,7 +794,7 @@ $('miniBar').onclick=()=>{
 
 (function(){ const h=new Date().getHours();
   const g = h<5?'Good night':h<12?'Good morning':h<18?'Good afternoon':'Good evening';
-  document.querySelector('.brand').innerHTML = g+`<span class="bdate"> · ${new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})}</span>`;
+  document.querySelector('.brand').innerHTML = g+`<span class="bdate"> · ${new Date().toLocaleDateString(appLocale(),{weekday:'short',month:'short',day:'numeric'})}</span>`;
 })();
 renderAll();
 animateTotal();
@@ -813,7 +881,7 @@ function maybeShowMonthlyRecap(){
   perf.sort((x,y)=>y.pct-x.pct);
   const best=perf[0], worst=perf[perf.length-1];
   const sp=perf.find(x=>x.sym===benchSym()) || perf.find(x=>x.sym==='VOO');
-  const mName=p0.toLocaleDateString([], now.getFullYear()!==p0.getFullYear() ? {month:'long',year:'numeric'} : {month:'long'});
+  const mName=p0.toLocaleDateString(appLocale(), now.getFullYear()!==p0.getFullYear() ? {month:'long',year:'numeric'} : {month:'long'});
   const krow=(k,v)=>`<div class="krow"><span class="k">${k}</span><span>${v}</span></div>`;
   openInfoSheet(`Your ${mName} in review`, `
     <div style="font-size:28px;font-weight:800;margin:4px 0 2px" class="${cls(gain!=null?gain:pct)}">${gain!=null?fmtSign(gain):fmtPct(pct)}</div>
@@ -849,7 +917,7 @@ function maybeShowRecap(){
   const voo=state.quotes.VOO, sp=(voo&&voo.prev>0)?(voo.price/voo.prev-1)*100:null;
   const row=x=>`<div class="krow"><span class="k">${esc(x.sym.replace('-','.'))}</span>
     <span><span class="${cls(x.imp)}">${fmtSign(x.imp)}</span> <span class="pctpill ${x.pct>=0?'up':'down'}" style="font-size:10px">${fmtPct(x.pct)}</span></span></div>`;
-  const nice=new Date(day+'T12:00:00').toLocaleDateString([],{weekday:'long',month:'short',day:'numeric'});
+  const nice=new Date(day+'T12:00:00').toLocaleDateString(appLocale(),{weekday:'long',month:'short',day:'numeric'});
   const vsSp = sp!=null ? ` — ${dayPct-sp>=0?'ahead of':'behind'} the S&P 500 (${fmtPct(sp)}) by ${Math.abs(dayPct-sp).toFixed(2)}%` : '';
   openInfoSheet((open?'Markets open · ':'Market close · ')+nice, `
     <div style="font-size:28px;font-weight:800;margin:4px 0 2px" class="${cls(t.day)}">${fmtSign(t.day)}</div>

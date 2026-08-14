@@ -7,7 +7,19 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Portfolio">
-<meta name="theme-color" content="#0b0f0d">
+<!-- iOS synthesizes the PWA launch screen from these (and from manifest.webmanifest's
+     background_color, below) before any CSS/JS has run, so it can't read css/tokens.css's
+     --canvas custom property directly — no build step in this repo to inline it. Kept
+     byte-identical to --canvas by hand instead: dark #0B0F17, light #f6f7f9 (css/tokens.css).
+     If --canvas ever moves, these two lines and manifest.webmanifest's
+     background_color/theme_color must move with it — that drift is exactly how the
+     launch screen ended up on the pre-Phase-1 #0b0f0d shade with no light variant at all
+     (found in a hunt session, fixed here; the identical native-shell copy was already
+     caught and fixed once before, in v2.6.143). js/app.js's in-app theme toggle
+     overwrites both tags' content at runtime once the user picks explicitly — see its
+     own comment — so this pair only governs the moment before that toggle can run. -->
+<meta name="theme-color" content="#0B0F17" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
 <!-- GitHub Pages serves no response headers, so this is the only CSP delivery path
      available — meta http-equiv cannot set frame-ancestors or report-uri (header-only,
      silently ignored if attempted here), so this app has no clickjacking directive and
@@ -209,6 +221,10 @@
   </div>
   <div class="greet" id="homeGreet"></div>
   <p class="t-caption muted" id="homeCountdown"></p>
+  <!-- Same copy/logic as Portfolio's #status — setStatus() (js/portfolio.js) paints
+       both, so Home (the landing tab) can't leave a stale price sitting with no
+       staleness/offline signal just because the user never taps through. -->
+  <div id="homeStatus" class="status"><span class="status__dot"></span><span id="homeStatusTx">Loading</span></div>
 
   <section class="card" id="homeCard">
     <div class="hero__eyebrow">Portfolio</div>
@@ -333,7 +349,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.144</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.149</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->

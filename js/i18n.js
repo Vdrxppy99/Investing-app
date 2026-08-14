@@ -16,6 +16,40 @@
    as it was. There is no fuzzy matching and no regex over free text — a mistake
    there would corrupt displayed figures, which is the one thing that must never
    happen.
+
+   ── ARCHITECTURE DECISION (German-coverage session 1 of 2) ──────────────────
+   The post-render pass above (dictionary + DE_PATTERNS regexes) cannot be made
+   complete — that's the root cause of the coverage gaps a bug-hunt session
+   found, not an oversight in any one string. It only ever sees a string AFTER
+   the engine has already assembled it, so it systematically misses two things:
+     1. Static boilerplate nobody added to the dictionary. Not an architecture
+        problem — the mechanism above already handles static text correctly
+        once an entry exists. Fixed this session by adding the missing entries
+        (see the "static gaps" additions below) — no new mechanism needed.
+     2. Sentences built from a template literal with an interpolated figure —
+        js/insights.js coach bodies, js/app.js's market countdown, etc. Every
+        instance is a different string (the number changes), so it can never
+        have a stable dictionary key, and writing one regex per sentence in
+        DE_PATTERNS (which is how the few that ARE covered today got there)
+        doesn't scale — it's exactly as easy to forget as the dictionary
+        entries were, just discovered later and by a different symptom.
+
+   For (2), the actual fix is translating at the RENDER SITE instead of after:
+   t(), added below, is a tagged-template function — prefix an existing
+   template literal with `t` and the STATIC segments (never the interpolated
+   values) become the dictionary lookup, so every instance of a sentence shares
+   one key regardless of what number lands in the middle:
+     `Estimates: ... (beta ${beta.toFixed(2)}). Not financial advice.`
+     becomes
+     t`Estimates: ... (beta ${beta.toFixed(2)}). Not financial advice.`
+   This is an INCREMENTAL migration, not a rewrite: the existing dictionary
+   pass keeps doing exactly what it already does for static strings (including
+   this session's new entries) — it is not being replaced, and no working
+   coverage above is touched. t() is additive, for new and fixed strings only.
+   Migrating js/insights.js's and js/sheets.js's existing template literals to
+   t() — the actual bulk of the remaining gap — is session 2's work, once this
+   session's guard test (test/i18n-coverage.spec.js) gives it a measured
+   starting count instead of a guess.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -29,6 +63,101 @@
     "My Portfolio": "Mein Portfolio",
     "Example data": "Beispieldaten",
     "Settings": "Einstellungen",
+    // The only one of the five tab labels with no entry at all (bug-hunt
+    // finding) — on screen on every page via the persistent nav. "Übersicht"
+    // (overview), not "Startseite" (start page) or the English loanword some
+    // German apps keep: this tab IS an overview/dashboard (total + movers +
+    // performance + insights in one glance), so the term matches what it does,
+    // the convention several German banking/broker apps already use for the
+    // same kind of screen.
+    "Home": "Übersicht",
+
+    /* ── static gaps (bug-hunt finding: never added to the dictionary, so the
+       working post-render pass had nothing to match) ──────────────────────── */
+    // The Portfolio tab's hero eyebrow, above the big total figure. "Gesamtwert"
+    // (total value) — the term German brokerage/banking apps use for exactly
+    // this label, not a literal "Gesamtportfolio".
+    "Total portfolio": "Gesamtwert",
+    // Markets search field's accessible label (singular "Search any stock or
+    // ETF" below is a pre-existing, different entry for a different string;
+    // this one is plural, "and" not "or") — same verb-final phrasing as that
+    // existing entry, for consistency.
+    "Search stocks and ETFs": "Aktien und ETFs suchen",
+    // Insights sub-caption under "Analyse". "Einzahlungsbereinigt" (deposit-
+    // adjusted) follows the standard German finance-writing pattern for "X-
+    // bereinigt" (adjusted for X — cf. "inflationsbereinigt", inflation-
+    // adjusted); reasonably confident, not verified against a style guide.
+    "Deposit-adjusted · updated today": "Einzahlungsbereinigt · heute aktualisiert",
+    // Insights stat-tile label for the sector breakdown. "Sektorengewichtung"
+    // (sector weighting) — the term German fund fact sheets use for "how much
+    // of the portfolio sits in which sector"; reasonably confident, not
+    // verified against a style guide.
+    "Sector exposure": "Sektorengewichtung",
+
+    /* ── static gaps, session 2 (test/i18n-coverage.spec.js's measured leak list —
+       these are static strings a template literal happens to embed, not ones that
+       actually need t()'s interpolation: no value ever changes inside them). */
+    // Home's cash row (js/portfolio.js renderList()). "Verrechnungskonto" is the
+    // standard German brokerage term for a cash/settlement account.
+    "Cash · settlement fund": "Bargeld · Verrechnungskonto",
+    // Home's Daily Movers card heading (index.html, never added to the dictionary).
+    "Your Daily Movers": "Deine Tagesbewegungen",
+    // Home's "Performance" card heading (index.html).
+    "Best performers": "Top-Performer",
+    // Screen-reader-only table caption for the Insights heatmap (js/insights.js).
+    "Monthly returns by year": "Monatliche Renditen nach Jahr",
+    // Markets tab retry messages (js/explore.js) — only visible when a fetch
+    // actually fails, so this session's own offline test environment is what
+    // surfaced them, not real day-to-day use; static strings, no interpolation.
+    "Couldn’t load — tap the Markets tab again to retry.": "Laden fehlgeschlagen — tippe erneut auf den Märkte-Tab, um es erneut zu versuchen.",
+    "Couldn’t load — tap Markets again.": "Laden fehlgeschlagen — tippe erneut auf Märkte.",
+    // Holding-detail sheet stat label (js/portfolio.js) — a different string from
+    // the plain "Profit" entry above (exact-match only), so it needed its own entry.
+    "Profit %": "Gewinn %",
+    // Asset-worth sheet title (js/insights.js). "1Y" kept as-is, matching every
+    // range button elsewhere in the app (1D/1W/1M/6M/YTD/1Y/5Y/MAX are never
+    // translated, by existing convention) — not re-litigated here.
+    "Asset worth · 1Y": "Vermögenswert · 1Y",
+    // Erase-holdings confirm dialog (js/portfolio.js showConfirm() call).
+    // The settings-sheet BUTTON (no "?") that opens the confirm dialog above —
+    // a distinct string from it, needing its own entry.
+    "Erase all holdings": "Alle Positionen löschen",
+    "Erase all holdings?": "Alle Positionen löschen?",
+    "ALL holdings, lots, cash and deposits will be removed from this device. Export a backup first if you might want them back.":
+      "ALLE Positionen, Steuerpositionen, Bargeld und Einzahlungen werden von diesem Gerät entfernt. Exportiere zuerst ein Backup, falls du sie zurückhaben möchtest.",
+    "Erase everything": "Alles löschen",
+
+    /* ── t()-migrated dynamic sentences, session 2 ───────────────────────────
+       Keys are %1/%2/… numbered, not the plain values a reader might expect —
+       see t()'s own comment (below, in the language-switch section) for why:
+       German clause order isn't English clause order, and a numbered
+       placeholder is what lets a value be reordered or repeated. */
+    // js/app.js marketCountdownText() — "Std."/"Min." are the standard German
+    // abbreviations for Stunden/Minuten, matching how a German finance app
+    // would show a countdown, not "h"/"m" carried over from English.
+    "Markets close in %1h %2m": "Markt schließt in %1 Std. %2 Min.",
+    "Markets open in %1h %2m": "Markt öffnet in %1 Std. %2 Min.",
+    // js/portfolio.js setStatus() — the market-closed suffix on the live-price
+    // status line (e.g. "Live · 3 min ago · market closed"). No interpolation of
+    // its own; migrated to t() only because it's concatenated into a larger
+    // dynamically-built string, so a plain dictionary entry could never match it
+    // (the post-render pass only matches a text node's FULL trimmed content).
+    " · market closed": " · Börse geschlossen",
+    // js/insights.js openHealthSheet() sheet title.
+    "Portfolio Health · %1/100": "Portfolio-Gesundheit · %1/100",
+    // js/sheets.js openTaxSheet() sheet title.
+    "Tax lots · all %1": "Steuerpositionen · alle %1",
+    // js/insights.js renderProjection()'s dividend-growth note — composed from up
+    // to four independently-conditional pieces (see the call site's own comment),
+    // each t()-migrated separately so the existing conditional composition still
+    // works unchanged; concatenating already-translated pieces, not translating
+    // the concatenation as one string.
+    "Dividends alone could grow from %1/yr today to ~%2/yr by %3. ":
+      "Allein die Dividenden könnten von %1/Jahr heute auf ~%2/Jahr bis %3 wachsen. ",
+    "What today's %1 can turn into on its own — no future deposits counted, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ":
+      "Was dein heutiges Vermögen von %1 allein daraus machen kann — ohne künftige Einzahlungen, monatlich verzinst mit 4 % / 7 % / 10 % pro Jahr. Langfristige Aktienrenditen lagen bei 7–10 % — niemand kennt die Zukunft. ",
+    "Gold dashed line = your goal. ": "Die goldene gestrichelte Linie zeigt dein Ziel. ",
+    "Not advice.": "Keine Anlageberatung.",
 
     /* ── lock screen ─────────────────────────────────────────────────────── */
     "Username": "Benutzername",
@@ -232,6 +361,31 @@
     "Shows once at each market open and close.":
       "Erscheint einmal bei Börsenstart und Börsenschluss.",
     "Don't show automatically": "Nicht automatisch anzeigen",
+
+    /* ── static gaps: footer disclaimers (bug-hunt finding — English on all five
+       tabs, never added to the dictionary). "Keine Anlageberatung" is this
+       codebase's own established term for "not advice" (see "Funds that add
+       something..." above) — reused here rather than invented fresh, so the
+       disclaimer reads the same way everywhere it appears. */
+    "Built from your purchase history. Not financial advice.":
+      "Basierend auf deiner Kaufhistorie. Keine Anlageberatung.",
+    "Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice.":
+      "Basierend auf deiner Kaufhistorie. Kurse von der kostenlosen Yahoo-Finance-Schnittstelle, aktualisiert während die US-Börse geöffnet ist. Keine Anlageberatung.",
+    "Market data from the Yahoo Finance free feed. Not financial advice.":
+      "Marktdaten von der kostenlosen Yahoo-Finance-Schnittstelle. Keine Anlageberatung.",
+    "P/E and fee figures are estimates from published fund data. Risk is computed from your real price history. Not financial advice.":
+      "KGV- und Gebührenangaben sind Schätzungen auf Basis veröffentlichter Fondsdaten. Das Risiko wird aus deiner tatsächlichen Kurshistorie berechnet. Keine Anlageberatung.",
+
+    /* ── static gaps, session 2: longer body paragraphs the leak candidate list
+       surfaced only via a short substring match ("Portfolio P/E", "Diversification",
+       "Today") — the actual untranslated string in each case is this whole
+       paragraph, not the short phrase. */
+    "Portfolio P/E is the price you pay for every $1 of your holdings' annual earnings — a rough valuation gauge. Lower is \"cheaper,\" higher means more growth is priced in. It's a share-weighted blend across your funds.":
+      "Das Portfolio-KGV ist der Preis, den du für jeden $1 Jahresgewinn deiner Positionen zahlst — ein grober Bewertungsmaßstab. Niedriger bedeutet \"günstiger\", höher heißt, dass mehr Wachstum bereits eingepreist ist. Es ist ein anteilsgewichteter Durchschnitt über all deine Fonds.",
+    "Diversification, global mix, cost and cash deployment are all strong — nothing is holding the grade down.":
+      "Diversifikation, globale Streuung, Kosten und Kapitaleinsatz sind allesamt stark — nichts drückt die Note.",
+    "Today's holdings compounded at your own growth rate — no assumed future deposits (your rule). Not advice.":
+      "Deine heutigen Positionen, hochgerechnet mit deiner eigenen Wachstumsrate — ohne angenommene künftige Einzahlungen (deine Vorgabe). Keine Anlageberatung.",
   };
 
   Object.assign(DE, SENTENCES);
@@ -380,6 +534,53 @@
     } catch (_) { return "en"; }
   };
   window.appLang = lang;
+
+  /* appLocale() — the ONE place that resolves the app's language setting to an
+     Intl locale string. Every number/date formatter in the app routes through
+     this instead of deriving a locale independently (a bug-hunt session found
+     five-plus call sites each deriving 'de-DE'/'en-US' from state.view.ccy — the
+     CURRENCY, not the language — so German with dollars rendered as American-
+     formatted digits; a sixth call site was just as easy to add wrong as the
+     first five, because nothing made that wrong). Locale controls SEPARATORS
+     and date order; Intl.NumberFormat's own `currency` option (state.view.ccy)
+     still controls which symbol appears — the two were always independent
+     inputs to the same API, the bug was only ever which one drove locale.
+     Decision — language drives formatting, not currency, not the browser's own
+     locale — made once, here, not per call site: German with dollars is
+     "153.959,57 $", not "$153,959.57". */
+  window.appLocale = () => lang() === "de" ? "de-DE" : "en-US";
+
+  /* t() — render-site translator for template literals (see the ARCHITECTURE
+     DECISION comment at the top of this file). The STATIC segments (the strings
+     array a tagged template receives) are joined into ONE dictionary key, with
+     each interpolation replaced by its 1-based position — %1, %2, … — not a bare
+     "%s". That numbering is the whole point: German clause order is routinely
+     different from English (session-2 requirement, confirmed against the
+     original bare-"%s" version, which failed this — see test/t-function.spec.js),
+     so the DE dictionary VALUE has to be able to place %2 before %1, or use %1
+     twice and never touch %2, or any other reordering — a bare split-and-zip by
+     position can't express any of that, because it hands values to whichever
+     template ends up being used in the ORDER THEY WERE PASSED, not by where the
+     translator wants them. Numbering makes substitution a lookup by NUMBER
+     instead: every %N in the final template (German or the untouched English
+     fallback) is replaced by values[N-1], regardless of where in the string that
+     number appears or how many times it repeats.
+     Looked up in the same DE dictionary the post-render pass already uses (not a
+     second dictionary to keep in sync). No dictionary entry, wrong language, or
+     a value itself containing the literal substring "%1" etc. (none of this
+     app's formatters emit that) all fall back to reassembling the untouched
+     English template — same "English is the layer switched off" fallback as
+     everywhere else in this file, never a blank or a thrown error. */
+  function t(strings, ...values) {
+    const key = strings.reduce((acc, s, i) => acc + s + (i < values.length ? `%${i + 1}` : ""), "");
+    const template = (lang() === "de" && DE[key]) ? DE[key] : key;
+    return template.replace(/%(\d+)/g, (m, n) => {
+      const i = +n - 1;
+      return i < values.length ? values[i] : m;
+    });
+  }
+  window.t = t;
+
   window.setAppLang = (l) => {
     try { localStorage.setItem(LANG_KEY, l === "de" ? "de" : "en"); } catch (_) {}
     location.reload();

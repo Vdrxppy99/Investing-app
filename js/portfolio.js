@@ -326,7 +326,7 @@ function renderIncome(){
     const yld=t.value>0?fwd/t.value*100:0;
     html += `<div class="inc-total">${fmt(fwd)}<span> projected next 12 mo · ~${yld.toFixed(2)}% yield</span></div>`;
     if(window.Chart && Object.keys(byMonth).length) html += `<div class="scrubro" id="divRO"></div><div style="position:relative;height:110px;margin:2px 0 10px"><canvas id="divCal"></canvas></div>`;
-    html += upcoming.slice(0,4).map(u=>`<div class="inc-row"><span>≈ ${new Date(u.when).toLocaleDateString([],{month:'short',day:'numeric'})} · ${esc(u.sym.replace('-','.'))}</span><span>~${fmt(u.est)}</span></div>`).join('');
+    html += upcoming.slice(0,4).map(u=>`<div class="inc-row"><span>≈ ${new Date(u.when).toLocaleDateString(appLocale(),{month:'short',day:'numeric'})} · ${esc(u.sym.replace('-','.'))}</span><span>~${fmt(u.est)}</span></div>`).join('');
   } else { html += `<div style="color:var(--mut);font-size:12px">Income forecast loads with the next online update.</div>`; }
   if(rl.length){
     const byYear={};
@@ -345,7 +345,7 @@ function renderIncome(){
     for(let i=1;i<=12;i++){
       const dt=new Date(now.getFullYear(), now.getMonth()+i, 1);
       const k=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');
-      labels.push(dt.toLocaleDateString([],{month:'short'})); data.push(byMonth[k]||0);
+      labels.push(dt.toLocaleDateString(appLocale(),{month:'short'})); data.push(byMonth[k]||0);
     }
     cal.setAttribute('role','img');
     cal.setAttribute('aria-label', `Dividend forecast by month, next 12 months, total ${fmt(fwd)}.`);
@@ -399,7 +399,7 @@ function renderStale(){
   const conf=state.confirmed;
   const days = conf ? Math.floor((Date.now()-new Date(conf+'T12:00:00').getTime())/86400000) : 999;
   if(staleDismissed || !conf || days<STALE_DAYS){ el.classList.add('hidden'); return; }
-  const when = new Date(conf+'T12:00:00').toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'});
+  const when = new Date(conf+'T12:00:00').toLocaleDateString(appLocale(), {month:'short',day:'numeric',year:'numeric'});
   el.innerHTML = `<span class="ic">⚠︎</span>
     <span class="tx">Holdings last confirmed <b>${when}</b> (${days} days ago). Buy anything since? Send your latest Vanguard statement to refresh, or log it here.</span>
     <button class="act" id="staleAct">Update</button>
@@ -422,11 +422,24 @@ function marketOpen(){
   const m = parseInt(g('hour'),10)*60 + parseInt(g('minute'),10);
   return m>=570 && m<960; // 9:30–16:00 ET
 }
+/* Paints every status element on the page, not just Portfolio's #status/#statusTx —
+   Home (the landing tab) has its own #homeStatus/#homeStatusTx mirroring the same
+   markup, so a user who never taps through to Portfolio still sees whether prices
+   are live, stale, or failed to load. One computed status, painted everywhere it's
+   shown — the same "single definition, every surface repaints from it" fix as
+   renderLiveSurfaces() (js/app.js) — so a third status surface only needs adding to
+   the STATUS_PAIRS list below, not a new copy of this function's logic. */
+const STATUS_PAIRS = [['status','statusTx'], ['homeStatus','homeStatusTx']];
+function paintStatus(cls, text){
+  for(const [dotId, txId] of STATUS_PAIRS){
+    const st=$(dotId); if(!st) continue;
+    st.className=cls;
+    $(txId).textContent=text;
+  }
+}
 function setStatus(){
-  const st=$('status');
   if(window.vaultSaveError || window.storageFull){ // data at risk beats everything else on this line
-    st.className='status err';
-    $('statusTx').textContent='⚠ Couldn’t save your changes on this device — export a backup now (⚙︎).';
+    paintStatus('status err', '⚠ Couldn’t save your changes on this device — export a backup now (⚙︎).');
     return;
   }
   const newest = Math.max(...uniqSyms().map(s=>state.quotes[s]?state.quotes[s].ts:0), SEED_TS);
@@ -435,10 +448,11 @@ function setStatus(){
   if(age<8) when='just now';
   else if(age<90) when=age+'s ago';
   else if(age<5400) when=Math.round(age/60)+' min ago';
-  else when=new Date(newest).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-  const mkt = marketOpen() ? '' : ' · market closed';
-  st.className = 'status'+(state.live?' live':'');
-  $('statusTx').textContent = state.fetching ? 'Updating prices…' : (state.live ? `Live · ${when}${mkt}` : `Prices from ${when} — will update when online${mkt}`);
+  else when=new Date(newest).toLocaleString(appLocale(), {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  const mkt = marketOpen() ? '' : t` · market closed`;
+  const cls = 'status'+(state.live?' live':'');
+  const text = state.fetching ? 'Updating prices…' : (state.live ? `Live · ${when}${mkt}` : `Prices from ${when} — will update when online${mkt}`);
+  paintStatus(cls, text);
 }
 
 /* ============ SERIES / CHART ============ */
@@ -590,7 +604,7 @@ function attachScrubAny(c, onMove){ // onMove(i) with index, onMove(null) when r
     c.update('none'); onMove(null);
   };
 }
-function niceLbl(l){ return /^\d{4}-\d{2}-\d{2}$/.test(l) ? new Date(l+'T12:00:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : l; }
+function niceLbl(l){ return /^\d{4}-\d{2}-\d{2}$/.test(l) ? new Date(l+'T12:00:00').toLocaleDateString(appLocale(),{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : l; }
 function wireDetailScrub(c, labels, closes, roId){ // price readout for holding/stock sheets
   const ro=$(roId); if(!ro||!c) return;
   const hint=ro.textContent;
@@ -630,7 +644,7 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers){
         tooltip: {
           ...CHART_TOOLTIP,
           callbacks:{
-            title:items=>{ const d=items[0].label; return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d+'T12:00:00').toLocaleDateString([], {weekday:'short',month:'short',day:'numeric',year:'numeric'}) : d; },
+            title:items=>{ const d=items[0].label; return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d+'T12:00:00').toLocaleDateString(appLocale(), {weekday:'short',month:'short',day:'numeric',year:'numeric'}) : d; },
             label:c=>{ if(c.dataset.label==='Buys') return 'Bought: '+fmt(markers.amt[c.dataIndex]);
               return (c.chart.data.datasets.length>1 ? c.dataset.label+': ' : '')+fmt(c.parsed.y); },
             afterLabel:c=>{ if(c.datasetIndex!==0) return ''; const d0=c.dataset.data[0]; if(c.dataIndex===0 || d0==null) return '';
@@ -641,7 +655,7 @@ function drawChart(canvasId, labels, data, msgEl, bench, markers){
         x:{display:true,grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,maxRotation:0,font:{size:10},
            callback:function(v){ const l=this.getLabelForValue(v); return /^\d{4}-/.test(l)?l.slice(5):l; }}},
         y:{display:true,grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},
-           callback:v=>new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}}},
+           callback:v=>new Intl.NumberFormat(appLocale(),{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}}},
     plugins: []};
   const c=new Chart(el,cfg); c._up=up; return c;
 }
@@ -698,7 +712,7 @@ function drawHeroChart(times, labels, data, msgEl, bench, markers){
   const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid'),
         card=cvar('--card'), faint=cvar('--faint');
   const priceFormatter = v => state.view.priv ? '' :
-    new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
+    new Intl.NumberFormat(appLocale(),{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
   // NOT autoSize: managing size ourselves (this measured rect at creation, then the
   // ResizeObserver below for every later change) gives one deterministic size transition
   // instead of relying on the vendor bundle's own internal autoSize/ResizeObserver timing.
@@ -784,7 +798,7 @@ function attachHeroScrub(chart, series, times, labels, data){
     chart.setCrosshairPosition(data[i], times[i], series);
     if($('tvNum')) $('tvNum').textContent=fmt(data[i]);
     const lb=labels[i];
-    const nice=/^\d{4}-\d{2}-\d{2}$/.test(lb) ? new Date(lb+'T12:00:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : lb;
+    const nice=/^\d{4}-\d{2}-\d{2}$/.test(lb) ? new Date(lb+'T12:00:00').toLocaleDateString(appLocale(),{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : lb;
     const d0=data[0], diff=data[i]-d0;
     const pct=(state.view.metric==='value'&&d0>0)?` (${fmtPct((data[i]/d0-1)*100)})`:(state.view.metric==='profit'&&chartBaseV>0)?` (${fmtPct(diff/chartBaseV*100)})`:'';
     $('chartDelta').innerHTML=`<span class="${cls(diff)}">${fmtSign(diff)}${pct}</span> <span class="rng">· ${nice}</span>`; };
@@ -904,7 +918,7 @@ function openDetail(sym){
       if(!ls.length) return '';
       return `<div style="font-size:13px;font-weight:700;margin-top:16px">Your purchases (${ls.length})</div>`+ls.map(l=>{
         const g=l.qty*p-l.cost;
-        return `<div class="krow"><span class="k">${new Date(l.date+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric',year:'2-digit'})}${l.div?' · dividend':''}</span><span>${l.qty.toFixed(3).replace(/\.?0+$/,'')} sh @ ${fmtPx(l.cost/l.qty)} <span class="${cls(g)}">${fmtSign(g)}</span></span></div>`;
+        return `<div class="krow"><span class="k">${new Date(l.date+'T12:00:00').toLocaleDateString(appLocale(),{month:'short',day:'numeric',year:'2-digit'})}${l.div?' · dividend':''}</span><span>${l.qty.toFixed(3).replace(/\.?0+$/,'')} sh @ ${fmtPx(l.cost/l.qty)} <span class="${cls(g)}">${fmtSign(g)}</span></span></div>`;
       }).join('');
     })()}${(function(){
       const al=(lsGet('pt_alerts')||[]).find(a=>a.sym===sym);

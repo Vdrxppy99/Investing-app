@@ -87,7 +87,7 @@ async function openStockSheet(sym, name){
   if(!sym) return;
   if(rows(state.view.acc).some(r=>r.sym===sym)){ openDetail(sym); return; } // you own it — show the richer holding view
   const isIdx=sym.startsWith('^');
-  const fmtP=v=>isIdx ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : fmtPx(v);
+  const fmtP=v=>isIdx ? v.toLocaleString(appLocale(),{maximumFractionDigits:2}) : fmtPx(v);
   const q=state.quotes[sym];
   $('detailSheetHead').innerHTML = `<div class="sheet__idrow">${badgeHtml(sym)}<div class="sheet__idcol">
       <h2 class="hsym sheet__title">${esc(sym.replace('-','.'))}</h2>
@@ -149,9 +149,9 @@ function openTaxSheet(){
     const b=new Date(l.date+'T12:00:00').getTime();
     return {l, b, g:l.qty*priceOf(l.sym)-l.cost, lt:now-b>=YR};
   }).sort((a,b)=>(a.lt===b.lt) ? a.b-b.b : (a.lt?1:-1));
-  const body=items.map(x=>`<div class="krow"><span class="k">${esc(x.l.sym.replace('-','.'))} · ${new Date(x.b).toLocaleDateString([],{month:'short',day:'numeric',year:'2-digit'})}${x.l.div?' · div':''}</span>
-    <span><span class="${cls(x.g)}">${fmtSign(x.g)}</span> ${x.lt?'<span class="pctpill up">LT</span>':`<span class="pctpill down">LT ${new Date(x.b+YR).toLocaleDateString([],{month:'short',day:'numeric'})}</span>`}</span></div>`).join('');
-  openListSheet('Tax lots · all '+items.length, body, 'LT = long-term (held over 1 year → lower US capital-gains rate). Red pills show when that lot turns long-term. Estimates — not tax advice.');
+  const body=items.map(x=>`<div class="krow"><span class="k">${esc(x.l.sym.replace('-','.'))} · ${new Date(x.b).toLocaleDateString(appLocale(),{month:'short',day:'numeric',year:'2-digit'})}${x.l.div?' · div':''}</span>
+    <span><span class="${cls(x.g)}">${fmtSign(x.g)}</span> ${x.lt?'<span class="pctpill up">LT</span>':`<span class="pctpill down">LT ${new Date(x.b+YR).toLocaleDateString(appLocale(),{month:'short',day:'numeric'})}</span>`}</span></div>`).join('');
+  openListSheet(t`Tax lots · all ${items.length}`, body, 'LT = long-term (held over 1 year → lower US capital-gains rate). Red pills show when that lot turns long-term. Estimates — not tax advice.');
 }
 function openSectorSheet(){
   const per={};

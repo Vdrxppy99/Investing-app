@@ -95,7 +95,7 @@ function renderMarkets(){
   const cards=IDX_LIST.map(x=>{
     const d=mkt.idx[x.s]; if(!d) return '';
     const pct=d.prev>0?(d.price/d.prev-1)*100:0;
-    return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)}"><div class="n">${x.n}</div><div class="p">${d.price.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="c ${cls(pct)}">${fmtPct(pct)}</div>${sparkArr(d.spark,102,26,pct>=0)}</div>`;
+    return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)}"><div class="n">${x.n}</div><div class="p">${d.price.toLocaleString(appLocale(),{maximumFractionDigits:0})}</div><div class="c ${cls(pct)}">${fmtPct(pct)}</div>${sparkArr(d.spark,102,26,pct>=0)}</div>`;
   }).join('');
   const skelTiles=n=>Array.from({length:n},()=>'<div class="skel-tile"></div>').join('');
   $('idxRow').innerHTML = cards || (mkt.fetching ? skelTiles(4) : `<div class="mload">Couldn’t load — tap the Markets tab again to retry.</div>`);
@@ -129,7 +129,7 @@ function renderFollowing(){
   $('watchList').innerHTML = wl.map(w=>{
     const q=state.quotes[w.sym];
     const isIdx=w.sym.startsWith('^');
-    const px = q&&q.price>0 ? (isIdx ? q.price.toLocaleString(undefined,{maximumFractionDigits:2}) : fmtPx(q.price)) : '…';
+    const px = q&&q.price>0 ? (isIdx ? q.price.toLocaleString(appLocale(),{maximumFractionDigits:2}) : fmtPx(q.price)) : '…';
     const pct = q&&q.prev>0 ? (q.price/q.prev-1)*100 : null;
     return mRow(w.sym, w.name, px, pct);
   }).join('');
@@ -176,7 +176,7 @@ async function runSearch(q){
         if(!qq||!(qq.price>0)||s.includes('.')) return;
         const pctv=qq.prev>0?(qq.price/qq.prev-1)*100:null;
         const right=el.querySelector('.mright');
-        if(right) right.innerHTML=`<div class="mpx">${s.startsWith('^')?qq.price.toLocaleString(undefined,{maximumFractionDigits:2}):fmtPx(qq.price)}</div>
+        if(right) right.innerHTML=`<div class="mpx">${s.startsWith('^')?qq.price.toLocaleString(appLocale(),{maximumFractionDigits:2}):fmtPx(qq.price)}</div>
           <div class="mchg">${pctv==null?'':`<span class="pctpill ${pctv>=0?'up':'down'}">${fmtPct(pctv)}</span>`}</div>`;
       });
     });

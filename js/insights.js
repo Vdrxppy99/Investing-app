@@ -49,7 +49,7 @@ function renderLook(){
     let n=0;
     if(syms.has('VTI')) n+=3600; else { if(syms.has('VOO')) n+=500; if(syms.has('VXF')) n+=3400; }
     if(syms.has('VXUS')) n+=8300;
-    sub.textContent = n>1000 ? `Your funds hold ~${n.toLocaleString()} companies across ~50 countries — these are your biggest slices.` : '';
+    sub.textContent = n>1000 ? `Your funds hold ~${n.toLocaleString(appLocale())} companies across ~50 countries — these are your biggest slices.` : '';
   }
   const look=lookExposure().slice(0,10);
   $('lookList').innerHTML = look.map(l=>{
@@ -184,7 +184,7 @@ function renderWorthChart(){
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{...CHART_TOOLTIP,callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,maxRotation:0,font:{size:10},callback:function(v){return this.getLabelForValue(v).slice(5);}}},
-              y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},callback:v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}}}});
+              y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},callback:v=>state.view.priv?'':new Intl.NumberFormat(appLocale(),{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate())}}}}});
   $('worthLegend').innerHTML=shown.map(d=>`<div class="alg"><span class="dot" style="background:${d.borderColor}"></span>${d.label}</div>`).join('');
   attachScrubAny(worthChart, i=>{ const ro=$('worthRO'); if(!ro) return;
     ro.textContent = i==null ? '' : `${niceLbl(days[i])} · `+shown.map(d=>`${d.label} ${cfmt(d.data[i])}`).join(' · '); });
@@ -198,7 +198,7 @@ function openPESheet(){
 function openRiskSheet(){
   const r=riskStats();
   if(!r){ openInfoSheet('Risk','<p>Needs a year of price history — connect once and check back.</p>'); return; }
-  const dstr=d=>new Date(d+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric'});
+  const dstr=d=>new Date(d+'T12:00:00').toLocaleDateString(appLocale(),{month:'short',day:'numeric'});
   const body = `<p>How much your portfolio swings, measured from your real price history.</p>
     <div class="krow"><span class="k">Volatility (1Y)</span><span>${r.vol.toFixed(1)}%</span></div>
     <div class="krow"><span class="k">Beta vs S&P 500</span><span>${r.beta.toFixed(2)}</span></div>
@@ -210,11 +210,12 @@ function openRiskSheet(){
 }
 function openHealthSheet(){
   const {score,metrics}=healthScore();
+  if(score==null){ openInfoSheet('Portfolio Health', '<p>Add a holding to see your portfolio\'s health check — there\'s nothing to measure yet.</p>'); return; }
   const barCol=v=>v>=75?cvar('--green'):v>=50?cvar('--warn'):cvar('--red');
   const body = `<p>A single grade for your portfolio\'s shape, averaged from four checks. Tap any bar\'s topic below to see where you stand and how to improve.</p>`
     + metrics.map(m=>`<div class="hmet"><div class="t"><span>${m.k}</span><span class="s">${m.detail} · ${Math.round(m.v)}/100</span></div><div class="bar"><i style="width:${m.v.toFixed(0)}%;background:${barCol(m.v)}"></i></div>${m.tip?`<div class="htip" style="margin-top:7px"><span class="ti">→</span><span>${m.tip}</span></div>`:'<div class="htip" style="margin-top:7px;color:var(--mut)"><span class="ti">✓</span><span>Looking good here.</span></div>'}</div>`).join('')
     + `<p style="margin-top:6px;color:var(--faint);font-size:11px">Score = average of the four checks. Guidance, not financial advice.</p>`;
-  openInfoSheet('Portfolio Health · '+score+'/100', body);
+  openInfoSheet(t`Portfolio Health · ${score}/100`, body);
 }
 // Modified Dietz: R = (V1 − V0 − D) / (V0 + D·w), a deposit-adjusted (money-weighted-ish but
 // non-iterative) return over one window. This app's D is pre-aggregated to one total per
@@ -802,7 +803,7 @@ function renderContribChart(){
     let [y,m]=cur.split('-').map(Number); m++; if(m>12){m=1;y++;} cur=y+'-'+String(m).padStart(2,'0'); }
   const cum=[]; let running=0; for(const v of data){ running+=v; cum.push(running); } // all-time running total
   const show=labels.slice(-24), sdata=data.slice(-24), scum=cum.slice(-24);
-  const compact=v=>state.view.priv?'':new Intl.NumberFormat(state.view.ccy==='EUR'?'de-DE':'en-US',{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
+  const compact=v=>state.view.priv?'':new Intl.NumberFormat(appLocale(),{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
   el.setAttribute('role','img');
   el.setAttribute('aria-label', `Contributions chart, last ${show.length} months. Total deposited: ${fmt(cum[cum.length-1])}. Last month added: ${fmt(data[data.length-1])}.`);
   const contribChart=new Chart(el,{data:{labels:show,datasets:[
@@ -862,7 +863,7 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   const turning=state.lots.map(l=>({sym:l.sym, g:l.qty*priceOf(l.sym)-l.cost, at:new Date(l.date+'T12:00:00').getTime()+YR}))
     .filter(x=>x.at>now && x.at<now+45*86400e3 && x.g>25).sort((a,b)=>a.at-b.at);
   if(turning.length){
-    const x=turning[0], d=new Date(x.at).toLocaleDateString([],{month:'short',day:'numeric'});
+    const x=turning[0], d=new Date(x.at).toLocaleDateString(appLocale(),{month:'short',day:'numeric'});
     const dl=Math.max(1,Math.ceil((x.at-now)/86400e3));
     items.push({ic:'🧾', title:'Tax timing', detail:`${x.sym.replace('-','.')} turns long-term in ${dl}d`, sev:'warn', t:`Selling ${x.sym.replace('-','.')}? Wait until ${d}`,
       b:`A lot with ${fmtSign(x.g)} of gain turns long-term on ${d} — before that, the gain would be taxed at the higher short-term rate.`});
@@ -947,8 +948,12 @@ function renderProjection(){
   let divLine='';
   { let fwd=0; for(const r2 of rows('all')){ const dv=state.divs[r2.sym]; if(!dv||!dv.list) continue;
       fwd+=r2.qty*dv.list.filter(e=>e[0]>Date.now()-370*86400e3).reduce((a,e)=>a+e[1],0); }
-    if(fwd>0 && V0>0) divLine=`Dividends alone could grow from ${fmt(fwd)}/yr today to ~${fmt(fwd*data[1][N]/V0)}/yr by ${y0+projYears}. `; }
-  $('projNote').textContent=divLine+`What today's ${cfmt(V0)} can turn into on its own — no future deposits counted, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. ${goal?'Gold dashed line = your goal. ':''}Not advice.`;
+    if(fwd>0 && V0>0) divLine=t`Dividends alone could grow from ${fmt(fwd)}/yr today to ~${fmt(fwd*data[1][N]/V0)}/yr by ${y0+projYears}. `; }
+  // Composed from independently-conditional pieces (divLine may be empty; the goal
+  // sentence only appears when a goal is set) — each piece is t()-migrated on its
+  // own and the RESULTS concatenated, not the template, so the existing
+  // conditional structure is unchanged.
+  $('projNote').textContent=divLine+t`What today's ${cfmt(V0)} can turn into on its own — no future deposits counted, compounded monthly at 4% / 7% / 10% a year. Long-run stock returns averaged 7–10% — nobody knows the future. `+(goal?t`Gold dashed line = your goal. `:'')+t`Not advice.`;
   renderMonteCarlo(V0, N, goal, y0);
 }
 /* Monte Carlo: bootstrap YOUR real monthly returns into many possible futures.

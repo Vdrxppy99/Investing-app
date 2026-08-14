@@ -146,6 +146,10 @@
     color-scheme: dark;
 
     --canvas: #0B0F17;
+    /* Manually duplicated (no build step to inline it) in index.html's dark
+       theme-color <meta> and manifest.webmanifest's background_color/theme_color —
+       both read this value before any CSS/JS can run, for the PWA launch screen.
+       Change this, change those two, or the launch screen drifts out of sync again. */
     /* Card fill: DESIGN-TARGET specifies rgba(255,255,255,.035) directly on
        canvas. Stored pre-composited as a flat hex (rather than the rgba()
        itself) so JS colour reads via cvar() — chart tooltip backgrounds,
@@ -249,6 +253,9 @@
     color-scheme: light;
 
     --canvas: #f6f7f9;
+    /* Also duplicated in index.html's light theme-color <meta> — see the dark
+       --canvas comment above; manifest.webmanifest has no light variant (JSON,
+       no media-query mechanism), so it stays on the dark value, the app's default. */
     /* Light theme doesn't need the dark theme's translucent-white-on-canvas
        trick — a white card with a hairline border already reads correctly on
        a light canvas, which is what --surface/--line already were. */
