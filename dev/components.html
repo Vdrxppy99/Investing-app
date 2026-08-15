@@ -181,7 +181,7 @@
   ]));
 
   var swatches = ['primary', 'primary-fill', 'secondary', 'gain', 'loss', 'canvas', 'surface', 'surface-2', 'surface-3', 'line', 'line-strong', 'border-control', 'text', 'text-muted', 'text-faint'];
-  var cats = ['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6', 'cat-7', 'cat-8'];
+  var cats = ['cat-1', 'cat-2', 'cat-3', 'cat-4', 'cat-5', 'cat-6'];
   S.push(section('Colour', 'Brand blue and P&L green are now different things. Old app: --brand and --green were byte-identical.', [
     box('tokens', '<div class="gal__sw">' + swatches.map(function (t) {
       return '<div class="gal__chip" data-tok="' + t + '"><span class="gal__dot gal__dot--' + t + '"></span>' + t + '</div>';
@@ -262,8 +262,6 @@
 .gal__dot--cat-4 { background: var(--cat-4); }
 .gal__dot--cat-5 { background: var(--cat-5); }
 .gal__dot--cat-6 { background: var(--cat-6); }
-.gal__dot--cat-7 { background: var(--cat-7); }
-.gal__dot--cat-8 { background: var(--cat-8); }
 </style>
 </body>
 </html>

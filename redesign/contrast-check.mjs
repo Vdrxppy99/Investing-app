@@ -61,14 +61,13 @@ const LIGHT = {
   "border-control": "#878D97",
 };
 
-// The 8-step categorical ramp for allocation/sector marks — DESIGN-TARGET.md's
-// exact asset palette, assigned by position order and stable per symbol.
-// Constraint: none may read as gain or loss, so the greens and reds of the
-// P&L tokens are excluded.
-// Corrected post-R1: position 4 was #2FD08A (== gain), position 3 shifted
-// amber→orange to stay distinguishable from 4. Kept in sync with tokens.css.
-const RAMP_DARK = ["#7C6CFF", "#5B8DEF", "#F97316", "#EAB308", "#3ABEC7", "#E36A9A", "#2F6BE0", "#B45309"];
-const RAMP_LIGHT = ["#2E63C8", "#6D4BC4", "#1B7F8C", "#8A6110", "#A83C67", "#3C6FA8", "#5A6478", "#7A5A2E"];
+// The 6-step categorical ramp for allocation/sector marks, assigned by
+// position order and stable per symbol. Six slots, not eight — re-derived
+// 2026-08 via validate_palette.js after the prior 8-slot ramp turned out to
+// contain only six distinct hues. Slot 1 is --brand; slots 2-6 are yellow,
+// magenta, orange, blue, aqua. Kept in sync with css/tokens.css.
+const RAMP_DARK = ["#7C6CFF", "#C57800", "#B54983", "#EC5406", "#007CDA", "#009B8B"];
+const RAMP_LIGHT = ["#4F3DC4", "#8E4900", "#D7639F", "#9C1A00", "#005CCB", "#008A7A"];
 
 // ── maths ──────────────────────────────────────────────────────────────────
 function srgb(hex) {

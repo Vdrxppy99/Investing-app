@@ -222,20 +222,26 @@
     --scrim: rgba(0, 0, 0, 0.5);
 
     /* Categorical ramp — allocation strip, sector bars. Assigned by position
-       order and stable per symbol; DESIGN-TARGET's exact 8-hue asset palette.
-       No step may read as gain or loss. All clear 3:1 on canvas and surface.
-       Corrected post-R1 (DESIGN-TARGET.md): position 4 was #2FD08A, byte-
-       identical to --gain, which contradicted the doc's own "green/red only
-       on gain/loss" rule. Position 3 shifted amber→orange so 3 and 4 stay
-       distinguishable now that 4 is yellow-gold, not green. */
+       order and stable per symbol. Six slots, not eight: six is also how many
+       positions the portfolio holds, and the prior 8-slot ramp only contained
+       six distinct hues (cat-2/cat-7 were both blue, cat-3/cat-8 both orange),
+       reading as different only through lightness, which the dark band
+       forbids. Re-derived 2026-08 against
+       .claude/skills/dataviz/scripts/validate_palette.js — slot 1 is --brand;
+       slots 2-6 are a fixed hue order (yellow, magenta, orange, blue, aqua)
+       chosen by enumerating orderings and keeping the one that maximizes the
+       worst adjacent OKLab ΔE. Passes all five checks in both modes against
+       this app's surfaces (#0B0F17 dark / #FBFBFC light): worst adjacent CVD
+       ΔE 16.5 dark / 19.4 light (≥8 target), worst adjacent normal-vision ΔE
+       17.0 dark / 20.5 light (≥15 floor), all six ≥3:1 contrast, no relief
+       needed. No step may read as gain or loss (kept in sync with
+       redesign/contrast-check.mjs's RAMP_DARK/RAMP_LIGHT). */
     --cat-1: #7C6CFF;
-    --cat-2: #5B8DEF;
-    --cat-3: #F97316;
-    --cat-4: #EAB308;
-    --cat-5: #3ABEC7;
-    --cat-6: #E36A9A;
-    --cat-7: #2F6BE0;
-    --cat-8: #B45309;
+    --cat-2: #C57800;
+    --cat-3: #B54983;
+    --cat-4: #EC5406;
+    --cat-5: #007CDA;
+    --cat-6: #009B8B;
 
     --skeleton: rgba(255, 255, 255, 0.06);
     --skeleton-sheen: rgba(255, 255, 255, 0.10);
@@ -296,14 +302,12 @@
     --highlight: none;
     --scrim: rgba(16, 21, 29, 0.32);
 
-    --cat-1: #2e63c8;
-    --cat-2: #6d4bc4;
-    --cat-3: #1b7f8c;
-    --cat-4: #8a6110;
-    --cat-5: #a83c67;
-    --cat-6: #3c6fa8;
-    --cat-7: #5a6478;
-    --cat-8: #7a5a2e;
+    --cat-1: #4F3DC4;
+    --cat-2: #8E4900;
+    --cat-3: #D7639F;
+    --cat-4: #9C1A00;
+    --cat-5: #005CCB;
+    --cat-6: #008A7A;
 
     --skeleton: rgba(16, 21, 29, 0.06);
     --skeleton-sheen: rgba(16, 21, 29, 0.03);
