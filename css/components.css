@@ -238,6 +238,66 @@
   }
   .stat__delta { font-size: var(--t-caption); margin-top: var(--s-1); }
 
+  /* ── 6.7b Insights v2 modules — a mark + names, not a number in a box ─────
+     design/target/insights-v2.html is the approved rendered target
+     (DESIGN-TARGET.md's "Insights v2" section). .goalline is its signature
+     element: an indigo rule marking the one sentence that translates the
+     module into the owner's own goal. */
+  .mod .card__head { margin-bottom: 0; }
+  .mod__sub {
+    font-size: var(--t-caption);
+    font-weight: var(--w-semibold);
+    color: var(--text-faint);
+  }
+  .mod svg { display: block; width: 100%; height: auto; margin-top: var(--s-3); overflow: visible; }
+  .modnames { margin-top: var(--s-3); display: flex; flex-direction: column; gap: var(--s-2); }
+  .modname { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-caption); }
+  .modname i { font-style: normal; width: 38px; flex: 0 0 auto; color: var(--text-faint); font-weight: var(--w-semibold); }
+  .modname s { text-decoration: none; flex: 1; color: var(--text-muted); }
+  .modname b { font-weight: var(--w-semibold); }
+  .goalline {
+    margin-top: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: var(--hairline) dashed var(--divider);
+    display: flex;
+    gap: var(--s-2);
+    font-size: var(--t-caption);
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+  .goalline::before {
+    content: "";
+    flex: 0 0 3px;
+    background: var(--brand);
+    border-radius: var(--edge);
+    align-self: stretch;
+  }
+  .goalline b { color: var(--text); font-weight: var(--w-semibold); }
+
+  /* Sequential single-hue ramp — sector exposure, ordered by magnitude. Opacity over one
+     hue (not a lightness-stepped ramp) to match design/target/insights-v2.html's own
+     sequential technique exactly; the fixed sr-96px label column mirrors the mockup's own
+     inline width so long sector names still align. */
+  .seqrows { margin-top: var(--s-3); display: flex; flex-direction: column; gap: var(--s-2); }
+  .seqrow { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-caption); }
+  .seqrow s { text-decoration: none; flex: 0 0 96px; color: var(--text-muted); font-weight: var(--w-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seqtrack { flex: 1; height: 9px; border-radius: var(--edge); background: var(--surface-2); overflow: hidden; display: block; }
+  /* min-width floor: geographic mix (session 3) can carry a genuinely tiny bucket (this
+     app's real demo data has a 1% "Cash" row) that a pure percentage width would render
+     under 2px — visually gone, not just small. Sector's own real buckets never dropped
+     this low, so the floor is a no-op there, not a visual change to session 2's work. */
+  .seqtrack i { display: block; height: 100%; min-width: 3px; background: var(--brand); border-radius: var(--edge); }
+  .seqrow b { flex: 0 0 34px; text-align: right; font-weight: var(--w-semibold); }
+
+  /* Asset worth's per-holding sparkline row (session 3) — reuses .modname's row
+     rhythm with an inline chart standing in for the usual <s> description text.
+     Each sparkline self-scales to its own min/max (set in the SVG's viewBox by
+     js/insights.js), so a $5k holding and an $80k holding both draw full-height —
+     the row communicates shape, not a shared dollar axis. */
+  .modname svg.spark { flex: 0 0 96px; height: 22px; display: block; overflow: visible; }
+  .sparkval { flex: 1; display: flex; align-items: baseline; justify-content: flex-end; gap: var(--s-2); }
+  .sparkval em { font-style: normal; font-size: var(--t-label); font-weight: var(--w-semibold); }
+
   /* ── 6.8 Input ───────────────────────────────────────────────────────────
      16px floor is enforced in base.css. Border uses --border-control, which
      exists specifically because a control boundary needs 3:1. */
@@ -1864,10 +1924,14 @@
   .tgtrow .dot { flex-shrink: 0; }
   .tgs { flex: 1; }
 
-  /* Coach / "Next moves" tiles — a heading and a sentence, not two loose lines. */
-  #coachGrid .icard, .icard.wide { display: grid; gap: var(--s-1); align-content: start; }
-  #coachGrid .icard .it { color: var(--text-faint); }
-  #coachGrid .icard b { font-size: var(--t-label); font-weight: var(--w-bold); }
+  /* Coach / "Next moves" tiles — a heading and a sentence, not two loose lines.
+     #homeCoachGrid (session 4: renderCoach() now also mounts on Home, same cards,
+     see js/insights.js's renderHomeCoach()) shares this ID-scoped rule with the
+     Insights sheet's own #coachGrid rather than a class, since the underlying
+     .icard/.cmove markup is otherwise generic and used elsewhere unstyled. */
+  #coachGrid .icard, #homeCoachGrid .icard, .icard.wide { display: grid; gap: var(--s-1); align-content: start; }
+  #coachGrid .icard .it, #homeCoachGrid .icard .it { color: var(--text-faint); }
+  #coachGrid .icard b, #homeCoachGrid .icard b { font-size: var(--t-label); font-weight: var(--w-bold); }
 
   /* Any bare paragraph the engine drops into a card reads as supporting copy,
      never as the headline. */
@@ -1916,7 +1980,10 @@
      Was: emoji as the icon, a heading-sized title wrapping to two lines, and a
      body line wrapping to three — four tiles filling a whole screen. Now a real
      icon, a compact title and a caption, so the grid scans in one glance. */
-  #coachGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
+  /* #homeCoachGrid (session 4, Home's own mount point — see js/insights.js's
+     renderHomeCoach()) shares this: the "grid-2" class on both containers' markup
+     carries no CSS of its own, this ID-scoped rule is the actual 2-column layout. */
+  #coachGrid, #homeCoachGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
   .cmove {
     display: grid;
     gap: var(--s-1);

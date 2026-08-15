@@ -272,6 +272,16 @@
       <div class="grid-3" id="homeInsights"></div>
     </div>
 
+    <!-- Next moves, moved here from Insights' More list (session 4): advice, not an
+         insight, and Home is where the owner actually lands, not a tap two levels deep.
+         No chart — js/insights.js's renderHomeCoach()/coachItems() render the exact same
+         cards openCoachSheet already did, just mounted here. coachItems() caps at 4, so
+         the full set fits without a "see all". -->
+    <div id="homeCoachSection">
+      <h2 class="section__label"><span>Next moves</span></h2>
+      <div class="grid-2" id="homeCoachGrid"></div>
+    </div>
+
     <div id="comingSection">
       <h2 class="section__label"><span>Coming up</span></h2>
       <section class="card"><div id="comingBody"></div></section>
@@ -349,7 +359,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.149</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.153</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->
@@ -435,13 +445,17 @@
 </div>
 
 <!-- ═══════════════════ INSIGHTS ═══════════════════ -->
-<!-- DESIGN-TARGET.md §Insights / five-tabs.html frame 4: a health card plus a
-     2-column module grid, not ~20 stacked cards. No maths lives here — every
-     figure below is computed by js/insights.js / js/app.js's healthScore()
-     and written into these IDs. Everything that isn't a headline number
-     (tax lots, contributions, projection, FI, coach, crash test, geography,
-     look-through, asset worth) moved behind a tap in #moreList — nothing
-     was deleted, see js/insights.js's open*Sheet functions. -->
+<!-- DESIGN-TARGET.md §Insights / five-tabs.html frame 4: a health card plus
+     grouped module sections, not ~20 stacked cards (nor one flat queue of
+     modules — session 3's own fix). No maths lives here — every figure below
+     is computed by js/insights.js / js/app.js's healthScore() and written
+     into these IDs. Section labels ("Performance"/"Risk"/"Income & tax"/
+     "Under the hood") are the taxonomy sessions 1-2 already provisioned DE
+     translations for in js/i18n.js but never wired to markup — used here for
+     the first time. "Future" (financial independence, projection, next-moves
+     coach) stays unwired: those stay behind #moreList this session, on
+     purpose (DESIGN-TARGET.md's "leave behind the tap" call) — nothing was
+     deleted, see js/insights.js's open*Sheet functions. -->
 <div id="page-insights" class="page hidden">
   <div class="appbar"><h1 class="t-title" id="insightsTitle" tabindex="-1">Insights</h1></div>
   <p class="t-caption muted insights-sub">Deposit-adjusted · updated today</p>
@@ -449,18 +463,117 @@
   <div class="stack--tight stack">
     <section class="card press" id="healthCard"><div id="healthBody"></div></section>
 
-    <div class="grid-2" id="modGrid"></div>
+    <!-- Insights v2 (DESIGN-TARGET.md) — a mark plus names, not a number in a
+         box. All label/sub-label text is written by js/insights.js's render
+         functions (not static markup here) — same convention #modGrid's own
+         tile labels already use, and it keeps test/i18n-coverage.spec.js's
+         leak ratchet honest (it only scans this file's static text). Hidden
+         by default; each render function un-hides once its own data exists.
+         Section <h2> labels ARE static markup (same convention as "More"
+         below and Following's "Watchlist"/"Stocks you already own") — every
+         label used here already has a js/i18n.js dictionary entry, so the
+         exact-match text-node walk translates them for real, not via the
+         uppercase-vs-mixed-case coincidence that currently hides "More"
+         itself from the leak scan (pre-existing, out of scope here). -->
+    <h2 class="section__label">Performance</h2>
+    <section class="card press mod" id="xirrModCard" hidden>
+      <div class="stat__label" id="xirrModHead"></div>
+      <svg width="342" height="92" viewBox="0 0 342 92" id="xirrBars"></svg>
+      <div class="goalline" id="xirrGoalLine" hidden></div>
+    </section>
+
+    <section class="card press mod" id="contribModCard" hidden>
+      <div class="card__head" id="contribModHead"></div>
+      <div class="t-display" id="contribModBig"></div>
+      <svg width="342" height="70" viewBox="0 0 342 70" id="contribBars"></svg>
+      <div class="goalline" id="contribGoalLine" hidden></div>
+    </section>
 
     <div class="card" id="hmCard">
       <div class="stat__label">Monthly returns</div>
       <div id="hmBody"></div>
     </div>
 
-    <div class="card press" id="sectorCard">
+    <h2 class="section__label">Risk</h2>
+    <section class="card press mod" id="riskModCard" hidden>
+      <div class="card__head" id="riskModHead"></div>
+      <div class="t-display" id="riskModBig"></div>
+      <svg width="342" height="96" viewBox="0 0 342 96" id="riskAxis"></svg>
+      <div class="goalline" id="riskGoalLine" hidden></div>
+    </section>
+
+    <section class="card press mod" id="ddModCard" hidden>
+      <div class="card__head" id="ddModHead"></div>
+      <div class="t-display neg" id="ddModBig"></div>
+      <svg width="342" height="80" viewBox="0 0 342 80" id="ddCurve"></svg>
+      <div class="modnames" id="ddModNames"></div>
+      <div class="goalline" id="ddGoalLine" hidden></div>
+    </section>
+
+    <!-- Crash test — surfaced from #moreList session 3. Pairs with Risk
+         above: Risk's goal line is "what a 20% drop costs"; this is "what
+         history's worst drops cost", same dropCost/projectedGoalDate formula
+         reused with CRASH_SCENARIOS' own drawdown fractions. -->
+    <section class="card press mod" id="crashModCard" hidden>
+      <div class="card__head" id="crashModHead"></div>
+      <svg width="342" height="102" viewBox="0 0 342 102" id="crashBars"></svg>
+      <div class="modnames" id="crashModNames"></div>
+      <div class="goalline" id="crashGoalLine" hidden></div>
+    </section>
+
+    <h2 class="section__label">Income &amp; tax</h2>
+    <!-- Tax lots — surfaced from #moreList session 3. A single split bar
+         (short-term vs long-term share of unrealized gain), not two magnitude
+         bars: the real demo split is 98%/2%, and a magnitude bar would render
+         the short-term side as an near-invisible sliver (session 1/2's own
+         "check against real clustered data" lesson). Names list which
+         holdings still carry a short-term lot and when it turns long-term —
+         "what not to sell yet". -->
+    <section class="card press mod" id="taxModCard" hidden>
+      <div class="card__head" id="taxModHead"></div>
+      <div class="t-display" id="taxModBig"></div>
+      <svg width="342" height="46" viewBox="0 0 342 46" id="taxBar"></svg>
+      <div class="modnames" id="taxModNames"></div>
+      <div class="goalline" id="taxGoalLine" hidden></div>
+    </section>
+
+    <h2 class="section__label">Under the hood</h2>
+    <section class="card press mod" id="sectorCard" hidden>
       <div class="stat__label">Sector exposure</div>
-      <div class="allocstrip" id="sectorStrip"></div>
-      <div class="dlegend" id="sectorLegend"></div>
-    </div>
+      <div class="seqrows" id="sectorRows"></div>
+      <div class="goalline" id="sectorGoalLine" hidden></div>
+    </section>
+
+    <!-- Geographic mix — surfaced from #moreList session 3, same sequential
+         single-hue-ramp form as sector above (locItems() is the same
+         aggregation openLocSheet already used, just re-formed). -->
+    <section class="card press mod" id="geoModCard" hidden>
+      <div class="stat__label" id="geoModHead"></div>
+      <div class="seqrows" id="geoRows"></div>
+      <div class="goalline" id="geoGoalLine" hidden></div>
+    </section>
+
+    <!-- Asset worth — surfaced from #moreList session 3. Delta's version
+         line-charts its "top four holdings"; this portfolio holds six and
+         can always name all of them (DESIGN-TARGET.md's own differentiator),
+         so every held symbol gets its own row: a self-scaled 1Y sparkline
+         plus its current value and 1Y change — not the 4-line class rollup
+         openWorthSheet's full Chart.js view still uses (reachable by tap,
+         unchanged). No goal line: the total-value number it would cite
+         already lives on Home/other cards, and duplicating it is the bug
+         class CLAUDE.md names three prior fights over. -->
+    <section class="card press mod" id="worthModCard" hidden>
+      <div class="card__head" id="worthModHead"></div>
+      <div class="modnames" id="worthRows"></div>
+    </section>
+
+    <section class="card press mod" id="peModCard" hidden>
+      <div class="stat__label">Portfolio P/E</div>
+      <svg width="342" height="92" viewBox="0 0 342 92" id="peBars"></svg>
+      <div class="modnames" id="peModNames"></div>
+    </section>
+
+    <div id="modGrid"></div>
 
     <h2 class="section__label">More</h2>
     <div class="card" id="moreList"></div>

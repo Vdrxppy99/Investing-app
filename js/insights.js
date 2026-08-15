@@ -114,9 +114,13 @@ function riskStats(){
   for(const r of rs){ const h=state.history[r.sym]; if(!h) continue; const m={}; for(let i=0;i<h.t.length;i++) if(h.c[i]!=null) m[dayStr(h.t[i])]=h.c[i]; H[r.sym]=m; }
   const days=[...new Set([].concat(...Object.values(H).map(m=>Object.keys(m))))].sort().slice(-253);
   const rets=[], voo=[], retDays=[];
+  // per-symbol daily returns, index-aligned with voo — same series the portfolio-weighted
+  // blend above pools together; kept per-symbol here too so holding-level beta (below) is
+  // the identical cov/var formula, just unpooled, not a second calculation.
+  const symRets={}; for(const s of Object.keys(H)) symRets[s]=[];
   for(let i=1;i<days.length;i++){
     let rp=0;
-    for(const s of Object.keys(H)){ const a=H[s][days[i-1]], b=H[s][days[i]]; if(a&&b) rp+=(w[s]||0)*(b/a-1); }
+    for(const s of Object.keys(H)){ const a=H[s][days[i-1]], b=H[s][days[i]]; const rs=(a&&b)?(b/a-1):null; if(rs!=null) rp+=(w[s]||0)*rs; symRets[s].push(rs); }
     rets.push(rp); retDays.push(days[i]);
     const va=H.VOO&&H.VOO[days[i-1]], vb=H.VOO&&H.VOO[days[i]];
     voo.push(va&&vb?vb/va-1:null);
@@ -146,6 +150,17 @@ function riskStats(){
   // top and bottom and cancels) and by the periods-per-year annualization above (neither cov
   // nor var is annualized here) — verified against an independent Python beta() (test/phase1).
   const beta=vx>0?cov/vx:1;
+  // Per-holding beta — the exact same cov/var-vs-VOO formula above, applied to each symbol's
+  // own return series instead of the portfolio-weighted blend. Powers the Risk module's axis
+  // (design/target/insights-v2.html): every holding plotted by its own real beta, not a guess.
+  const holdingBeta={};
+  for(const s of Object.keys(H)){
+    const pairs2=symRets[s].map((r,i)=>[r,voo[i]]).filter(p=>p[0]!=null&&p[1]!=null);
+    if(pairs2.length<30) continue;
+    const mx2=mean(pairs2.map(p=>p[1])), my2=mean(pairs2.map(p=>p[0]));
+    const cov2=mean(pairs2.map(p=>(p[0]-my2)*(p[1]-mx2))), vx2=mean(pairs2.map(p=>(p[1]-mx2)**2));
+    if(vx2>0) holdingBeta[s]=cov2/vx2;
+  }
   // Max drawdown reads directly off the cumulative portfolio-value series (buildSeries): a
   // peak-to-trough ratio with no time dimension, so it is also unaffected by sampling frequency.
   let peak=0, mdd=0; const s=buildSeries('all');
@@ -156,7 +171,113 @@ function riskStats(){
   // Sharpe = reward per unit of risk: (annualized return − 4% cash rate) ÷ annualized volatility
   const annRet=mu*periodsPerYear*100, RF=4;
   const sharpe=vol>0?(annRet-RF)/vol:0;
-  return {vol, beta, mdd:mdd*100, best:{d:retDays[bi], p:rets[bi]*100}, worst:{d:retDays[wi], p:rets[wi]*100}, sharpe, annRet};
+  return {vol, beta, mdd:mdd*100, best:{d:retDays[bi], p:rets[bi]*100}, worst:{d:retDays[wi], p:rets[wi]*100}, sharpe, annRet, holdingBeta, weights:w};
+}
+/* Deepest drop: the real drawdown curve (peak → trough → recovery), dated, plus which
+   holding fell hardest and which held up best over that exact window. The peak-tracking
+   scan is the same one riskStats() already runs to produce its single mdd figure above —
+   this just keeps the path instead of collapsing it, and extends it to find WHEN. */
+function drawdownStats(){
+  const s=buildSeries('all'); if(!s||s.labels.length<10) return null;
+  let peak=s.value[0], peakI=0, troughI=0, troughDd=0, troughPeakI=0;
+  for(let i=0;i<s.value.length;i++){
+    const v=s.value[i];
+    if(v>peak){ peak=v; peakI=i; }
+    const dd=peak>0?(v/peak-1):0;
+    if(dd<troughDd){ troughDd=dd; troughI=i; troughPeakI=peakI; }
+  }
+  if(troughI===troughPeakI) return null; // never actually dropped
+  const peakVal=s.value[troughPeakI], troughVal=s.value[troughI];
+  const dropDollars=peakVal-troughVal;
+  let recI=-1;
+  for(let i=troughI+1;i<s.value.length;i++){ if(s.value[i]>=peakVal){ recI=i; break; } }
+  const peakDate=s.labels[troughPeakI], troughDate=s.labels[troughI], recDate=recI>=0?s.labels[recI]:null;
+  const recoveryMonths=recDate?(new Date(recDate+'T12:00:00')-new Date(troughDate+'T12:00:00'))/2629800000:null; // 30.4375-day month
+  const endI=recI>=0?recI:s.value.length-1;
+  const curveLabels=s.labels.slice(troughPeakI,endI+1);
+  const curve=s.value.slice(troughPeakI,endI+1).map(v=>(v/peakVal-1)*100);
+  // per-holding price move, peak date -> trough date — same binary-search-over-daily-closes
+  // technique pathValue() already uses above, just reading a window instead of a lump sum.
+  const moves=[];
+  for(const r of rows('all')){
+    const h=state.history[r.sym]; if(!h) continue;
+    const px={}; for(let i=0;i<h.t.length;i++) if(h.c[i]!=null) px[dayStr(h.t[i])]=h.c[i];
+    const dys=Object.keys(px).sort();
+    const at=d=>{ let lo=0,hi=dys.length-1,ans=null; while(lo<=hi){ const m=(lo+hi)>>1; if(dys[m]<=d){ans=dys[m];lo=m+1;} else hi=m-1; } return ans?px[ans]:null; };
+    const p0=at(peakDate), p1=at(troughDate);
+    if(p0>0 && p1!=null) moves.push({sym:r.sym, pct:(p1/p0-1)*100});
+  }
+  moves.sort((a,b)=>a.pct-b.pct);
+  const boughtThrough=state.lots.some(l=>!l.div && l.date>=peakDate && l.date<=troughDate);
+  return {peakVal, troughVal, dropDollars, peakDate, troughDate, recDate, recoveryMonths, curveLabels, curve,
+    hardest:moves[0]||null, heldUp:moves.length?moves[moves.length-1]:null, boughtThrough, mddPct:troughDd*100};
+}
+// "Same buys in VOO" as an annualized rate — identical xirr() cashflows and no-root fallback
+// as personalReturn() (js/core.js), terminal value swapped for the VOO benchmark replay
+// (pathValue, above) instead of your real portfolio total. Needed because the Return-vs-
+// benchmark module's paired bars must compare two numbers of the same kind (both annualized
+// %), not personalReturn()'s XIRR against the point-in-time dollar delta renderModGrid's
+// "vs VOO" tile uses.
+function benchmarkXirr(acc, sym){
+  const sp=pathValue(sym); if(!sp) return null;
+  const flows=state.lots.filter(l=>(acc==='all'||l.acc===acc)&&!l.div)
+    .map(l=>({t:new Date(l.date+'T16:00:00Z').getTime(), v:-l.cost})).sort((a,b)=>a.t-b.t);
+  if(!flows.length) return null;
+  flows.push({t:Date.now(), v:sp.value});
+  const x=xirr(flows);
+  if(x!=null) return x;
+  const inv=-flows.slice(0,-1).reduce((a,f)=>a+f.v,0), end=flows[flows.length-1].v;
+  const yrs=Math.max(0.2,(flows[flows.length-1].t-flows[0].t)/31557600000);
+  return inv>0&&end>0 ? Math.pow(end/inv,1/yrs)-1 : null;
+}
+// Goal-date projection shared by the three modules' goal lines below. Same log-compound ETA
+// renderFI()/openFISheet() already use for the 4%-rule freedom number ("At your ~7%/yr pace,
+// work could be optional in about N years") — retargeted at state.goal.amt (the owner's own
+// target + year, set via the Home goal card) instead of the FI number. Not a new model: same
+// formula, same growthRate(), a different target value.
+function monthsToReach(amount, from){
+  if(!(amount>0) || !(from>0) || from>=amount) return 0;
+  return Math.log(amount/from)/Math.log(1+growthRate())*12;
+}
+function projectedGoalDate(fromValue){
+  const goal=state.goal; if(!goal || !(goal.amt>0)) return null;
+  if(fromValue>=goal.amt) return new Date();
+  const months=monthsToReach(goal.amt, fromValue);
+  if(!(months>0) || !isFinite(months)) return null;
+  const d=new Date(); d.setMonth(d.getMonth()+Math.round(months));
+  return d;
+}
+function monthYear(d){ return d.toLocaleDateString(appLocale(),{month:'short',year:'numeric'}); }
+// Contribution-aware goal ETA for the Contributions module's goal line. monthsToReach()
+// above deliberately has no contribution term — it mirrors renderFI()/renderProjection()'s
+// established "today's money alone, no future deposits" convention. A contribution RATE
+// needs a model that actually adds money over time, and the only one this app has is
+// js/monte-carlo.js's runMonteCarloProjection() (used by Home's goal card). Reused here at
+// its already-tested zero-volatility, one-path special case (test/monte-carlo.spec.js:
+// "zero volatility with contributions matches a hand-computed annuity-with-inflation-decay
+// sum") — same engine, same formula, just deterministic inputs instead of stochastic ones,
+// so this is a numeric read of an existing model, not a new one. Linear interpolation
+// between the two bracketing yearly points turns its year-granularity fan into a month
+// figure — standard curve interpolation, not a second financial model.
+function monthsToReachWithContribution(amount, from, monthlyPmt){
+  if(!(amount>0) || !(from>0) || from>=amount || typeof runMonteCarloProjection!=='function') return null;
+  const YEARS_CAP=60;
+  const {fan}=runMonteCarloProjection({v0:from, years:YEARS_CAP, monthlyContribution:Math.max(0,monthlyPmt),
+    goal:amount, meanReal:growthRate(), sdReal:0, meanInfl:0, sdInfl:0, paths:1, seed:1});
+  const yr=fan.p50.findIndex(v=>v>=amount);
+  if(yr<0) return null; // doesn't reach within the cap
+  if(yr===0) return 0;
+  const v0=fan.p50[yr-1], v1=fan.p50[yr];
+  const frac=v1>v0 ? (amount-v0)/(v1-v0) : 0;
+  return (yr-1+frac)*12;
+}
+function projectedGoalDateWithContribution(fromValue, monthlyPmt){
+  const goal=state.goal; if(!goal || !(goal.amt>0)) return null;
+  if(fromValue>=goal.amt) return new Date();
+  const months=monthsToReachWithContribution(goal.amt, fromValue, monthlyPmt);
+  if(months==null || !isFinite(months)) return null;
+  const d=new Date(); d.setMonth(d.getMonth()+Math.round(months));
+  return d;
 }
 function renderWorthChart(){
   const el=$('worthChart'); if(!window.Chart) return;
@@ -188,6 +309,44 @@ function renderWorthChart(){
   $('worthLegend').innerHTML=shown.map(d=>`<div class="alg"><span class="dot" style="background:${d.borderColor}"></span>${d.label}</div>`).join('');
   attachScrubAny(worthChart, i=>{ const ro=$('worthRO'); if(!ro) return;
     ro.textContent = i==null ? '' : `${niceLbl(days[i])} · `+shown.map(d=>`${d.label} ${cfmt(d.data[i])}`).join(' · '); });
+}
+/* ASSET WORTH — surfaced from #moreList (DESIGN-TARGET.md session 3). Delta's version
+   line-charts its "top four holdings" because it must generalise to portfolios it can't
+   fully show; this one holds six and can always name all of them (DESIGN-TARGET.md's own
+   differentiator), so every held symbol gets its own row — a self-scaled 1Y sparkline (each
+   row normalizes to its OWN min/max, so VOO's $83k and VXF's $5k both draw a full-height
+   line; the point is shape, not a shared dollar axis) plus its current value and 1Y change.
+   Same per-day qty×price walk renderWorthChart() above already does, just grouped by symbol
+   instead of rolled up into ASSET_CLASSES. No goal line: see the HTML comment for why. */
+function renderWorthMod(){
+  const card=$('worthModCard'), body=$('worthRows'); if(!card||!body) return;
+  const rs=rows('all'); if(!rs.length){ card.hidden=true; return; }
+  const cut=rangeCutoff('1Y');
+  const series=rs.map(r=>{
+    const h=state.history[r.sym]; const map={}; const days=[];
+    if(h) for(let i=0;i<h.t.length;i++){ if(h.c[i]!=null){ const d=dayStr(h.t[i]); if(d>=cut){ if(!(d in map)) days.push(d); map[d]=h.c[i]; } } }
+    days.sort();
+    const vals=[]; let last=null;
+    for(const d of days){ const ls=lotState('all',d); const q=ls.qty[r.sym]||0; if(map[d]!=null) last=map[d]; if(q>0&&last!=null) vals.push(q*last); }
+    return {sym:r.sym, vals, cur:r.qty*priceOf(r.sym)};
+  }).filter(s=>s.vals.length>=2);
+  if(!series.length){ card.hidden=true; return; }
+  card.hidden=false;
+  const head=$('worthModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`Asset worth`}</div><span class="mod__sub">${t`by holding`} · 1Y</span>`;
+  const w=110,h=22;
+  body.innerHTML = series.slice().sort((a,b)=>b.cur-a.cur).map(s=>{
+    const step=Math.max(1,Math.floor(s.vals.length/40));
+    const pts=s.vals.filter((_,i)=>i%step===0 || i===s.vals.length-1);
+    const lo=Math.min(...pts), hi=Math.max(...pts), span=(hi-lo)||1;
+    const X=i=>i*w/(pts.length-1), Y=v=>h-2-((v-lo)/span)*(h-4);
+    const d=pts.map((v,i)=>`${i===0?'M':'L'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+    const chg=pts.length>1 ? (pts[pts.length-1]/pts[0]-1)*100 : 0;
+    const col=colorOf(s.sym);
+    return `<div class="modname"><i>${esc(s.sym.replace('-','.'))}</i>`+
+      `<svg class="spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(s.sym)} 1Y trend, ${chg>=0?'up':'down'} ${Math.abs(chg).toFixed(1)}%"><path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`+
+      `<span class="sparkval"><b>${esc(fmt(s.cur))}</b><em class="${chg>=0?'pos':'neg'}">${fmtPct(chg)}</em></span></div>`;
+  }).join('');
+  card.onclick=openWorthSheet;
 }
 function openPESheet(){
   const rs=rows('all');
@@ -343,51 +502,376 @@ function ensureChartsSized(){ // charts created mid page-transition can get stam
    below), instead of unconditionally into cards that no longer exist. */
 function renderInsights(){
   renderHealth();
+  renderRiskMod();
+  renderDrawdownMod();
+  renderCrashMod();
+  renderXirrMod();
+  renderContribMod();
+  renderTaxMod();
+  renderSectorMod();
+  renderGeoMod();
+  renderWorthMod();
+  renderPEMod();
   renderModGrid();
   renderHeatmap();
-  renderSectorStrip();
   renderMoreList();
 }
-/* Six single-stat tiles: XIRR, vs VOO ("same buys" $ comparison), Volatility,
-   Beta, Max drawdown, Portfolio P/E. Colour is applied only to the figures
-   that ARE gain/loss (XIRR, vs VOO, Max drawdown) — Volatility/Beta/P/E are
-   risk & valuation magnitudes, not gain/loss, so they stay neutral text per
-   DESIGN-TARGET's "green/red only on gain/loss" rule. */
+/* One single-stat tile: Volatility. XIRR, vs VOO, Beta, Max drawdown, Contributions,
+   Sector and Portfolio P/E all moved out to their own picture-plus-names cards
+   (DESIGN-TARGET.md's Insights v2) — a number with a caption is a stat tile, not
+   an Insights module. Volatility stays a flat tile because the approved rendered
+   spec (design/target/insights-v2.html) keeps it as one too, paired with Sharpe. */
 function renderModGrid(){
   const grid=$('modGrid'); if(!grid) return;
-  const rr=personalReturn('all');
-  const t=totals('all'), sp=spPathValue(), mine=t.value-cashFor('all');
-  const vsVoo = (sp && sp.value>0) ? (mine-sp.value)/sp.value*100 : null;
   const r=riskStats();
-  const pe=portfolioPE();
   const tile=(mod,label,value,tone,sub)=>
     `<button type="button" class="stat press" data-mod="${mod}">`+
     `<div class="stat__label">${esc(label)}</div>`+
     `<div class="stat__value${tone?` ${tone}`:''}">${esc(value)}</div>`+
     `<div class="stat__delta">${esc(sub)}</div></button>`;
   grid.innerHTML =
-    tile('perf', 'XIRR', rr!=null?fmtPct(rr*100):'—', rr!=null?cls(rr*100):'', 'annualised') +
-    tile('perf', 'vs VOO', vsVoo!=null?fmtPct(vsVoo):'—', vsVoo!=null?cls(vsVoo):'', 'same buys in VOO') +
-    tile('risk', 'Volatility', r?r.vol.toFixed(2)+'%':'—', '', r?'Sharpe '+r.sharpe.toFixed(2):'Needs price history') +
-    tile('risk', 'Beta', r?r.beta.toFixed(2):'—', '', 'vs S&P 500') +
-    tile('risk', 'Max drawdown', r?fmtPct(r.mdd):'—', r?'neg':'', 'peak to trough') +
-    tile('pe', 'Portfolio P/E', pe!=null?pe.toFixed(1)+'×':'—', '', 'across your holdings');
+    tile('risk', 'Volatility', r?r.vol.toFixed(2)+'%':'—', '', r?'Sharpe '+r.sharpe.toFixed(2):'Needs price history');
   grid.querySelectorAll('[data-mod]').forEach(el=> el.onclick=()=>{
-    const m=el.dataset.mod;
-    if(m==='perf') openPerfSheet();
-    else if(m==='risk') openRiskSheet();
-    else if(m==='pe') openPESheet();
+    if(el.dataset.mod==='risk') openRiskSheet();
   });
 }
-/* Sector exposure as one segmented strip (allocstrip — same component/
-   convention as the Portfolio hero's allocation strip, js/portfolio.js
-   renderAllocStrip) plus a wrapped plain-text legend, replacing the old
-   per-sector .hbrow list. Same SECTOR_WEIGHTS aggregation as before — no
-   maths changed, only presentation. Colours read live from --cat-N tokens
-   (never boot.js's stale CAT array) so this can't reproduce the gain-colour
-   collision the categorical palette had before this phase's tokens.css fix. */
-function renderSectorStrip(){
-  const el=$('sectorStrip'); const legend=$('sectorLegend'); if(!el||!legend) return;
+/* ============ Insights v2 modules — a mark + names, not a number in a box ============
+   design/target/insights-v2.html is the approved rendered spec (DESIGN-TARGET.md's
+   "Insights v2" section). Session 1: Risk, Deepest drop, Return-vs-benchmark. Session 2
+   (this pass): Contributions, Sector (categorical allocstrip → sequential ramp — a form
+   fix, not a restyle) and Portfolio P/E, further down this file. Each ends on the indigo
+   goal-line rule where the state to write one honestly exists. Volatility stays a flat
+   modGrid tile — the spec's own choice too. Heatmap/health/"More" untouched this session.
+   Anti-pattern checks: see the commit note this lands with. */
+function renderRiskMod(){
+  const card=$('riskModCard'), svgEl=$('riskAxis'); if(!card||!svgEl) return;
+  const r=riskStats();
+  const hold=r?Object.entries(r.holdingBeta).map(([sym,beta])=>({sym,beta})).sort((a,b)=>a.beta-b.beta):[];
+  if(!r || !hold.length){ card.hidden=true; return; }
+  card.hidden=false;
+  const head=$('riskModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`Risk`}</div><span class="mod__sub">${t`beta vs S&P 500`}</span>`;
+  const vals=[1, r.beta, ...hold.map(h=>h.beta)];
+  const lo=Math.min(...vals)-0.12, hi=Math.max(...vals)+0.12;
+  const w=342,h=96,pl=8,pr=8,y=52;
+  const X=v=>pl+(v-lo)/(hi-lo)*(w-pl-pr);
+  const MUT=cvar('--mut'), GRID=cvar('--grid'), BRAND=cvar('--brand'), CANVAS=cvar('--canvas');
+  let s=`<line x1="${pl}" y1="${y}" x2="${w-pr}" y2="${y}" stroke="${GRID}" stroke-width="1.5"/>`;
+  s+=`<line x1="${X(1).toFixed(1)}" y1="${y-13}" x2="${X(1).toFixed(1)}" y2="${y+13}" stroke="${MUT}" stroke-width="1.5" stroke-dasharray="2 3"/>`;
+  s+=`<text x="${X(1).toFixed(1)}" y="${y+27}" fill="${MUT}" font-size="9.5" font-weight="600" text-anchor="middle">S&amp;P 1.00</text>`;
+  // Label rows: real betas cluster far tighter than the mockup's illustrative spread-out
+  // demo values (a real observed cluster: YOU/VOO/VTI/VXUS all within ~0.13 of each other),
+  // so simple alternation isn't enough — strict alternation only guarantees the two
+  // IMMEDIATE x-neighbors differ in row; a 4-item cluster still puts every other one (YOU
+  // and VTI, or VOO and VXUS) in the SAME row, close enough to collide. Fix: alternate for
+  // the common case, then declutter each row independently — walk it in x-order and push
+  // any label that's still too close to the previous one in that row rightward. Circles
+  // stay at the true data position (`x`); only the text position (`tx`) moves.
+  const px=+X(r.beta).toFixed(1);
+  const items=[{x:px, sym:'YOU', isYou:true}, ...hold.map(hd=>({x:+X(hd.beta).toFixed(1), sym:hd.sym.replace('-','.'), isYou:false}))];
+  items.sort((a,b)=>a.x-b.x);
+  items.forEach((it,i)=>{ it.row=(i%2===0)?'up':'down'; it.tx=it.x; });
+  const MIN_GAP=24;
+  for(const row of ['up','down']){
+    const rowItems=items.filter(it=>it.row===row);
+    for(let i=1;i<rowItems.length;i++){
+      const prev=rowItems[i-1], cur=rowItems[i];
+      if(cur.tx-prev.tx<MIN_GAP) cur.tx=prev.tx+MIN_GAP;
+    }
+    for(const it of rowItems) it.tx=Math.min(w-pr-4,Math.max(pl+4,it.tx));
+  }
+  for(const it of items){
+    if(it.isYou) continue;
+    s+=`<circle cx="${it.x}" cy="${y}" r="4" fill="${CANVAS}" stroke="${MUT}" stroke-width="1.6"/>`;
+    s+=`<text x="${it.tx.toFixed(1)}" y="${it.row==='up'?y-18:y+40}" fill="${MUT}" font-size="9" font-weight="650" text-anchor="middle">${esc(it.sym)}</text>`;
+  }
+  const youIt=items.find(it=>it.isYou);
+  s+=`<circle cx="${px}" cy="${y}" r="7.5" fill="${BRAND}" stroke="${CANVAS}" stroke-width="2.5"/>`;
+  s+=`<text x="${youIt.tx.toFixed(1)}" y="${youIt.row==='up'?y-18:y+40}" fill="${BRAND}" font-size="10" font-weight="700" text-anchor="middle">YOU</text>`;
+  s+=`<text x="${pl}" y="${y+27}" fill="${MUT}" font-size="9" font-weight="600">${t`calmer`}</text>`;
+  s+=`<text x="${w-pr}" y="${y+27}" fill="${MUT}" font-size="9" font-weight="600" text-anchor="end">${t`wilder`}</text>`;
+  svgEl.innerHTML=s;
+  svgEl.setAttribute('role','img');
+  svgEl.setAttribute('aria-label', `Beta vs S&P 500, on one axis. You: ${r.beta.toFixed(2)}. `+hold.map(hd=>`${hd.sym.replace('-','.')} ${hd.beta.toFixed(2)}`).join(', ')+'.');
+  const big=$('riskModBig'); if(big) big.textContent=r.beta.toFixed(2);
+  // Goal line: dollar cost of a 20% market drop (same formula as openCrashSheet's crash-test
+  // scenarios — index drawdown × your measured beta), translated into how far it pushes the
+  // owner's own goal date (projectedGoalDate — real state.goal.amt/year, never a guess).
+  const gl=$('riskGoalLine'); if(gl){
+    const t2=totals('all'), dropCost=t2.value*0.20*Math.max(0,r.beta);
+    const baseDate=projectedGoalDate(t2.value), shockDate=dropCost>0?projectedGoalDate(t2.value-dropCost):null;
+    if(dropCost>0 && baseDate && shockDate && shockDate>baseDate){
+      const costB=`<b>${fmt(dropCost)}</b>`, fromB=`<b>${monthYear(baseDate)}</b>`, toB=`<b>${monthYear(shockDate)}</b>`;
+      gl.innerHTML=`<span>${t`A 20% market drop costs you ${costB} — and pushes your goal from ${fromB} to ${toB}.`}</span>`;
+      gl.hidden=false;
+    } else gl.hidden=true;
+  }
+  card.onclick=openRiskSheet;
+}
+function renderDrawdownMod(){
+  const card=$('ddModCard'), svgEl=$('ddCurve'); if(!card||!svgEl) return;
+  const d=drawdownStats();
+  if(!d){ card.hidden=true; return; }
+  card.hidden=false;
+  const head=$('ddModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`Deepest drop`}</div><span class="mod__sub">${t`peak to trough`}</span>`;
+  const big=$('ddModBig'); if(big) big.textContent=fmtPct(d.mddPct);
+  const w=342,h=80,pt=10,pb=14;
+  const lo=Math.min(...d.curve,0)||-0.01;
+  const X=i=>i*w/Math.max(1,d.curve.length-1), Y=v=>pt+(v/lo)*(h-pt-pb);
+  let path=`M0 ${Y(d.curve[0]).toFixed(1)}`;
+  for(let i=1;i<d.curve.length;i++){
+    const a=X(i-1),b=Y(d.curve[i-1]),c=X(i),e=Y(d.curve[i]),m=(a+c)/2;
+    path+=` C${m.toFixed(1)} ${b.toFixed(1)},${m.toFixed(1)} ${e.toFixed(1)},${c.toFixed(1)} ${e.toFixed(1)}`;
+  }
+  const troughRelI=d.curveLabels.indexOf(d.troughDate);
+  const LOSS=cvar('--loss'), GRID=cvar('--grid'), CANVAS=cvar('--canvas'), zeroY=Y(0).toFixed(1);
+  let s=`<defs><linearGradient id="ddg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${LOSS}" stop-opacity=".02"/><stop offset="1" stop-color="${LOSS}" stop-opacity=".22"/></linearGradient></defs>`+
+    `<line x1="0" y1="${zeroY}" x2="${w}" y2="${zeroY}" stroke="${GRID}" stroke-width="1"/>`+
+    `<path d="${path} L${w} ${zeroY} L0 ${zeroY} Z" fill="url(#ddg)"/>`+
+    `<path d="${path}" fill="none" stroke="${LOSS}" stroke-width="2" stroke-linecap="round"/>`;
+  if(troughRelI>=0){
+    const cx=X(troughRelI).toFixed(1), cy=Y(d.curve[troughRelI]).toFixed(1);
+    s+=`<circle cx="${cx}" cy="${cy}" r="3.6" fill="${LOSS}" stroke="${CANVAS}" stroke-width="2"/>`+
+      `<text x="${cx}" y="${(+cy+15).toFixed(1)}" fill="${LOSS}" font-size="9.5" font-weight="650" text-anchor="middle">${esc(monthYear(new Date(d.troughDate+'T12:00:00')))}</text>`;
+  }
+  svgEl.innerHTML=s;
+  svgEl.setAttribute('role','img');
+  svgEl.setAttribute('aria-label', `Drawdown curve. Peak to trough: ${fmtPct(d.mddPct)}, trough on ${monthYear(new Date(d.troughDate+'T12:00:00'))}.`);
+  const names=$('ddModNames');
+  if(names) names.innerHTML=[
+    d.hardest?`<div class="modname"><i>${esc(d.hardest.sym.replace('-','.'))}</i><s>${t`fell hardest`}</s><b class="neg">${fmtPct(d.hardest.pct)}</b></div>`:'',
+    (d.heldUp && d.heldUp!==d.hardest)?`<div class="modname"><i>${esc(d.heldUp.sym.replace('-','.'))}</i><s>${t`held up best`}</s><b class="${d.heldUp.pct<0?'neg':'pos'}">${fmtPct(d.heldUp.pct)}</b></div>`:'',
+  ].join('');
+  const gl=$('ddGoalLine');
+  if(gl){
+    if(d.dropDollars>0){
+      const rec=(d.recDate&&d.recoveryMonths!=null)?Math.max(1,Math.round(d.recoveryMonths)):null;
+      const costB=`<b>${fmt(d.dropDollars)}</b>`;
+      if(rec!=null){
+        const monthsB=`<b>${rec} ${rec===1?t`month`:t`months`}</b>`;
+        gl.innerHTML = d.boughtThrough
+          ? `<span>${t`Cost ${costB} at the low. You were back to even in ${monthsB} — you kept buying through it.`}</span>`
+          : `<span>${t`Cost ${costB} at the low. You were back to even in ${monthsB}.`}</span>`;
+      } else {
+        gl.innerHTML = `<span>${t`Cost ${costB} at the low.`}</span>`;
+      }
+      gl.hidden=false;
+    } else gl.hidden=true;
+  }
+  card.onclick=openRiskSheet;
+}
+/* CRASH TEST — surfaced from #moreList (DESIGN-TARGET.md session 3): what past
+   crashes would do to TODAY's portfolio, as a bar per scenario instead of the
+   plain-text rows openCrashSheet's full sheet still uses (reachable by tap,
+   unchanged). Same CRASH_SCENARIOS + beta-scaled dropCost math openCrashSheet
+   already computes (defined further down this file — safe to reference here,
+   this only runs once renderInsights() is called, by which point the whole
+   script has executed). Pairs with the Risk card above: same dropCost/
+   projectedGoalDate formula as renderRiskMod's goal line, just with each
+   scenario's own drawdown fraction instead of a flat 20%. */
+function renderCrashMod(){
+  const card=$('crashModCard'), svgEl=$('crashBars'); if(!card||!svgEl) return;
+  const t2=totals('all'); const rk=riskStats();
+  if(!(t2.value>0) || !rk){ card.hidden=true; return; }
+  const beta=Math.min(Math.max(0,rk.beta),1.3);
+  const CRASH_LABELS={'2008 financial crisis':t`2008 financial crisis`,'2020 COVID crash':t`2020 COVID crash`,'2022 rate shock':t`2022 rate shock`};
+  const scenarios=CRASH_SCENARIOS.map(c=>({...c, hit:t2.value*c.d*beta}));
+  card.hidden=false;
+  const head=$('crashModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`Crash test`}</div><span class="mod__sub">${t`past crashes, scaled to you`}</span>`;
+  // Label sits ABOVE its bar, not beside it: the real scenario names ("2008 financial
+  // crisis") run 20+ characters, too wide for a left-side gutter at this card's 342px
+  // width (session 1/2's "check against real clustered data" lesson, hit again — the
+  // first version of this put the label in a 132px-wide left gutter and it collided
+  // with the bar). The value sits INSIDE the bar's own right edge instead of past it,
+  // because the largest scenario's bar already runs ~95% of the track width, leaving no
+  // outside gutter free either.
+  const w=342,h=102, max=Math.max(...scenarios.map(s=>s.hit))*1.05;
+  const rowH=34, barH=14;
+  let s='';
+  scenarios.forEach((sc,i)=>{
+    const y=i*rowH, ww=Math.max(56,(sc.hit/max)*w);
+    s+=`<text x="0" y="${y+9}" fill="${cvar('--mut')}" font-size="10" font-weight="600">${esc(CRASH_LABELS[sc.n]||sc.n)}</text>`;
+    s+=`<rect x="0" y="${y+13}" width="${w}" height="${barH}" rx="5" fill="${cvar('--surface-2')}"/>`;
+    s+=`<rect x="0" y="${y+13}" width="${ww.toFixed(1)}" height="${barH}" rx="5" fill="${cvar('--loss')}"/>`;
+    s+=`<text x="${(ww-6).toFixed(1)}" y="${y+13+10}" fill="${cvar('--on-primary')}" font-size="10" font-weight="650" text-anchor="end">−${esc(fmt(sc.hit))}</text>`;
+  });
+  svgEl.innerHTML=s;
+  svgEl.setAttribute('role','img');
+  svgEl.setAttribute('aria-label', `Crash test. `+scenarios.map(sc=>`${CRASH_LABELS[sc.n]||sc.n}: −${fmt(sc.hit)}`).join(', ')+'.');
+  const names=$('crashModNames');
+  const hold=Object.entries(rk.holdingBeta).sort((a,b)=>b[1]-a[1]);
+  if(names) names.innerHTML = hold.length
+    ? `<div class="modname"><i>${esc(hold[0][0].replace('-','.'))}</i><s>${t`would fall hardest`}</s><b>${hold[0][1].toFixed(2)}β</b></div>`
+    : '';
+  const gl=$('crashGoalLine');
+  if(gl){
+    const worst=scenarios.reduce((a,b)=>b.hit>a.hit?b:a, scenarios[0]);
+    const baseDate=projectedGoalDate(t2.value), shockDate=worst.hit>0?projectedGoalDate(t2.value-worst.hit):null;
+    if(worst.hit>0 && baseDate && shockDate && shockDate>baseDate){
+      const costB=`<b>${fmt(worst.hit)}</b>`, fromB=`<b>${monthYear(baseDate)}</b>`, toB=`<b>${monthYear(shockDate)}</b>`;
+      gl.innerHTML=`<span>${t`A repeat of the ${esc(CRASH_LABELS[worst.n]||worst.n)} costs you ${costB} — and pushes your goal from ${fromB} to ${toB}.`}</span>`;
+      gl.hidden=false;
+    } else gl.hidden=true;
+  }
+  card.onclick=openCrashSheet;
+}
+function renderXirrMod(){
+  const card=$('xirrModCard'), svgEl=$('xirrBars'); if(!card||!svgEl) return;
+  const you=personalReturn('all'), bench=benchmarkXirr('all','VOO');
+  if(you==null || bench==null){ card.hidden=true; return; }
+  card.hidden=false;
+  const head=$('xirrModHead'); if(head) head.textContent=t`Your return vs buying VOO instead`;
+  const w=342,h=92, barRows=[[t`You`, you*100, cvar('--brand')], [t`Same buys in VOO`, bench*100, cvar('--mut')]];
+  const max=Math.max(20, Math.abs(you*100), Math.abs(bench*100))*1.05;
+  const bx=112, bw=w-bx-58;
+  let s='';
+  barRows.forEach(([lab,v,col],i)=>{
+    const y=14+i*38, ww=Math.max(4,(Math.max(0,v)/max)*bw);
+    s+=`<text x="0" y="${y+13}" fill="${cvar('--mut')}" font-size="11" font-weight="600">${esc(lab)}</text>`;
+    s+=`<rect x="${bx}" y="${y}" width="${bw}" height="20" rx="4" fill="${cvar('--surface-2')}"/>`;
+    s+=`<rect x="${bx}" y="${y}" width="${ww.toFixed(1)}" height="20" rx="4" fill="${col}"/>`;
+    s+=`<text x="${w}" y="${y+14}" fill="${cvar('--text')}" font-size="11.5" font-weight="650" text-anchor="end">${fmtPct(v)}</text>`;
+  });
+  svgEl.innerHTML=s;
+  svgEl.setAttribute('role','img');
+  svgEl.setAttribute('aria-label', `Your annualized return ${fmtPct(you*100)} versus the same buys in VOO, ${fmtPct(bench*100)}.`);
+  const gl=$('xirrGoalLine');
+  if(gl){
+    const t2=totals('all'), sp=spPathValue(), mine=t2.value-cashFor('all'), added=sp?mine-sp.value:null;
+    if(added){
+      const baseDate=projectedGoalDate(t2.value-added), aheadDate=projectedGoalDate(t2.value);
+      if(baseDate && aheadDate && baseDate.getTime()!==aheadDate.getTime()){
+        const months=Math.max(1,Math.round(Math.abs(baseDate-aheadDate)/2629800000));
+        const monthsB=`<b>${months} ${months===1?t`month`:t`months`}</b>`;
+        gl.innerHTML=added>0
+          ?`<span>${t`Your timing added ${'<b>'+fmt(added)+'</b>'} — about ${monthsB} off the goal date.`}</span>`
+          :`<span>${t`Your timing cost you ${'<b>'+fmt(-added)+'</b>'} — about ${monthsB} later on the goal date.`}</span>`;
+        gl.hidden=false;
+      } else gl.hidden=true;
+    } else gl.hidden=true;
+  }
+  card.onclick=openPerfSheet;
+}
+/* WHAT YOU ADDED — bars over the last 12 real contribution months, replacing the
+   old contribCard's Chart.js line+bar combo on the Insights tab itself (openContribSheet's
+   full renderContribChart(), still Chart.js, is unchanged and still reachable by tap). Same
+   monthly aggregation as renderContribChart() below, just the last 12 months rather than 24,
+   and drawn as small hand-rolled SVG bars matching design/target/insights-v2.html exactly. */
+function renderContribMod(){
+  const card=$('contribModCard'), svgEl=$('contribBars'); if(!card||!svgEl) return;
+  const per={};
+  for(const l of state.lots){ if(!l.div) per[l.date.slice(0,7)]=(per[l.date.slice(0,7)]||0)+l.cost; }
+  const keys=Object.keys(per).sort();
+  if(!keys.length){ card.hidden=true; return; }
+  const labels=[], data=[];
+  let cur=keys[0]; const end=dayStr(Date.now()).slice(0,7);
+  while(cur<=end){ labels.push(cur); data.push(per[cur]||0);
+    let [y,m]=cur.split('-').map(Number); m++; if(m>12){m=1;y++;} cur=y+'-'+String(m).padStart(2,'0'); }
+  const V=data.slice(-12), L=labels.slice(-12);
+  card.hidden=false;
+  const head=$('contribModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`What you added`}</div><span class="mod__sub">${V.length} ${V.length===1?t`month`:t`months`}</span>`;
+  const total=V.reduce((a,v)=>a+v,0);
+  const big=$('contribModBig'); if(big) big.textContent=fmt(total);
+  const w=342,h=70,g=4,bw=(w-g*(V.length-1))/V.length,max=Math.max(...V,1);
+  const mLbl=k=>new Date(k+'-02T12:00:00').toLocaleDateString(appLocale(),{month:'short'});
+  let s='';
+  V.forEach((v,i)=>{
+    const bh=Math.max(1,(v/max)*(h-14)), x=i*(bw+g), y=h-14-bh;
+    s+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${cvar('--brand')}" opacity="${(0.45+0.55*v/max).toFixed(2)}"/>`;
+  });
+  s+=`<text x="0" y="${h-1}" fill="${cvar('--mut')}" font-size="8.5" font-weight="600">${esc(mLbl(L[0]))}</text>`;
+  s+=`<text x="${w}" y="${h-1}" fill="${cvar('--mut')}" font-size="8.5" font-weight="600" text-anchor="end">${esc(mLbl(L[L.length-1]))}</text>`;
+  svgEl.innerHTML=s;
+  svgEl.setAttribute('role','img');
+  svgEl.setAttribute('aria-label', `What you added, last ${V.length} months. Total ${fmt(total)}. `+L.map((k,i)=>`${mLbl(k)} ${fmt(V[i])}`).join(', ')+'.');
+  // Goal line: the pace shown IS the average of the 12 months on screen (not contribPace()'s
+  // separate all-time average) — same number the chart already displays, nothing recomputed
+  // differently. Arrival dates: the no-contribution baseline reuses session 1's
+  // projectedGoalDate(); the contribution-aware dates reuse monthsToReachWithContribution()
+  // above (the existing Monte Carlo engine's own deterministic special case).
+  const gl=$('contribGoalLine');
+  if(gl){
+    const pmt=total/V.length, t2=totals('all');
+    const baseDate=pmt>0?projectedGoalDate(t2.value):null;
+    const paceDate=pmt>0?projectedGoalDateWithContribution(t2.value,pmt):null;
+    if(baseDate && paceDate && baseDate>paceDate){
+      const earlyMonths=Math.max(1,Math.round((baseDate-paceDate)/2629800000));
+      const pmtB=`<b>${fmt(pmt)}</b>`, earlyB=`<b>${earlyMonths} ${earlyMonths===1?t`month`:t`months`} early</b>`;
+      const moreDate=projectedGoalDateWithContribution(t2.value,pmt+100);
+      const moreMonths=(moreDate && moreDate<paceDate) ? Math.max(1,Math.round((baseDate-moreDate)/2629800000)) : null;
+      gl.innerHTML = moreMonths!=null
+        ? `<span>${t`At ${pmtB}/month you arrive ${earlyB}. Adding $100 more makes it ${'<b>'+moreMonths+'</b>'}.`}</span>`
+        : `<span>${t`At ${pmtB}/month you arrive ${earlyB}.`}</span>`;
+      gl.hidden=false;
+    } else gl.hidden=true;
+  }
+  card.onclick=openContribSheet;
+}
+/* TAX LOTS — surfaced from #moreList (DESIGN-TARGET.md session 3): short-term vs long-term
+   as ONE split bar, not two magnitude bars. Real demo data is 98%/2% (verified against the
+   live demo dataset, not the mockup's illustrative even split) — a magnitude bar would
+   render the short-term side as a near-invisible sliver, so the form is a single proportional
+   bar instead (session 1/2's "check against real clustered data" lesson, applied again). Same
+   per-lot age/gain loop openTaxSheet (js/sheets.js) and renderMoreList's ltPct meta already
+   use — no new maths, just re-formed and, new here, grouped per holding so the names list can
+   say which holding still carries a short-term lot and when it clears — "what not to sell yet". */
+function renderTaxMod(){
+  const card=$('taxModCard'), svgEl=$('taxBar'); if(!card||!svgEl) return;
+  const lots=state.lots.filter(l=>!l.div);
+  if(!lots.length){ card.hidden=true; return; }
+  const YR=31557600000, now=Date.now();
+  let st=0, lt=0; const bySym={};
+  for(const l of lots){
+    const bornMs=new Date(l.date+'T12:00:00').getTime(), isLt=now-bornMs>=YR;
+    const g=l.qty*priceOf(l.sym)-l.cost;
+    if(isLt) lt+=g; else st+=g;
+    if(!isLt){
+      const ltDate=new Date(bornMs+YR);
+      if(!bySym[l.sym] || ltDate<bySym[l.sym]) bySym[l.sym]=ltDate;
+    }
+  }
+  card.hidden=false;
+  const totG=st+lt, ltPct=totG>0?lt/totG*100:0, stPct=100-ltPct;
+  const head=$('taxModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`Tax lots`}</div><span class="mod__sub">${t`short-term vs long-term`}</span>`;
+  const big=$('taxModBig'); if(big) big.textContent=ltPct.toFixed(0)+'%';
+  const w=342,h=46, bx=0, bw=w, by=16, bh=14;
+  const stW=Math.max(0,(stPct/100)*bw), ltW=bw-stW;
+  let s=`<text x="0" y="9" fill="${cvar('--mut')}" font-size="9.5" font-weight="600">${t`Short-term gains`}</text>`;
+  s+=`<text x="${w}" y="9" fill="${cvar('--mut')}" font-size="9.5" font-weight="600" text-anchor="end">${t`Long-term gains`}</text>`;
+  s+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="7" fill="${cvar('--surface-2')}"/>`;
+  if(stW>0) s+=`<rect x="${bx}" y="${by}" width="${stW.toFixed(1)}" height="${bh}" rx="7" fill="${cvar('--text-faint')}"/>`;
+  if(ltW>0) s+=`<rect x="${(bx+stW).toFixed(1)}" y="${by}" width="${ltW.toFixed(1)}" height="${bh}" rx="7" fill="${cvar('--brand')}"/>`;
+  s+=`<text x="0" y="${by+bh+11}" fill="${cvar('--text')}" font-size="10" font-weight="650">${stPct.toFixed(0)}% · ${esc(fmt(st))}</text>`;
+  s+=`<text x="${w}" y="${by+bh+11}" fill="${cvar('--text')}" font-size="10" font-weight="650" text-anchor="end">${ltPct.toFixed(0)}% · ${esc(fmt(lt))}</text>`;
+  svgEl.innerHTML=s;
+  svgEl.setAttribute('role','img');
+  svgEl.setAttribute('aria-label', `Tax lots. Short-term ${stPct.toFixed(0)}% (${fmt(st)}), long-term ${ltPct.toFixed(0)}% (${fmt(lt)}).`);
+  const pending=Object.entries(bySym).sort((a,b)=>a[1]-b[1]);
+  const names=$('taxModNames');
+  if(names) names.innerHTML = pending.map(([sym,d])=>
+    `<div class="modname"><i>${esc(sym.replace('-','.'))}</i><s>${t`goes long-term`}</s><b>${esc(monthYear(d))}</b></div>`).join('');
+  const gl=$('taxGoalLine');
+  if(gl){
+    if(pending.length){
+      const [soonSym,soonDate]=pending[0];
+      const soonGain=lots.filter(l=>l.sym===soonSym && now-new Date(l.date+'T12:00:00').getTime()<YR).reduce((a,l)=>a+(l.qty*priceOf(l.sym)-l.cost),0);
+      const symB=`<b>${esc(soonSym.replace('-','.'))}</b>`, gainB=`<b>${fmt(soonGain)}</b>`, dateB=`<b>${monthYear(soonDate)}</b>`;
+      gl.innerHTML=`<span>${t`${symB} has ${gainB} in short-term gains — it turns long-term on ${dateB}.`}</span>`;
+      gl.hidden=false;
+    } else {
+      gl.innerHTML=`<span>${t`Every lot you own already qualifies for the long-term rate.`}</span>`;
+      gl.hidden=false;
+    }
+  }
+  card.onclick=openTaxSheet;
+}
+/* WHERE THE MONEY ACTUALLY IS — sector exposure as a sequential single-hue ramp, ordered by
+   magnitude, replacing the categorical allocstrip. Ordered magnitude is a sequential job
+   (choosing-a-form.md): the reader's task is "which sector is biggest, by how much," not
+   "instantly tell sector X's hue from sector Y's" — six categorical hues were spending the
+   identity channel re-encoding what row order + label already show. Same SECTOR_WEIGHTS
+   aggregation renderSectorStrip() (removed) and sheets.js's openSectorSheet() already use —
+   no maths changed, only the form. */
+function sectorExposure(){
   const per={};
   for(const r of rows('all')){
     const w=SECTOR_WEIGHTS[r.sym]; if(!w) continue;
@@ -396,17 +880,120 @@ function renderSectorStrip(){
   }
   let other=per['Other']||0; delete per['Other'];
   const items=Object.entries(per).sort((a,b)=>b[1]-a[1]);
-  const top=items.slice(0,6); other += items.slice(6).reduce((a,x)=>a+x[1],0);
-  if(other>0) top.push(['Other', other]);
-  if(!top.length){ el.innerHTML=''; legend.innerHTML=''; return; }
+  const top=items.slice(0,6); other+=items.slice(6).reduce((a,x)=>a+x[1],0);
+  if(other>0) top.push([t`Everything else`, other]);
+  return top;
+}
+function renderSectorMod(){
+  const card=$('sectorCard'), body=$('sectorRows'); if(!card||!body) return;
+  const top=sectorExposure();
+  if(!top.length){ card.hidden=true; return; }
+  card.hidden=false;
   const tot=top.reduce((a,x)=>a+x[1],0)||1;
-  el.innerHTML = top.map(()=>'<i></i>').join('');
-  el.querySelectorAll('i').forEach((it,i)=>{
-    const [label,v]=top[i];
-    it.style.setProperty('--w', (v/tot*100).toFixed(2)+'%');
-    it.style.setProperty('--seg', label==='Other' ? cvar('--faint') : cvar('--cat-'+(i+1)));
+  const max=top[0][1];
+  body.innerHTML=top.map(([label,v])=>{
+    const pct=v/tot*100, op=(0.25+0.75*v/max).toFixed(2);
+    return `<div class="seqrow"><s>${esc(label)}</s>`+
+      `<span class="seqtrack"><i style="width:${pct.toFixed(1)}%;opacity:${op}"></i></span>`+
+      `<b>${pct.toFixed(0)}%</b></div>`;
+  }).join('');
+  // Goal line: a look-through fact, not an assumption — find the top sector's two largest
+  // dollar-contributing holdings (SECTOR_WEIGHTS, same source as the bars above), then check
+  // lookExposure() (js/explore.js — already computes each underlying mega-cap's $ exposure
+  // and which of your funds it comes "via") for whether those two holdings actually share
+  // underlying companies, rather than assuming a sector-label match means real overlap.
+  const gl=$('sectorGoalLine');
+  if(gl){
+    const [topLabel, topVal]=top[0];
+    const contrib=rows('all').map(r=>{
+      const w=SECTOR_WEIGHTS[r.sym]; const pc=w&&w[topLabel]; if(!pc) return null;
+      return {sym:r.sym, v:r.qty*priceOf(r.sym)*pc/100};
+    }).filter(Boolean).sort((a,b)=>b.v-a.v);
+    if(contrib.length>=2){
+      const [a,b]=contrib;
+      const look=lookExposure();
+      const shared=look.filter(l=>l.via.includes(a.sym)&&l.via.includes(b.sym)).length;
+      const pctB=`<b>${(topVal/tot*100).toFixed(0)}%</b>`, aB=`<b>${esc(a.sym.replace('-','.'))}</b>`, bB=`<b>${esc(b.sym.replace('-','.'))}</b>`;
+      if(shared>0){
+        gl.innerHTML=`<span>${t`${esc(topLabel)} is ${pctB} of you — via ${aB} and ${bB}, not by choice. Your two biggest holdings there own the same companies.`}</span>`;
+        gl.hidden=false;
+      } else {
+        gl.innerHTML=`<span>${t`${esc(topLabel)} is ${pctB} of you, mostly through ${aB} and ${bB}.`}</span>`;
+        gl.hidden=false;
+      }
+    } else gl.hidden=true;
+  }
+  card.onclick=openSectorSheet;
+}
+/* WHERE YOUR MONEY LIVES — geographic mix, surfaced from #moreList (DESIGN-TARGET.md
+   session 3), same sequential single-hue-ramp form as sector above: it's the same job
+   (part-to-whole, ordered by magnitude), so it gets the same picture. locItems() (top of
+   this file) is the same regional aggregation openLocSheet already lists — no maths
+   changed, only the form. Real demo data: United States alone is ~83% of the portfolio,
+   so the ramp's top row sits near-solid brand and the rest are thin slivers — expected
+   for a US-heavy portfolio, not a rendering bug (checked against the live demo dataset). */
+function renderGeoMod(){
+  const card=$('geoModCard'), body=$('geoRows'); if(!card||!body) return;
+  const items=locItems();
+  if(!items.length){ card.hidden=true; return; }
+  card.hidden=false;
+  const head=$('geoModHead'); if(head) head.textContent=t`Where your money lives`;
+  const tot=items.reduce((a,x)=>a+x.v,0)||1;
+  const max=Math.max(...items.map(x=>x.v));
+  body.innerHTML=items.slice().sort((a,b)=>b.v-a.v).map(({label,v})=>{
+    const pct=v/tot*100, op=(0.25+0.75*v/max).toFixed(2);
+    return `<div class="seqrow"><s>${esc(label)}</s>`+
+      `<span class="seqtrack"><i style="width:${pct.toFixed(1)}%;opacity:${op}"></i></span>`+
+      `<b>${pct.toFixed(0)}%</b></div>`;
+  }).join('');
+  const gl=$('geoGoalLine');
+  if(gl){
+    const top=items.slice().sort((a,b)=>b.v-a.v)[0];
+    const contrib = top.label==='United States'
+      ? rows('all').filter(r=>r.sym!=='VXUS').map(r=>({sym:r.sym, v:r.qty*priceOf(r.sym)})).sort((a,b)=>b.v-a.v)
+      : (top.label==='Cash' ? [] : [{sym:'VXUS', v:top.v}]);
+    if(contrib.length){
+      const pctB=`<b>${(top.v/tot*100).toFixed(0)}%</b>`;
+      if(contrib.length>=2){
+        const [a,b]=contrib;
+        gl.innerHTML=`<span>${t`${esc(top.label)} is ${pctB} of you — mostly through ${'<b>'+esc(a.sym.replace('-','.'))+'</b>'} and ${'<b>'+esc(b.sym.replace('-','.'))+'</b>'}.`}</span>`;
+      } else {
+        gl.innerHTML=`<span>${t`${esc(top.label)} is ${pctB} of you, entirely through ${'<b>'+esc(contrib[0].sym.replace('-','.'))+'</b>'}.`}</span>`;
+      }
+      gl.hidden=false;
+    } else gl.hidden=true;
+  }
+  card.onclick=openLocSheet;
+}
+/* PORTFOLIO P/E — a bar against VOO (this app's standing S&P 500 proxy everywhere else:
+   riskStats()'s beta, benchmarkXirr(), pathValue() all benchmark against VOO), holdings
+   ranked beneath by their own published P/E (FUND_META — the same figures openPESheet()
+   already lists per fund, just ranked here instead of listed in filing order). */
+function renderPEMod(){
+  const card=$('peModCard'), svgEl=$('peBars'); if(!card||!svgEl) return;
+  const pe=portfolioPE(), spy=FUND_META.VOO&&FUND_META.VOO.pe;
+  if(pe==null || !spy){ card.hidden=true; return; }
+  card.hidden=false;
+  const w=342,h=92, barRows=[[t`You`, pe, cvar('--brand')], ['VOO ('+t`S&P 500`+')', spy, cvar('--mut')]];
+  const max=Math.max(pe,spy)*1.15;
+  const bx=112, bw=w-bx-58;
+  let s='';
+  barRows.forEach(([lab,v,col],i)=>{
+    const y=14+i*38, ww=Math.max(4,(v/max)*bw);
+    s+=`<text x="0" y="${y+13}" fill="${cvar('--mut')}" font-size="11" font-weight="600">${esc(lab)}</text>`;
+    s+=`<rect x="${bx}" y="${y}" width="${bw}" height="20" rx="4" fill="${cvar('--surface-2')}"/>`;
+    s+=`<rect x="${bx}" y="${y}" width="${ww.toFixed(1)}" height="20" rx="4" fill="${col}"/>`;
+    s+=`<text x="${w}" y="${y+14}" fill="${cvar('--text')}" font-size="11.5" font-weight="650" text-anchor="end">${v.toFixed(1)}×</text>`;
   });
-  legend.innerHTML = top.map(([label,v])=>`<span>${esc(label)} ${(v/tot*100).toFixed(0)}%</span>`).join('');
+  svgEl.innerHTML=s;
+  svgEl.setAttribute('role','img');
+  svgEl.setAttribute('aria-label', `Portfolio P/E ${pe.toFixed(1)} versus VOO/S&P 500 at ${spy.toFixed(1)}.`);
+  const names=$('peModNames');
+  if(names){
+    const ranked=rows('all').map(r=>({sym:r.sym, pe:FUND_META[r.sym]&&FUND_META[r.sym].pe})).filter(x=>x.pe).sort((a,b)=>b.pe-a.pe);
+    names.innerHTML=ranked.map(x=>`<div class="modname"><i>${esc(x.sym.replace('-','.'))}</i><s></s><b>${x.pe.toFixed(0)}×</b></div>`).join('');
+  }
+  card.onclick=openPESheet;
 }
 /* The "More" list — every remaining Insights feature, demoted to a compact
    disclose row (js/ui.js's own comment: "how a demoted module is reached on
@@ -416,21 +1003,19 @@ function renderSectorStrip(){
 function renderMoreList(){
   const list=$('moreList'); if(!list) return;
   const t=totals('all');
-  const now=Date.now(), YR=31557600000;
-  let st=0, lt=0;
-  for(const l of state.lots){ const g=l.qty*priceOf(l.sym)-l.cost; if(now-new Date(l.date+'T12:00:00').getTime()>=YR) lt+=g; else st+=g; }
-  const totG=st+lt, ltPct=totG>0?lt/totG*100:0;
   const m12=new Set(state.lots.filter(l=>!l.div && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
+  // Tax lots, Crash test, Where your money lives and Asset worth moved out of this list to
+  // their own mod cards on the tab (DESIGN-TARGET.md session 3 — see index.html's Insights
+  // section comment). Next moves moved to Home instead (session 4 — see renderHomeCoach()
+  // above and index.html's Home section comment): advice, not an insight, and Home is
+  // where the owner actually lands. Contributions and Stocks-you-indirectly-own stay
+  // listed here even though both also have a front door elsewhere (mod card / Following
+  // tab respectively) — pre-existing, out of scope (already-settled in session 3's brief).
   const rowsDef=[
-    {title:'Tax lots', meta:`${ltPct.toFixed(0)}% long-term`, fn:openTaxSheet},
     {title:'Contributions', meta:`${m12} of last 12 months`, fn:openContribSheet},
     {title:'Where this is headed', meta:`${projYears}y projection`, fn:openProjSheet},
     {title:'Financial independence', meta:`${fmt(t.value*0.04/12)}/mo safe income`, fn:openFISheet},
-    {title:'Next moves', meta:`${coachItems().length} to review`, fn:openCoachSheet},
-    {title:'Crash test', meta:'Past crashes, scaled to you', fn:openCrashSheet},
-    {title:'Where your money lives', meta:'Regional breakdown', fn:openLocSheet},
-    {title:'Stocks you indirectly own', meta:'Your ETF look-through', fn:openLookSheet},
-    {title:'Asset worth', meta:'By category · 1Y', fn:openWorthSheet}
+    {title:'Stocks you indirectly own', meta:'Your ETF look-through', fn:openLookSheet}
   ];
   list.innerHTML = rowsDef.map((r,i)=>
     `<button class="disclose" data-i="${i}"><span class="disclose__title">${esc(r.title)}</span>`+
@@ -894,8 +1479,12 @@ function savingsAlt(){ // replay every real deposit into a 3%/yr savings account
   alt+=(+state.cash.main||0)+(+state.cash.brok||0);
   return {alt, val:t.value, ahead:t.value-alt};
 }
-function renderCoach(){
-  const grid=$('coachGrid'); if(!grid) return;
+/* targetId defaults to the Insights sheet's own #coachGrid (openCoachSheet, still
+   wired for anyone/anything that still calls it) — session 4 adds a second caller,
+   renderHomeCoach() below, pointed at Home's #homeCoachGrid instead. Same items,
+   same per-card tap-through to openInfoSheet(); only the mount point differs. */
+function renderCoach(targetId){
+  const grid=$(targetId||'coachGrid'); if(!grid) return;
   const items=coachItems();
   grid.innerHTML = items.length ? items.map(x=>
     `<div class="icard cmove sev-${x.sev||'info'}">
@@ -905,6 +1494,19 @@ function renderCoach(){
     : '<div class="icard wide"><div class="sub-n" style="text-align:center;padding:10px 0">✓ Nothing needs your attention — the portfolio is running clean.</div></div>';
   grid.querySelectorAll('.cmove').forEach((el,i)=> el.onclick=()=>openInfoSheet(items[i].t, `<p>${items[i].b}</p>`));
 }
+/* NEXT MOVES, moved to Home (DESIGN-TARGET.md session 3 left this open: "advice
+   is not an insight and does not want a chart. Leave it behind the tap, or move
+   it to Home." Session 4's call: move — Home is where the owner actually lands,
+   and these are time-sensitive nudges (idle cash, a lot about to turn long-term,
+   a contribution streak going cold), not something that should wait on him
+   remembering to open Insights and tap "More". No chart added — same cards
+   openCoachSheet already rendered, just mounted on Home instead of (only) behind
+   a tap. Insights' #moreList no longer lists it (renderMoreList, below); the
+   sheet-opening path (openCoachSheet/#coachGrid) is left intact rather than
+   deleted, since test/i18n-coverage.spec.js's SHEET_OPENERS still exercises it
+   directly by name. coachItems() already caps at 4 — small enough to show in
+   full, no "see all" needed. */
+function renderHomeCoach(){ renderCoach('homeCoachGrid'); }
 let projYears=10;
 function renderProjection(){
   const el=$('projChart'); if(!el||!window.Chart) return;

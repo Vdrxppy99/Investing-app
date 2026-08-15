@@ -638,7 +638,7 @@ function renderLiveSurfaces(){
 function renderAll(){
   renderLiveSurfaces();
   renderGoal(); renderStale(); renderChips(); renderChart(); renderAlloc(); renderIncome(); setStatus();
-  renderHomeChrome(); renderComingUp();
+  renderHomeChrome(); renderComingUp(); renderHomeCoach();
   if(!$('page-insights').classList.contains('hidden')) renderInsights();
   if(!$('page-markets').classList.contains('hidden')) renderMarkets();
   if(!$('page-following').classList.contains('hidden')) renderFollowing();

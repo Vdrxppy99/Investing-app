@@ -272,3 +272,146 @@ where you are headed.
 6. **Goal** — the Monte Carlo projection. Longest horizon, so it closes.
 
 Section content, components and copy stay exactly as built. This is a reorder.
+
+---
+
+# Insights v2 — show the data, don't file it
+
+Owner brief, August 2026. Supersedes the Insights section of Home v2.
+
+## The problem, stated precisely
+
+Two separate failures, and they compound.
+
+**One: the app files information instead of showing it.** R2 collapsed ~20
+stacked cards into a health card, six stat tiles and a "More" list. That fixed
+an endless scroll and created a discovery problem — fourteen features now sit
+behind a tap, so the app's best work is invisible.
+
+**Two, and worse: the modules that ARE visible show numbers in boxes.** A number
+with a caption is not a visualization. Even a surfaced feature reads as a fact in
+a list rather than something you look at.
+
+## The pattern to adopt, from Delta
+
+Delta's Portfolio Insights modules are, without exception, **a chart plus the
+specific holdings driving it**. Their Risk module is a comparative chart plus a
+"riskiest assets" list. Their P/E module is a comparative chart plus a "top P/E
+assets" list. Asset Worth is a line chart highlighting the top four holdings.
+
+They never print a lone number. They show a shape, then name names.
+
+Our beta module says `0.93 — vs S&P 500`. It should show where the portfolio sits
+against the benchmark, and which holdings pull it up and down.
+
+**Rule: every Insights module carries a mark and at least one holding name.**
+If a module can only be a number, it is a stat tile on Home, not an Insights
+module.
+
+## The personal flair — what makes this not a Delta clone
+
+Delta generalises because its users hold fifty assets across ten exchanges. It
+must show "top 4" because it cannot show forty.
+
+**This portfolio holds six positions. It can always name all of them.** Every
+module shows the complete picture rather than a truncated leaderboard — every
+holding's contribution to beta, to sector exposure, to drawdown, to yield. That
+is a capability Delta structurally cannot offer, and it comes from the owner's
+situation rather than from copying anyone.
+
+Second differentiator, already built and under-used: the app knows every purchase
+lot with its date. Per-lot outcomes belong in Insights, not just on the asset
+sheet.
+
+## Form per module — pick by the data's job, not by habit
+
+Read `.claude/skills/dataviz` before writing any of these. The form heuristic
+and the mark specs are not optional, and the palette validator is runnable.
+
+- **Health** — single headline → ring. Already correct. Keep.
+- **XIRR vs benchmark** — comparison of two magnitudes → paired bars, not two
+  separate tiles printing two numbers.
+- **Risk** — position on a scale → the portfolio's beta marked against the
+  benchmark on a single axis, with each holding's beta plotted on the same
+  axis. One picture answers "how risky, and because of what".
+- **Drawdown** — change over time → the actual drawdown curve, not the number
+  `-9.81%`.
+- **Sector and geography** — part-to-whole → the existing bar strip. Keep.
+- **Monthly returns** — magnitude over a time grid → heatmap. Keep.
+- **Portfolio P/E** — comparison plus contributors → bar against SPY, holdings
+  ranked beneath.
+- **Tax lots** — categorical split → short-term versus long-term as a bar, with
+  the lots listed by holding.
+- **Contributions** — change over time → bars by period.
+
+## Structural rule
+
+The "More" list stops being the default destination. A feature goes behind a tap
+only if its full form genuinely needs a full screen. Everything else gets a small
+mark on the tab itself — a sparkline, a strip, a two-bar comparison — with the
+tap opening the detailed version.
+
+## Palette — currently failing validation, must be fixed first
+
+`node .claude/skills/dataviz/scripts/validate_palette.js` on the current
+`--cat-1..8` fails in dark mode on three checks:
+
+- **Lightness band** — four slots sit outside the legal `L 0.48-0.67`.
+- **CVD separation** — `--cat-1` and `--cat-2` measure ΔE 5.7 under deuteranopia.
+- **Normal-vision floor** — that same pair measures ΔE 9.0 for full-colour
+  vision, a hard fail. Below 15 means nobody can reliably tell them apart.
+
+In practice: in the allocation strip, `--cat-1` and `--cat-2` are the two largest
+holdings, sitting adjacent, and they look like the same colour.
+
+Root cause: the eight slots do not contain eight distinct hues. `--cat-2`/`--cat-7`
+are both blue and `--cat-3`/`--cat-8` are both orange; they read as different only
+because of lightness, which the legal band forbids. **Six validated slots beat
+eight that collide** — and six matches the number of positions actually held.
+
+Re-derive with the validator, in both modes, against surfaces `#0B0F17` and
+`#FBFBFC`. Keep `--brand` as slot 1. `--gain` and `--loss` are status colours and
+must never appear as a categorical slot.
+
+## The rendered spec
+
+`design/target/insights-v2.html` — open it in a browser. It is the approved
+target for this work, the same way `five-tabs.html` was for the five-tab
+rebuild. Six modules are built there; the pattern generalises to the rest.
+
+Three things it establishes:
+
+**1. Form.** Risk is an axis with every holding plotted and the portfolio marked
+on it, not the number 0.93. Deepest drop is the actual curve with the trough
+dated, not the number −9.81%. Return-vs-benchmark is paired bars, not two tiles.
+Contributions are bars. Sector is a **sequential single-hue ramp ordered by
+magnitude**, not six categorical colours — ordered magnitude is a sequential job,
+and treating it categorically was a form error.
+
+**2. Names.** Every module that can name a holding does. Deepest drop names which
+fell hardest and which held up. Risk plots all six on the axis. This is only
+possible because the portfolio has six positions — Delta shows "top 4" because
+its users hold fifty and it cannot show forty. Showing all of them is a
+capability that comes from the owner's situation, not from copying anyone.
+
+**3. The goal line.** Every card ends with one sentence, marked by an indigo
+rule, translating the module into the goal:
+
+> A 20% market drop costs you **$27,536** — and pushes your goal from
+> **Nov 2028** to **Jul 2029**.
+
+> Cost **$14,517** at the low. You were back to even in **4 months** — you kept
+> buying through it.
+
+> At **$850**/month you arrive **11 months early**. Adding $100 more makes it 18.
+
+This is the part a consumer tracker structurally cannot write, because it does
+not know the owner's target or date. It is the difference between an app that
+shows you data and an app that is yours. Where a module has no honest goal-
+relative statement, omit the line rather than inventing one — a filler sentence
+is worse than none.
+
+**Colour note:** every module in the rendered spec uses brand plus gain/loss
+only. None of these forms needs the categorical palette, which is why the
+palette fix and this work can proceed independently. Only the allocation strip
+still needs categorical slots.

@@ -159,6 +159,30 @@
     "Gold dashed line = your goal. ": "Die goldene gestrichelte Linie zeigt dein Ziel. ",
     "Not advice.": "Keine Anlageberatung.",
 
+    /* ── Insights v2 modules surfaced from #moreList, session 3 ──────────────
+       Crash test, Tax lots, Geographic mix and Asset worth's own labels and
+       goal lines (js/insights.js renderCrashMod/renderTaxMod/renderGeoMod/
+       renderWorthMod). Note: the OLDER goal lines from sessions 1-2 (Risk,
+       Drawdown, XIRR, Contributions, Sector) are not covered here — they were
+       never in the dictionary before this session either, a pre-existing gap
+       out of this session's scope; not repeating it for the new sentences. */
+    "2008 financial crisis": "Finanzkrise 2008",
+    "2020 COVID crash": "Corona-Crash 2020",
+    "2022 rate shock": "Zinsschock 2022",
+    "past crashes, scaled to you": "vergangene Krisen, auf dich skaliert",
+    "would fall hardest": "würde am stärksten fallen",
+    "A repeat of the %1 costs you %2 — and pushes your goal from %3 to %4.":
+      "Eine Wiederholung von %1 kostet dich %2 — und verschiebt dein Ziel von %3 auf %4.",
+    "short-term vs long-term": "kurzfristig vs. langfristig",
+    "goes long-term": "wird langfristig",
+    "Every lot you own already qualifies for the long-term rate.":
+      "Jede deiner Positionen erfüllt bereits die Bedingungen für den langfristigen Steuersatz.",
+    "%1 has %2 in short-term gains — it turns long-term on %3.":
+      "%1 hat %2 an kurzfristigen Gewinnen — wird am %3 langfristig.",
+    "%1 is %2 of you — mostly through %3 and %4.": "%1 sind %2 von dir — größtenteils über %3 und %4.",
+    "%1 is %2 of you, entirely through %3.": "%1 sind %2 von dir — vollständig über %3.",
+    "by holding": "nach Position",
+
     /* ── lock screen ─────────────────────────────────────────────────────── */
     "Username": "Benutzername",
     "Passcode": "Passwort",
