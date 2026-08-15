@@ -130,6 +130,17 @@
        offset from this ONE value so they can never drift apart again. */
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --bottom-clear: calc(var(--tabbar-h) + var(--fab-size) + var(--fab-gap) + var(--s-5) + var(--safe-bottom));
+    /* ── Top chrome geometry ─────────────────────────────────────────────── */
+    /* Bottom chrome (tab bar + FAB) has --bottom-clear; the pinned glass balance
+       bar (js/app.js showPage()'s `pin` — always shown on tabs without their own
+       hero: Insights, Markets, Following) never got the equivalent. Non-demo mode
+       had ZERO top clearance for it at all (only body.demo's own padding, sized
+       for the demo badge, happened to roughly cover it by coincidence) — a real
+       gap, not a styling choice; the Insights page title sat under the mini bar
+       for anyone not in demo mode. Composed from the same primitives .minibar's
+       own CSS uses (css/components.css) rather than a measured pixel value, so
+       it can't drift out of sync with the element it's clearing. */
+    --minibar-h: calc(var(--s-2) * 2 + var(--lh-label) + var(--hairline));
     --heat-cell-min: 20px;
     /* Home v2 §1 — Daily Movers bar chart. Max is the leader's height in the
        visible set; min is the visible-sliver floor a near-zero (or, edge case,

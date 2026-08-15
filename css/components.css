@@ -244,6 +244,12 @@
      element: an indigo rule marking the one sentence that translates the
      module into the owner's own goal. */
   .mod .card__head { margin-bottom: 0; }
+  /* Respect the same bottom keep-out any explicit scroll-to-this-card ever uses
+     (module-tile taps, a future "jump to" link) as the CARD's own scroll-margin,
+     not just the page's trailing padding — .wrap's padding-bottom only ever
+     guarantees the LAST card on the page clears the tab bar/FAB, it says nothing
+     about a mid-page card an explicit scroll targets directly. */
+  .mod { scroll-margin-bottom: var(--bottom-clear); }
   .mod__sub {
     font-size: var(--t-caption);
     font-weight: var(--w-semibold);

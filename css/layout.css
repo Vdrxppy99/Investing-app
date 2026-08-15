@@ -26,6 +26,11 @@
        card and of every chart's x-axis sat underneath it. One token now. */
     padding-bottom: var(--bottom-clear);
   }
+  /* Clear the pinned glass balance bar the same way — see --minibar-h's own
+     comment in css/tokens.css. body.mbfix is set whenever js/app.js's
+     showPage() pins it (Insights, Markets, Following): additive on top of
+     .shell's own safe-area padding, not a replacement for it. */
+  body.mbfix .wrap { padding-top: var(--minibar-h); }
 
   .appbar {
     display: flex;
