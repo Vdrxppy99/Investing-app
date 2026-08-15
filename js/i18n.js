@@ -159,6 +159,49 @@
     "Gold dashed line = your goal. ": "Die goldene gestrichelte Linie zeigt dein Ziel. ",
     "Not advice.": "Keine Anlageberatung.",
 
+    /* ── The projection module, surfaced from #moreList/Home's own goal card ──
+       js/insights.js's renderProjMod()/projAsOfText(). Real Monte Carlo fan
+       chart (Phase 6's runMonteCarloProjection()), main run always at
+       monthlyContribution:0, the what-if input's own re-run adds the rest. */
+    "/month": "/Monat",
+    "years": "Jahre",
+    "/mo added": "/Monat dazu",
+    "no more deposits": "keine weiteren Einzahlungen",
+    "Adding %1/month, you have a %2 chance of reaching %3 by %4.":
+      "Bei %1/Monat zusätzlich hast du eine %2-Chance, %3 bis %4 zu erreichen.",
+    "With no more deposits, you have a %1 chance of reaching %2 by %3.":
+      "Ohne weitere Einzahlungen hast du eine %1-Chance, %2 bis %3 zu erreichen.",
+    "Adding %1/month, the median path reaches %2 by %3 — likely range %4.":
+      "Bei %1/Monat zusätzlich erreicht der mittlere Pfad %2 bis %3 — wahrscheinliche Spanne %4.",
+    "With no more deposits, the median path reaches %1 by %2 — likely range %3.":
+      "Ohne weitere Einzahlungen erreicht der mittlere Pfad %1 bis %2 — wahrscheinliche Spanne %3.",
+    "Computed just now": "Gerade eben berechnet",
+    "Computed %1s ago": "Vor %1s berechnet",
+    "Computed %1 min ago": "Vor %1 Min. berechnet",
+    "Computed %1": "Berechnet am %1",
+
+    /* ── Leaks the projection module's new dictionary candidates exposed ──────
+       "years" and "/month" becoming candidates (above) surfaced two PRE-EXISTING
+       gaps the i18n-coverage ratchet had never been able to see before, because
+       neither word had ever been a candidate on its own: session 3's own
+       Contributions goal line (renderContribMod, noted in that session's commit
+       as one of the untranslated older goal lines — now fixed because it
+       shares "/month" with this session's new module) and Crash test's/the old
+       Projection sheet's own untranslated sentences (openCrashSheet,
+       renderProjection — fixed above by renaming a shadowed `t` and wrapping
+       the text, here just the dictionary entries). */
+    "At %1/month you arrive %2. Adding $100 more makes it %3.":
+      "Bei %1/Monat kommst du %2 an. Mit $100 mehr sind es %3.",
+    "At %1/month you arrive %2.": "Bei %1/Monat kommst du %2 an.",
+    "The other half of the story: <b>every one of these fully recovered</b> — in %1. Money you won't need for years can afford to ride it out; panic-selling at the bottom is the only move that makes the loss permanent.":
+      "Die andere Hälfte der Geschichte: <b>jede einzelne davon hat sich vollständig erholt</b> — in %1. Geld, das du jahrelang nicht brauchst, kann die Durststrecke aussitzen; Panikverkäufe am Tiefpunkt sind der einzige Schritt, der den Verlust endgültig macht.",
+    "In %1 years:": "In %1 Jahren:",
+    "about 4 years": "etwa 4 Jahre",
+    "about 5 months": "etwa 5 Monate",
+    "about 2 years": "etwa 2 Jahre",
+    "Your timing added %1 — about %2 off the goal date.": "Dein Timing hat dir %1 gebracht — etwa %2 früher am Ziel.",
+    "Your timing cost you %1 — about %2 later on the goal date.": "Dein Timing hat dich %1 gekostet — etwa %2 später am Ziel.",
+
     /* ── Insights v2 modules surfaced from #moreList, session 3 ──────────────
        Crash test, Tax lots, Geographic mix and Asset worth's own labels and
        goal lines (js/insights.js renderCrashMod/renderTaxMod/renderGeoMod/
