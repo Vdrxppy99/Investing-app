@@ -380,7 +380,16 @@ function renderHealth(){
   }
   const grade=score>=85?'A':score>=75?'B':score>=65?'C':score>=50?'D':'F';
   const weakest=metrics.filter(m=>m.tip).sort((a,b)=>a.v-b.v)[0];
-  const oneLiner=weakest?weakest.tip:'Diversification, global mix, cost and cash deployment are all strong — nothing is holding the grade down.';
+  // healthScore() above deliberately scores single-STOCK concentration only ("broad index
+  // funds ARE diversification; only single companies count as concentration" — its own
+  // comment); it never weighs sector or country weight, on purpose, so it can't move when
+  // Sector/Geographic mix show real concentration (26% one sector, 83% one country in the
+  // live demo data — a bug-hunt session caught this exact contradiction: A/100, "nothing is
+  // holding the grade down", on a screen that then shows that). The number can't change
+  // here — healthScore()'s score is a golden-master figure — so the fix is the claim: it no
+  // longer says "nothing" is holding the grade down, it names what this score does and does
+  // not cover and points at the cards that actually answer sector/country concentration.
+  const oneLiner=weakest?weakest.tip:"Single-stock risk, global mix, cost and cash deployment are all strong by this score. It doesn't weigh sector or country concentration — see Sector exposure and Where your money lives below.";
   $('healthBody').innerHTML=`
     <div class="hsplit">
       <div class="hscore">${ringSvg(score/100, cvar('--brand'), 40)}<div class="rt"><b>${grade}</b><span>${score}/100</span></div></div>

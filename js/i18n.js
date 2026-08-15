@@ -406,8 +406,8 @@
        paragraph, not the short phrase. */
     "Portfolio P/E is the price you pay for every $1 of your holdings' annual earnings — a rough valuation gauge. Lower is \"cheaper,\" higher means more growth is priced in. It's a share-weighted blend across your funds.":
       "Das Portfolio-KGV ist der Preis, den du für jeden $1 Jahresgewinn deiner Positionen zahlst — ein grober Bewertungsmaßstab. Niedriger bedeutet \"günstiger\", höher heißt, dass mehr Wachstum bereits eingepreist ist. Es ist ein anteilsgewichteter Durchschnitt über all deine Fonds.",
-    "Diversification, global mix, cost and cash deployment are all strong — nothing is holding the grade down.":
-      "Diversifikation, globale Streuung, Kosten und Kapitaleinsatz sind allesamt stark — nichts drückt die Note.",
+    "Single-stock risk, global mix, cost and cash deployment are all strong by this score. It doesn't weigh sector or country concentration — see Sector exposure and Where your money lives below.":
+      "Einzelaktienrisiko, globale Streuung, Kosten und Kapitaleinsatz sind laut dieser Bewertung allesamt stark. Sektor- oder Länderkonzentration fließt hier nicht ein — siehe Sektorengewichtung und Wo dein Geld liegt weiter unten.",
     "Today's holdings compounded at your own growth rate — no assumed future deposits (your rule). Not advice.":
       "Deine heutigen Positionen, hochgerechnet mit deiner eigenen Wachstumsrate — ohne angenommene künftige Einzahlungen (deine Vorgabe). Keine Anlageberatung.",
   };
