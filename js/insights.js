@@ -557,18 +557,37 @@ function renderRiskMod(){
   const MUT=cvar('--mut'), GRID=cvar('--grid'), BRAND=cvar('--brand'), CANVAS=cvar('--canvas');
   let s=`<line x1="${pl}" y1="${y}" x2="${w-pr}" y2="${y}" stroke="${GRID}" stroke-width="1.5"/>`;
   s+=`<line x1="${X(1).toFixed(1)}" y1="${y-13}" x2="${X(1).toFixed(1)}" y2="${y+13}" stroke="${MUT}" stroke-width="1.5" stroke-dasharray="2 3"/>`;
-  s+=`<text x="${X(1).toFixed(1)}" y="${y+27}" fill="${MUT}" font-size="9.5" font-weight="600" text-anchor="middle">S&amp;P 1.00</text>`;
-  // Label rows: real betas cluster far tighter than the mockup's illustrative spread-out
-  // demo values (a real observed cluster: YOU/VOO/VTI/VXUS all within ~0.13 of each other),
-  // so simple alternation isn't enough — strict alternation only guarantees the two
-  // IMMEDIATE x-neighbors differ in row; a 4-item cluster still puts every other one (YOU
-  // and VTI, or VOO and VXUS) in the SAME row, close enough to collide. Fix: alternate for
-  // the common case, then declutter each row independently — walk it in x-order and push
-  // any label that's still too close to the previous one in that row rightward. Circles
-  // stay at the true data position (`x`); only the text position (`tx`) moves.
+  // Two collision problems, not one. Session 1 only ever decluttered label TEXT (below),
+  // never the MARKER circles themselves — this session's bug report caught VOO/VTI circles
+  // overlapping outright on real clustered betas (a 0.78-1.18 band). Separately, the S&P
+  // benchmark's label used to be drawn at a fixed position outside the declutter system
+  // entirely, so a holding near beta=1.00 collided with it directly. Fixed by folding the
+  // benchmark label into the SAME items array (r:0 — it never gets its own circle, the
+  // dashed tick line above stays at the true X(1), unmoved) and running a two-pass
+  // (forward then backward) minimum-gap resolution on marker x BEFORE the per-row label
+  // declutter, so labels now start from already-separated markers instead of raw values.
   const px=+X(r.beta).toFixed(1);
-  const items=[{x:px, sym:'YOU', isYou:true}, ...hold.map(hd=>({x:+X(hd.beta).toFixed(1), sym:hd.sym.replace('-','.'), isYou:false}))];
+  const items=[
+    {x:px, sym:'YOU', isYou:true, r:7.5},
+    ...hold.map(hd=>({x:+X(hd.beta).toFixed(1), sym:hd.sym.replace('-','.'), isYou:false, r:4})),
+    {x:+X(1).toFixed(1), sym:'S&P 1.00', isBench:true, r:0},
+  ];
   items.sort((a,b)=>a.x-b.x);
+  for(let i=1;i<items.length;i++){
+    const need=items[i-1].r+items[i].r+3;
+    if(items[i].x-items[i-1].x<need) items[i].x=items[i-1].x+need;
+  }
+  for(let i=items.length-2;i>=0;i--){
+    const need=items[i].r+items[i+1].r+3;
+    if(items[i+1].x-items[i].x<need) items[i].x=items[i+1].x-need;
+  }
+  for(const it of items) it.x=Math.min(w-pr-4,Math.max(pl+4,it.x));
+  // Label rows: real betas cluster far tighter than the mockup's illustrative spread-out
+  // demo values, so simple alternation isn't enough — strict alternation only guarantees
+  // the two IMMEDIATE x-neighbors differ in row; a 4-item cluster still puts every other
+  // one in the SAME row, close enough to collide. Alternate for the common case, then
+  // declutter each row independently — walk it in x-order and push any label still too
+  // close to the previous one in that row rightward.
   items.forEach((it,i)=>{ it.row=(i%2===0)?'up':'down'; it.tx=it.x; });
   const MIN_GAP=24;
   for(const row of ['up','down']){
@@ -580,15 +599,16 @@ function renderRiskMod(){
     for(const it of rowItems) it.tx=Math.min(w-pr-4,Math.max(pl+4,it.tx));
   }
   for(const it of items){
-    if(it.isYou) continue;
-    s+=`<circle cx="${it.x}" cy="${y}" r="4" fill="${CANVAS}" stroke="${MUT}" stroke-width="1.6"/>`;
-    s+=`<text x="${it.tx.toFixed(1)}" y="${it.row==='up'?y-18:y+40}" fill="${MUT}" font-size="9" font-weight="650" text-anchor="middle">${esc(it.sym)}</text>`;
+    if(it.isYou || it.isBench) continue;
+    s+=`<circle cx="${it.x.toFixed(1)}" cy="${y}" r="4" fill="${CANVAS}" stroke="${MUT}" stroke-width="1.6"/>`;
+    s+=`<text x="${it.tx.toFixed(1)}" y="${it.row==='up'?y-18:y+40}" fill="${MUT}" stroke="none" font-size="9" font-weight="650" text-anchor="middle">${esc(it.sym)}</text>`;
   }
-  const youIt=items.find(it=>it.isYou);
-  s+=`<circle cx="${px}" cy="${y}" r="7.5" fill="${BRAND}" stroke="${CANVAS}" stroke-width="2.5"/>`;
-  s+=`<text x="${youIt.tx.toFixed(1)}" y="${youIt.row==='up'?y-18:y+40}" fill="${BRAND}" font-size="10" font-weight="700" text-anchor="middle">YOU</text>`;
-  s+=`<text x="${pl}" y="${y+27}" fill="${MUT}" font-size="9" font-weight="600">${t`calmer`}</text>`;
-  s+=`<text x="${w-pr}" y="${y+27}" fill="${MUT}" font-size="9" font-weight="600" text-anchor="end">${t`wilder`}</text>`;
+  const youIt=items.find(it=>it.isYou), benchIt=items.find(it=>it.isBench);
+  s+=`<circle cx="${youIt.x.toFixed(1)}" cy="${y}" r="7.5" fill="${BRAND}" stroke="${CANVAS}" stroke-width="2.5"/>`;
+  s+=`<text x="${youIt.tx.toFixed(1)}" y="${youIt.row==='up'?y-18:y+40}" fill="${BRAND}" stroke="none" font-size="10" font-weight="700" text-anchor="middle">YOU</text>`;
+  s+=`<text x="${benchIt.tx.toFixed(1)}" y="${benchIt.row==='up'?y-18:y+40}" fill="${MUT}" stroke="none" font-size="9.5" font-weight="600" text-anchor="middle">S&amp;P 1.00</text>`;
+  s+=`<text x="${pl}" y="${y+27}" fill="${MUT}" stroke="none" font-size="9" font-weight="600">${t`calmer`}</text>`;
+  s+=`<text x="${w-pr}" y="${y+27}" fill="${MUT}" stroke="none" font-size="9" font-weight="600" text-anchor="end">${t`wilder`}</text>`;
   svgEl.innerHTML=s;
   svgEl.setAttribute('role','img');
   svgEl.setAttribute('aria-label', `Beta vs S&P 500, on one axis. You: ${r.beta.toFixed(2)}. `+hold.map(hd=>`${hd.sym.replace('-','.')} ${hd.beta.toFixed(2)}`).join(', ')+'.');
@@ -626,12 +646,12 @@ function renderDrawdownMod(){
   const LOSS=cvar('--loss'), GRID=cvar('--grid'), CANVAS=cvar('--canvas'), zeroY=Y(0).toFixed(1);
   let s=`<defs><linearGradient id="ddg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${LOSS}" stop-opacity=".02"/><stop offset="1" stop-color="${LOSS}" stop-opacity=".22"/></linearGradient></defs>`+
     `<line x1="0" y1="${zeroY}" x2="${w}" y2="${zeroY}" stroke="${GRID}" stroke-width="1"/>`+
-    `<path d="${path} L${w} ${zeroY} L0 ${zeroY} Z" fill="url(#ddg)"/>`+
+    `<path d="${path} L${w} ${zeroY} L0 ${zeroY} Z" fill="url(#ddg)" stroke="none"/>`+
     `<path d="${path}" fill="none" stroke="${LOSS}" stroke-width="2" stroke-linecap="round"/>`;
   if(troughRelI>=0){
     const cx=X(troughRelI).toFixed(1), cy=Y(d.curve[troughRelI]).toFixed(1);
     s+=`<circle cx="${cx}" cy="${cy}" r="3.6" fill="${LOSS}" stroke="${CANVAS}" stroke-width="2"/>`+
-      `<text x="${cx}" y="${(+cy+15).toFixed(1)}" fill="${LOSS}" font-size="9.5" font-weight="650" text-anchor="middle">${esc(monthYear(new Date(d.troughDate+'T12:00:00')))}</text>`;
+      `<text x="${cx}" y="${(+cy+15).toFixed(1)}" fill="${LOSS}" stroke="none" font-size="9.5" font-weight="650" text-anchor="middle">${esc(monthYear(new Date(d.troughDate+'T12:00:00')))}</text>`;
   }
   svgEl.innerHTML=s;
   svgEl.setAttribute('role','img');
@@ -689,10 +709,10 @@ function renderCrashMod(){
   let s='';
   scenarios.forEach((sc,i)=>{
     const y=i*rowH, ww=Math.max(56,(sc.hit/max)*w);
-    s+=`<text x="0" y="${y+9}" fill="${cvar('--mut')}" font-size="10" font-weight="600">${esc(CRASH_LABELS[sc.n]||sc.n)}</text>`;
-    s+=`<rect x="0" y="${y+13}" width="${w}" height="${barH}" rx="5" fill="${cvar('--surface-2')}"/>`;
-    s+=`<rect x="0" y="${y+13}" width="${ww.toFixed(1)}" height="${barH}" rx="5" fill="${cvar('--loss')}"/>`;
-    s+=`<text x="${(ww-6).toFixed(1)}" y="${y+13+10}" fill="${cvar('--on-primary')}" font-size="10" font-weight="650" text-anchor="end">−${esc(fmt(sc.hit))}</text>`;
+    s+=`<text x="0" y="${y+9}" fill="${cvar('--mut')}" stroke="none" font-size="10" font-weight="600">${esc(CRASH_LABELS[sc.n]||sc.n)}</text>`;
+    s+=`<rect x="0" y="${y+13}" width="${w}" height="${barH}" rx="5" fill="${cvar('--surface-2')}" stroke="none"/>`;
+    s+=`<rect x="0" y="${y+13}" width="${ww.toFixed(1)}" height="${barH}" rx="5" fill="${cvar('--loss')}" stroke="none"/>`;
+    s+=`<text x="${(ww-6).toFixed(1)}" y="${y+13+10}" fill="${cvar('--on-primary')}" stroke="none" font-size="10" font-weight="650" text-anchor="end">−${esc(fmt(sc.hit))}</text>`;
   });
   svgEl.innerHTML=s;
   svgEl.setAttribute('role','img');
@@ -726,10 +746,10 @@ function renderXirrMod(){
   let s='';
   barRows.forEach(([lab,v,col],i)=>{
     const y=14+i*38, ww=Math.max(4,(Math.max(0,v)/max)*bw);
-    s+=`<text x="0" y="${y+13}" fill="${cvar('--mut')}" font-size="11" font-weight="600">${esc(lab)}</text>`;
-    s+=`<rect x="${bx}" y="${y}" width="${bw}" height="20" rx="4" fill="${cvar('--surface-2')}"/>`;
-    s+=`<rect x="${bx}" y="${y}" width="${ww.toFixed(1)}" height="20" rx="4" fill="${col}"/>`;
-    s+=`<text x="${w}" y="${y+14}" fill="${cvar('--text')}" font-size="11.5" font-weight="650" text-anchor="end">${fmtPct(v)}</text>`;
+    s+=`<text x="0" y="${y+13}" fill="${cvar('--mut')}" stroke="none" font-size="11" font-weight="600">${esc(lab)}</text>`;
+    s+=`<rect x="${bx}" y="${y}" width="${bw}" height="20" rx="4" fill="${cvar('--surface-2')}" stroke="none"/>`;
+    s+=`<rect x="${bx}" y="${y}" width="${ww.toFixed(1)}" height="20" rx="4" fill="${col}" stroke="none"/>`;
+    s+=`<text x="${w}" y="${y+14}" fill="${cvar('--text')}" stroke="none" font-size="11.5" font-weight="650" text-anchor="end">${fmtPct(v)}</text>`;
   });
   svgEl.innerHTML=s;
   svgEl.setAttribute('role','img');
@@ -776,10 +796,10 @@ function renderContribMod(){
   let s='';
   V.forEach((v,i)=>{
     const bh=Math.max(1,(v/max)*(h-14)), x=i*(bw+g), y=h-14-bh;
-    s+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${cvar('--brand')}" opacity="${(0.45+0.55*v/max).toFixed(2)}"/>`;
+    s+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${cvar('--brand')}" stroke="none" opacity="${(0.45+0.55*v/max).toFixed(2)}"/>`;
   });
-  s+=`<text x="0" y="${h-1}" fill="${cvar('--mut')}" font-size="8.5" font-weight="600">${esc(mLbl(L[0]))}</text>`;
-  s+=`<text x="${w}" y="${h-1}" fill="${cvar('--mut')}" font-size="8.5" font-weight="600" text-anchor="end">${esc(mLbl(L[L.length-1]))}</text>`;
+  s+=`<text x="0" y="${h-1}" fill="${cvar('--mut')}" stroke="none" font-size="8.5" font-weight="600">${esc(mLbl(L[0]))}</text>`;
+  s+=`<text x="${w}" y="${h-1}" fill="${cvar('--mut')}" stroke="none" font-size="8.5" font-weight="600" text-anchor="end">${esc(mLbl(L[L.length-1]))}</text>`;
   svgEl.innerHTML=s;
   svgEl.setAttribute('role','img');
   svgEl.setAttribute('aria-label', `What you added, last ${V.length} months. Total ${fmt(total)}. `+L.map((k,i)=>`${mLbl(k)} ${fmt(V[i])}`).join(', ')+'.');
@@ -835,13 +855,13 @@ function renderTaxMod(){
   const big=$('taxModBig'); if(big) big.textContent=ltPct.toFixed(0)+'%';
   const w=342,h=46, bx=0, bw=w, by=16, bh=14;
   const stW=Math.max(0,(stPct/100)*bw), ltW=bw-stW;
-  let s=`<text x="0" y="9" fill="${cvar('--mut')}" font-size="9.5" font-weight="600">${t`Short-term gains`}</text>`;
-  s+=`<text x="${w}" y="9" fill="${cvar('--mut')}" font-size="9.5" font-weight="600" text-anchor="end">${t`Long-term gains`}</text>`;
-  s+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="7" fill="${cvar('--surface-2')}"/>`;
-  if(stW>0) s+=`<rect x="${bx}" y="${by}" width="${stW.toFixed(1)}" height="${bh}" rx="7" fill="${cvar('--text-faint')}"/>`;
-  if(ltW>0) s+=`<rect x="${(bx+stW).toFixed(1)}" y="${by}" width="${ltW.toFixed(1)}" height="${bh}" rx="7" fill="${cvar('--brand')}"/>`;
-  s+=`<text x="0" y="${by+bh+11}" fill="${cvar('--text')}" font-size="10" font-weight="650">${stPct.toFixed(0)}% · ${esc(fmt(st))}</text>`;
-  s+=`<text x="${w}" y="${by+bh+11}" fill="${cvar('--text')}" font-size="10" font-weight="650" text-anchor="end">${ltPct.toFixed(0)}% · ${esc(fmt(lt))}</text>`;
+  let s=`<text x="0" y="9" fill="${cvar('--mut')}" stroke="none" font-size="9.5" font-weight="600">${t`Short-term gains`}</text>`;
+  s+=`<text x="${w}" y="9" fill="${cvar('--mut')}" stroke="none" font-size="9.5" font-weight="600" text-anchor="end">${t`Long-term gains`}</text>`;
+  s+=`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="7" fill="${cvar('--surface-2')}" stroke="none"/>`;
+  if(stW>0) s+=`<rect x="${bx}" y="${by}" width="${stW.toFixed(1)}" height="${bh}" rx="7" fill="${cvar('--text-faint')}" stroke="none"/>`;
+  if(ltW>0) s+=`<rect x="${(bx+stW).toFixed(1)}" y="${by}" width="${ltW.toFixed(1)}" height="${bh}" rx="7" fill="${cvar('--brand')}" stroke="none"/>`;
+  s+=`<text x="0" y="${by+bh+11}" fill="${cvar('--text')}" stroke="none" font-size="10" font-weight="650">${stPct.toFixed(0)}% · ${esc(fmt(st))}</text>`;
+  s+=`<text x="${w}" y="${by+bh+11}" fill="${cvar('--text')}" stroke="none" font-size="10" font-weight="650" text-anchor="end">${ltPct.toFixed(0)}% · ${esc(fmt(lt))}</text>`;
   svgEl.innerHTML=s;
   svgEl.setAttribute('role','img');
   svgEl.setAttribute('aria-label', `Tax lots. Short-term ${stPct.toFixed(0)}% (${fmt(st)}), long-term ${ltPct.toFixed(0)}% (${fmt(lt)}).`);
@@ -890,11 +910,17 @@ function renderSectorMod(){
   if(!top.length){ card.hidden=true; return; }
   card.hidden=false;
   const tot=top.reduce((a,x)=>a+x[1],0)||1;
-  const max=top[0][1];
+  // Opacity-as-sequential-ramp dropped this session: 0.25+0.75*(v/max) compresses every
+  // non-largest row toward the low end whenever one category dominates (this app's own
+  // real data is exactly that — one ~25-83% row plus several much smaller ones), and the
+  // resulting deltas (measured live: 0.53/0.53/0.52/0.45 across four sector rows) are too
+  // close to read as different indigo shades in a 9px-tall bar. Length already encodes the
+  // same magnitude precisely and comparably — the opacity channel was doubling up on a job
+  // length was already doing, not doing a second job. One flat fill; length is the encoding.
   body.innerHTML=top.map(([label,v])=>{
-    const pct=v/tot*100, op=(0.25+0.75*v/max).toFixed(2);
+    const pct=v/tot*100;
     return `<div class="seqrow"><s>${esc(label)}</s>`+
-      `<span class="seqtrack"><i style="width:${pct.toFixed(1)}%;opacity:${op}"></i></span>`+
+      `<span class="seqtrack"><i style="width:${pct.toFixed(1)}%"></i></span>`+
       `<b>${pct.toFixed(0)}%</b></div>`;
   }).join('');
   // Goal line: a look-through fact, not an assumption — find the top sector's two largest
@@ -939,11 +965,15 @@ function renderGeoMod(){
   card.hidden=false;
   const head=$('geoModHead'); if(head) head.textContent=t`Where your money lives`;
   const tot=items.reduce((a,x)=>a+x.v,0)||1;
-  const max=Math.max(...items.map(x=>x.v));
+  // Opacity ramp dropped, same reasoning/evidence as renderSectorMod above: with one row
+  // this dominant (US ~83%), 0.25+0.75*(v/max) crowds five of six rows into a 0.05-wide
+  // opacity band (measured live: 0.31/0.29/0.29/0.26/0.26) — not perceptibly different
+  // shades. Length alone is the encoding; the 3px seqtrack-i min-width floor (session 3,
+  // css/components.css) still keeps this portfolio's real 1% buckets visible as a sliver.
   body.innerHTML=items.slice().sort((a,b)=>b.v-a.v).map(({label,v})=>{
-    const pct=v/tot*100, op=(0.25+0.75*v/max).toFixed(2);
+    const pct=v/tot*100;
     return `<div class="seqrow"><s>${esc(label)}</s>`+
-      `<span class="seqtrack"><i style="width:${pct.toFixed(1)}%;opacity:${op}"></i></span>`+
+      `<span class="seqtrack"><i style="width:${pct.toFixed(1)}%"></i></span>`+
       `<b>${pct.toFixed(0)}%</b></div>`;
   }).join('');
   const gl=$('geoGoalLine');
@@ -980,10 +1010,10 @@ function renderPEMod(){
   let s='';
   barRows.forEach(([lab,v,col],i)=>{
     const y=14+i*38, ww=Math.max(4,(v/max)*bw);
-    s+=`<text x="0" y="${y+13}" fill="${cvar('--mut')}" font-size="11" font-weight="600">${esc(lab)}</text>`;
-    s+=`<rect x="${bx}" y="${y}" width="${bw}" height="20" rx="4" fill="${cvar('--surface-2')}"/>`;
-    s+=`<rect x="${bx}" y="${y}" width="${ww.toFixed(1)}" height="20" rx="4" fill="${col}"/>`;
-    s+=`<text x="${w}" y="${y+14}" fill="${cvar('--text')}" font-size="11.5" font-weight="650" text-anchor="end">${v.toFixed(1)}×</text>`;
+    s+=`<text x="0" y="${y+13}" fill="${cvar('--mut')}" stroke="none" font-size="11" font-weight="600">${esc(lab)}</text>`;
+    s+=`<rect x="${bx}" y="${y}" width="${bw}" height="20" rx="4" fill="${cvar('--surface-2')}" stroke="none"/>`;
+    s+=`<rect x="${bx}" y="${y}" width="${ww.toFixed(1)}" height="20" rx="4" fill="${col}" stroke="none"/>`;
+    s+=`<text x="${w}" y="${y+14}" fill="${cvar('--text')}" stroke="none" font-size="11.5" font-weight="650" text-anchor="end">${v.toFixed(1)}×</text>`;
   });
   svgEl.innerHTML=s;
   svgEl.setAttribute('role','img');

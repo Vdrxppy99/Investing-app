@@ -168,7 +168,16 @@
     text-decoration: none;
   }
 
-  svg {
+  /* Scoped to the icon-sprite pattern only (every <svg><use href="#i-…"/></svg> icon in
+     this app carries aria-hidden="true"; every hand-built chart SVG is role="img" instead
+     — the two are mutually exclusive, confirmed by grepping every <svg> tag in index.html).
+     Was bare `svg{}`: fill and stroke are INHERITED SVG properties, so every <text>, <rect>
+     and <circle> drawn into a chart SVG (js/insights.js's render*Mod functions) inherited a
+     1.75px near-white stroke from this rule — chart text read as embossed, bars got pill
+     outlines. Chart SVGs already set fill/stroke explicitly on every element they draw
+     (js/insights.js) rather than relying on inheritance, so scoping this loses nothing for
+     them and fixes everything. */
+  svg[aria-hidden="true"] {
     display: block;
     fill: none;
     stroke: currentColor;
