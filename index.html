@@ -359,7 +359,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.154</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.155</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->
@@ -422,9 +422,11 @@
 <!-- ═══════════════════ FOLLOWING ═══════════════════ -->
 <!-- DESIGN-TARGET.md §5 / five-tabs.html frame 5: the other half of the old
      Explore tab — watchlist, then the ETF look-through given a headline
-     section instead of being buried one tap deep in Insights' #moreList
-     (js/insights.js's openLookSheet still reaches the same data for anyone
-     coming from there; nothing was removed, this just gives it a front door). -->
+     section instead of being buried one tap deep in Insights' #moreList.
+     Session 3 gave this a front door while leaving Insights' own copy
+     (js/insights.js's openLookSheet) reachable too; session 5 removed that
+     copy outright — this version carries more (live quotes, day % change),
+     so it's the only one now, not a duplicate with two doors. -->
 <div id="page-following" class="page hidden">
   <div class="appbar"><h1 class="t-title" id="followingTitle" tabindex="-1">Following</h1></div>
 
@@ -450,12 +452,13 @@
      modules — session 3's own fix). No maths lives here — every figure below
      is computed by js/insights.js / js/app.js's healthScore() and written
      into these IDs. Section labels ("Performance"/"Risk"/"Income & tax"/
-     "Under the hood") are the taxonomy sessions 1-2 already provisioned DE
-     translations for in js/i18n.js but never wired to markup — used here for
-     the first time. "Future" (financial independence, projection, next-moves
-     coach) stays unwired: those stay behind #moreList this session, on
-     purpose (DESIGN-TARGET.md's "leave behind the tap" call) — nothing was
-     deleted, see js/insights.js's open*Sheet functions. -->
+     "Under the hood"/"Future") are the taxonomy sessions 1-2 already
+     provisioned DE translations for in js/i18n.js but never wired to markup —
+     used here for the first time. "Future" now carries the projection module
+     (below, #projModCard) — the owner's own words were "hidden and it is the
+     app's best feature". Financial independence and next-moves coach (moved
+     to Home, session 4) stay off this tab; nothing else was deleted, see
+     js/insights.js's open*Sheet functions. -->
 <div id="page-insights" class="page hidden">
   <div class="appbar"><h1 class="t-title" id="insightsTitle" tabindex="-1">Insights</h1></div>
   <p class="t-caption muted insights-sub">Deposit-adjusted · updated today</p>
@@ -574,6 +577,32 @@
     </section>
 
     <div id="modGrid"></div>
+
+    <!-- Where this is headed — the real Monte Carlo engine (Phase 6's
+         runMonteCarloProjection(), js/monte-carlo.js), surfaced for the first time
+         as its own always-visible module instead of living only inside Home's
+         goal-gated card or one tap deep behind Insights' OLD #moreList entry
+         (js/insights.js's openProjSheet — a separate, weaker deterministic
+         4/7/10%-scenario chart with no percentile bands; left in place, still
+         reachable by tap for its adjustable 5/10/20y view). MAIN run always uses
+         monthlyContribution:0 — "what my money does if I never add another
+         dollar" (the owner's own framing), not a rate derived from past buying
+         pace. The what-if input re-runs the SAME engine with a typed monthly
+         amount, debounced, in the Web Worker (js/app.js's runProbabilisticGoal(),
+         unchanged) so typing it never blocks the main thread. -->
+    <h2 class="section__label">Future</h2>
+    <section class="card press mod" id="projModCard" hidden>
+      <div class="card__head" id="projModHead"></div>
+      <div class="t-display" id="projModBig"></div>
+      <div class="chart-box chart-box--sheet"><div id="projFan"></div></div>
+      <div class="whatif">
+        <label for="projWhatIfInput">Add</label>
+        <input id="projWhatIfInput" type="number" inputmode="decimal" min="0" step="50" placeholder="0" aria-label="What-if monthly contribution">
+        <span>/month</span>
+      </div>
+      <p class="t-caption faint" id="projModAsOf"></p>
+      <div class="goalline" id="projModGoalLine" hidden></div>
+    </section>
 
     <h2 class="section__label">More</h2>
     <div class="card" id="moreList"></div>

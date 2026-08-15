@@ -91,7 +91,6 @@ const SHEET_OPENERS = [
   ['Contributions', () => window.openContribSheet()],
   ['Projection/Goal', () => window.openProjSheet()],
   ['Coach / next moves', () => window.openCoachSheet()],
-  ['Stocks you indirectly own', () => window.openLookSheet()],
   ['Asset worth', () => window.openWorthSheet()],
   ['Crash test', () => window.openCrashSheet()],
   ['Financial independence', () => window.openFISheet()],

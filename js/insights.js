@@ -41,35 +41,6 @@ function locItems(){
     {label:'Cash',          v:cash,                        color:CAT[2]}
   ].filter(i=>i.v>0);
 }
-function renderLook(){
-  if(!$('lookList')) return;
-  const sub=$('lookSub');
-  if(sub){
-    const syms=new Set(rows('all').map(r=>r.sym));
-    let n=0;
-    if(syms.has('VTI')) n+=3600; else { if(syms.has('VOO')) n+=500; if(syms.has('VXF')) n+=3400; }
-    if(syms.has('VXUS')) n+=8300;
-    sub.textContent = n>1000 ? `Your funds hold ~${n.toLocaleString(appLocale())} companies across ~50 countries — these are your biggest slices.` : '';
-  }
-  const look=lookExposure().slice(0,10);
-  $('lookList').innerHTML = look.map(l=>{
-    const q=state.quotes[l.sym];
-    const pct=q&&q.prev>0?(q.price/q.prev-1)*100:null;
-    return mRow(l.sym, (LOOK_NAMES[l.sym]||'')+' · via '+l.via.map(v=>v.replace('-','.')).join(' + '), fmt(l.usd), pct);
-  }).join('') || '<div class="mload">No fund holdings yet.</div>';
-}
-let lookFetching=false;
-async function ensureLookQuotes(){
-  if(lookFetching) return;
-  const TTL=5*60000;
-  const stale=lookExposure().slice(0,10).filter(l=>{const q=state.quotes[l.sym]; return !q||!q.ts||Date.now()-q.ts>TTL;});
-  if(!stale.length) return;
-  lookFetching=true;
-  await Promise.allSettled(stale.map(l=>fetchQuote(l.sym)));
-  lookFetching=false;
-  lsSet('pt_quotes',state.quotes);
-  renderLook();
-}
 function renderDrawdown(){
   const el=$('ddChart'); if(!el||!window.Chart) return;
   const o=Chart.getChart(el); if(o) o.destroy();
@@ -512,6 +483,7 @@ function renderInsights(){
   renderGeoMod();
   renderWorthMod();
   renderPEMod();
+  renderProjMod();
   renderModGrid();
   renderHeatmap();
   renderMoreList();
@@ -1025,6 +997,107 @@ function renderPEMod(){
   }
   card.onclick=openPESheet;
 }
+/* ============ THE PROJECTION — surfaced session 5, "hidden and it is the app's
+   best feature" (the owner's own words; he'd forgotten it existed) ============
+   Phase 6's runMonteCarloProjection() (js/monte-carlo.js) is the real fan-chart
+   engine this app has — until now only ever run for Home's goal card
+   (js/app.js renderGoal(), gated behind having a goal set), and reachable from
+   Insights only via the OLDER, weaker openProjSheet() (a flat 4/7/10%
+   deterministic chart with no percentile bands — left in place below, still
+   reachable by tap for its adjustable 5/10/20y view; this module supersedes it
+   as the default view, not a replacement of its code).
+
+   MAIN run: monthlyContribution:0, always — "what my money does if I never add
+   another dollar" is the headline (the owner's own framing), not a rate derived
+   from past buying pace the way Home's goal card's deriveMonthlyContribution()
+   still does (a different, deliberately narrower question — "will THIS SPECIFIC
+   goal, at my past pace, land" — left alone, out of this session's scope). The
+   what-if input re-runs the SAME engine with a typed monthly amount — his
+   number, not a derived one — debounced (450ms) and run through the same Web
+   Worker path (runProbabilisticGoal(), js/app.js) so typing it never blocks the
+   main thread (Phase 4's INP work). Same constants Home's card already uses
+   (7%/12% real, 2%/0.8% inflation, 10,000 paths, a fixed seed so results don't
+   jitter run to run) — no new model, no new maths.
+
+   Memoized the same way Home's goal card is (key over goal/years/$50-rounded
+   value/contribution — see js/app.js renderGoal()'s own goalCalcKey), so typing
+   the SAME what-if value twice, or switching tabs and back with nothing
+   material changed, replays the cached result instead of re-running 10,000
+   paths. projModCalcAt records when a result was actually (re)computed, not
+   just rendered — investigated whether a fresh app open re-runs it (session
+   task 4): these are plain module-level variables, reset to null on every
+   page load, so YES, a fresh open always computes for real. It is not stale.
+   The actual problem was that nothing showed the owner WHEN it last ran —
+   #projModAsOf below is that, not an invented refresh control. */
+let projModCalcKey=null, projModCalcResult=null, projModCalcAt=null, projModWhatIfTimer=null;
+function projAsOfText(ts){
+  if(!ts) return '';
+  const age=Math.max(0,Math.round((Date.now()-ts)/1000));
+  if(age<8) return t`Computed just now`;
+  if(age<90) return t`Computed ${age}s ago`;
+  if(age<5400) return t`Computed ${Math.round(age/60)} min ago`;
+  return t`Computed ${new Date(ts).toLocaleString(appLocale(),{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`;
+}
+function renderProjMod(){
+  const card=$('projModCard'); if(!card) return;
+  const t2=totals('all');
+  if(!(t2.value>0)){ card.hidden=true; return; }
+  card.hidden=false;
+  // Taps through to the OLD deterministic 5/10/20y chart's sheet — same
+  // "mod card opens the fuller detail view" convention every other surfaced
+  // module uses — EXCEPT inside .whatif: the input has to stay interactive,
+  // not be swallowed by the card's own click-to-open-sheet handler when its
+  // own click event bubbles up.
+  card.onclick=e=>{ if(!e.target.closest('.whatif')) openProjSheet(); };
+  const input=$('projWhatIfInput');
+  const contrib=input?Math.max(0,parseFloat(input.value)||0):0;
+  const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
+  const nowYear=new Date().getFullYear();
+  const years=(state.goal&&state.goal.year>nowYear)?state.goal.year-nowYear:10;
+  const params={v0:t2.value, years, monthlyContribution:contrib, goal,
+    meanReal:0.07, sdReal:0.12, meanInfl:0.02, sdInfl:0.008, paths:10000, seed:20260101};
+  const key=`${goal}|${years}|${Math.round(t2.value/50)*50}|${contrib.toFixed(2)}`;
+  const head=$('projModHead');
+  if(head){
+    const yrsTxt=`${years} ${t`years`}`;
+    const contribTxt=contrib>0?`${fmt(contrib)}${t`/mo added`}`:t`no more deposits`;
+    head.innerHTML=`<div class="stat__label">${t`Where this is headed`}</div><span class="mod__sub">${esc(yrsTxt)} · ${esc(contribTxt)}</span>`;
+  }
+  const apply=result=>{
+    if($('projModCard')===null || $('projModCard').hidden) return; // gone/hidden by the time the Worker replies
+    const big=$('projModBig');
+    const p50N=result.fan.p50[years], p10N=result.fan.p10[years], p90N=result.fan.p90[years];
+    if(big) big.textContent = goal ? (result.probabilityOfGoal*100).toFixed(0)+'%' : fmt(p50N);
+    drawGoalFan(result.fan, goal, nowYear, 'projFan');
+    const asOf=$('projModAsOf'); if(asOf) asOf.textContent=projAsOfText(projModCalcAt);
+    const gl=$('projModGoalLine');
+    if(gl){
+      const yearB=`<b>${nowYear+years}</b>`, pmtB=contrib>0?`<b>${fmt(contrib)}</b>`:null;
+      if(goal){
+        const pctB=`<b>${(result.probabilityOfGoal*100).toFixed(0)}%</b>`, goalB=`<b>${fmt(goal)}</b>`;
+        gl.innerHTML = contrib>0
+          ? `<span>${t`Adding ${pmtB}/month, you have a ${pctB} chance of reaching ${goalB} by ${yearB}.`}</span>`
+          : `<span>${t`With no more deposits, you have a ${pctB} chance of reaching ${goalB} by ${yearB}.`}</span>`;
+      } else {
+        const p50B=`<b>${fmt(p50N)}</b>`, rangeB=`<b>${fmt(p10N)}–${fmt(p90N)}</b>`;
+        gl.innerHTML = contrib>0
+          ? `<span>${t`Adding ${pmtB}/month, the median path reaches ${p50B} by ${yearB} — likely range ${rangeB}.`}</span>`
+          : `<span>${t`With no more deposits, the median path reaches ${p50B} by ${yearB} — likely range ${rangeB}.`}</span>`;
+      }
+      gl.hidden=false;
+    }
+  };
+  if(key===projModCalcKey && projModCalcResult){ apply(projModCalcResult); return; }
+  runProbabilisticGoal(params).then(result=>{
+    if(!$('projModCard') || $('projModCard').hidden) return; // tab navigated away before the Worker replied
+    projModCalcKey=key; projModCalcResult=result; projModCalcAt=Date.now();
+    apply(result);
+  });
+}
+if($('projWhatIfInput')) $('projWhatIfInput').oninput=()=>{
+  clearTimeout(projModWhatIfTimer);
+  projModWhatIfTimer=setTimeout(renderProjMod, 450);
+};
 /* The "More" list — every remaining Insights feature, demoted to a compact
    disclose row (js/ui.js's own comment: "how a demoted module is reached on
    mobile" — built in R1 for exactly this). Meta text reuses the same formulas
@@ -1038,14 +1111,17 @@ function renderMoreList(){
   // their own mod cards on the tab (DESIGN-TARGET.md session 3 — see index.html's Insights
   // section comment). Next moves moved to Home instead (session 4 — see renderHomeCoach()
   // above and index.html's Home section comment): advice, not an insight, and Home is
-  // where the owner actually lands. Contributions and Stocks-you-indirectly-own stay
-  // listed here even though both also have a front door elsewhere (mod card / Following
-  // tab respectively) — pre-existing, out of scope (already-settled in session 3's brief).
+  // where the owner actually lands. Where this is headed moved out too (session 5 —
+  // renderProjMod() above, the "Future" section): it was the exact same openProjSheet()
+  // this row still pointed at, so leaving the row here would have been two paths to one
+  // sheet. Stocks you indirectly own REMOVED entirely this session, not relocated — the
+  // Following tab's version carries more (session 3 already gave it a front door there);
+  // openLookSheet()/renderLook()/ensureLookQuotes() removed with it, nothing else called
+  // them (checked). Contributions stays listed here even though it also has a front door
+  // (its own mod card) — pre-existing, out of scope (already-settled in session 3's brief).
   const rowsDef=[
     {title:'Contributions', meta:`${m12} of last 12 months`, fn:openContribSheet},
-    {title:'Where this is headed', meta:`${projYears}y projection`, fn:openProjSheet},
     {title:'Financial independence', meta:`${fmt(t.value*0.04/12)}/mo safe income`, fn:openFISheet},
-    {title:'Stocks you indirectly own', meta:'Your ETF look-through', fn:openLookSheet}
   ];
   list.innerHTML = rowsDef.map((r,i)=>
     `<button class="disclose" data-i="${i}"><span class="disclose__title">${esc(r.title)}</span>`+
@@ -1106,12 +1182,6 @@ function openCoachSheet(){
   showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
   renderCoach();
 }
-function openLookSheet(){
-  $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Stocks you indirectly own</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
-  $('detailSheetBody').innerHTML = `<div class="t-caption muted" id="lookSub"></div><div id="lookList"></div>`;
-  showOverlay('detail'); $('detailX').onclick=closeDetail; $('detailX').focus({preventScroll:true});
-  renderLook(); ensureLookQuotes();
-}
 function openWorthSheet(){
   $('detailSheetHead').innerHTML = `<h2 class="hsym sheet__title">Asset worth · 1Y</h2><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `<div class="scrubro" id="worthRO"></div>
@@ -1127,15 +1197,23 @@ const CRASH_SCENARIOS=[
   {n:'2020 COVID crash',      d:.34, rec:'~5 months'},
   {n:'2022 rate shock',       d:.25, rec:'~2 years'}
 ];
+// Fixed set of 3 — translated by value, not by pattern-replacing '~': found leaking
+// (session 5, once "years" became a dictionary candidate for the new projection
+// module) that this sheet's own recovery-time text was never translated at all.
+const CRASH_RECOVERY_TXT={'~4 years':()=>t`about 4 years`, '~5 months':()=>t`about 5 months`, '~2 years':()=>t`about 2 years`};
 function openCrashSheet(){
-  const t=totals('all'); if(!(t.value>0)) return;
+  // named tot, not t — this function's body composes t`` translated sentences below,
+  // and t is the global translation tag (js/i18n.js); every other function in this
+  // file that still names its totals('all') result "t" has never needed to.
+  const tot=totals('all'); if(!(tot.value>0)) return;
   const rk=riskStats(); const beta=(rk&&rk.beta>0)?Math.min(rk.beta,1.3):1;
-  const rows=CRASH_SCENARIOS.map(c=>{ const hit=t.value*c.d*beta;
-    return `<div class="krow"><span class="k">${c.n}</span><span><b class="neg">−${fmt(hit).replace('-','')}</b> → <b>${fmt(t.value-hit)}</b></span></div>`; }).join('');
+  const rows=CRASH_SCENARIOS.map(c=>{ const hit=tot.value*c.d*beta;
+    return `<div class="krow"><span class="k">${c.n}</span><span><b class="neg">−${fmt(hit).replace('-','')}</b> → <b>${fmt(tot.value-hit)}</b></span></div>`; }).join('');
+  const recoveryList=CRASH_SCENARIOS.map(c=>(CRASH_RECOVERY_TXT[c.rec]?CRASH_RECOVERY_TXT[c.rec]():c.rec.replace('~','about '))).join(', ');
   openInfoSheet('Crash test', `
-    <p>If history's worst markets replayed <b>tomorrow</b>, here's roughly where today's ${fmt(t.value)} would land (scaled to your funds' actual sensitivity):</p>
+    <p>If history's worst markets replayed <b>tomorrow</b>, here's roughly where today's ${fmt(tot.value)} would land (scaled to your funds' actual sensitivity):</p>
     ${rows}
-    <p style="margin-top:12px">The other half of the story: <b>every one of these fully recovered</b> — in ${CRASH_SCENARIOS.map(c=>c.rec.replace('~','about ')).join(', ')}. Money you won't need for years can afford to ride it out; panic-selling at the bottom is the only move that makes the loss permanent.</p>
+    <p style="margin-top:12px">${t`The other half of the story: <b>every one of these fully recovered</b> — in ${recoveryList}. Money you won't need for years can afford to ride it out; panic-selling at the bottom is the only move that makes the loss permanent.`}</p>
     <div class="inc-note" style="margin-top:10px">Estimates: index drawdown × your portfolio's measured sensitivity (beta ${beta.toFixed(2)}). Not financial advice.</div>`);
 }
 
@@ -1570,7 +1648,7 @@ function renderProjection(){
               y:{grid:{color:cvar('--grid')},border:{display:false},ticks:{color:cvar('--mut'),maxTicksLimit:5,font:{size:10},
                  callback:v=>state.view.priv?'':cfmt(v)}}}}});
   const ro=$('projRO');
-  const base=`In ${projYears} years: <b>${fmt(data[1][N])}</b> at 7%/yr <span style="color:var(--faint)">(range ${cfmt(data[0][N])} – ${cfmt(data[2][N])})</span>`;
+  const base=`${t`In ${projYears} years:`} <b>${fmt(data[1][N])}</b> at 7%/yr <span style="color:var(--faint)">(range ${cfmt(data[0][N])} – ${cfmt(data[2][N])})</span>`;
   ro.innerHTML=base;
   attachScrubAny(projChart, i=>{
     if(i==null){ ro.innerHTML=base; return; }

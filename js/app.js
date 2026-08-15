@@ -167,12 +167,17 @@ function renderGoalForm(prefillAmt, prefillYear){ // shared by first-time setup 
     <input id="goalYearInput" type="number" inputmode="numeric" step="1" placeholder="Target year, e.g. ${nowYear+15}" aria-label="Target year"${prefillYear>0?` value="${prefillYear}"`:''}>
     <button class="btn pri btn--full" id="goalSave">${prefillAmt>0?'Update goal':'Set goal'}</button>
     ${prefillAmt>0?'<div class="ebtns"><button class="btn sec" id="goalCancel">Cancel</button><button class="btn warn" id="goalRemove">Remove goal</button></div>':''}</div>`;
+  const refreshInsightsProjections=()=>{
+    if($('page-insights').classList.contains('hidden')) return;
+    if(typeof renderProjection==='function') renderProjection();
+    if(typeof renderProjMod==='function') renderProjMod();
+  };
   $('goalSave').onclick=()=>{
     const v=+$('goalInput').value, y=Math.round(+$('goalYearInput').value)||0;
-    if(v>0){ state.goal={amt:v, year:y>0?y:undefined}; lsSet('pt_goal',state.goal); renderGoal(); if(typeof renderProjection==='function' && !$('page-insights').classList.contains('hidden')) renderProjection(); }
+    if(v>0){ state.goal={amt:v, year:y>0?y:undefined}; lsSet('pt_goal',state.goal); renderGoal(); refreshInsightsProjections(); }
   };
   const gc=$('goalCancel'); if(gc) gc.onclick=renderGoal;
-  const gr=$('goalRemove'); if(gr) gr.onclick=()=>{ state.goal=null; lsSet('pt_goal',null); renderGoal(); };
+  const gr=$('goalRemove'); if(gr) gr.onclick=()=>{ state.goal=null; lsSet('pt_goal',null); renderGoal(); refreshInsightsProjections(); };
 }
 /* Contribution rate the projection assumes: the average monthly cost of your own
    real (non-dividend) buys, spread over the calendar span they cover. Needs at
@@ -288,11 +293,15 @@ function renderGoalProgress(){
   const barEl=body.querySelector('.goalbar i');
   if(barEl) barEl.style.setProperty('--w', (Math.min(1,pctRaw)*100).toFixed(1)+'%');
 }
-let goalFanChart=null;
-function drawGoalFan(fan, goal, y0){
+/* targetId defaults to Home's own #goalFan — session 5 adds a second caller,
+   js/insights.js's renderProjMod(), pointed at Insights' #projFan mount instead. The
+   chart instance is stashed on the element itself (el._lwcChart) rather than a single
+   module-level variable, so two independent mount points can each hold their own
+   instance without a second copy of this function or a chart-instances map. */
+function drawGoalFan(fan, goal, y0, targetId){
   const LC=window.LightweightCharts;
-  const el=$('goalFan'); if(!el||!LC) return;
-  if(goalFanChart){ goalFanChart.remove(); goalFanChart=null; }
+  const el=$(targetId||'goalFan'); if(!el||!LC) return;
+  if(el._lwcChart){ el._lwcChart.remove(); el._lwcChart=null; }
   el.innerHTML='';
   const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid');
   const priceFormatter=v=>state.view.priv?'':cfmt(v);
@@ -326,7 +335,7 @@ function drawGoalFan(fan, goal, y0){
     goalLine.setData(fan.years.map(y=>({time:asTime(y), value:goal})));
   }
   chart.timeScale().setVisibleLogicalRange({ from:0, to:fan.years.length-1 });
-  goalFanChart=chart;
+  el._lwcChart=chart;
 }
 function healthScore(){
   const rs=rows('all'), t=totals('all'), inv=Math.max(1,t.value-cashFor('all'));

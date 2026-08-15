@@ -280,6 +280,25 @@
   }
   .goalline b { color: var(--text); font-weight: var(--w-semibold); }
 
+  /* The projection module's what-if input (session 5) — inline, not a full-width
+     .field/.input (that pattern is for a form, this is one number inside a
+     sentence). Text label + suffix are static (js/i18n.js dictionary entries,
+     same convention as "Sector exposure"/"Portfolio P/E"'s static labels) —
+     only the input's own value is dynamic, and inputs are never translated. */
+  .whatif { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-3); font-size: var(--t-caption); color: var(--text-muted); }
+  .whatif input {
+    width: 84px;
+    height: var(--tap);
+    padding: 0 var(--s-2);
+    background: var(--surface-2);
+    border: var(--hairline) solid var(--border-control);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font-weight: var(--w-semibold);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
   /* Sequential single-hue ramp — sector exposure, ordered by magnitude. Opacity over one
      hue (not a lightness-stepped ramp) to match design/target/insights-v2.html's own
      sequential technique exactly; the fixed sr-96px label column mirrors the mockup's own
@@ -1683,8 +1702,10 @@
   /* Phase 6 goal fan chart — Lightweight Charts (js/app.js drawGoalFan()), same
      "size the plain mount div via ResizeObserver, don't force it" contract as
      .chart #mainChart above; must NOT get width/height:100% !important like the
-     Chart.js canvas rule does, or it fights the library's own pixel-exact canvas. */
-  .chart-box--sheet #goalFan { position: absolute; inset: 0; }
+     Chart.js canvas rule does, or it fights the library's own pixel-exact canvas.
+     #projFan (session 5, js/insights.js's renderProjMod()) is the same chart
+     mounted a second place — same rule, not a second copy of it. */
+  .chart-box--sheet #goalFan, .chart-box--sheet #projFan { position: absolute; inset: 0; }
   .chart-box__msg {
     position: absolute;
     inset: 0;
