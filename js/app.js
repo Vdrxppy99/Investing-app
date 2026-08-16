@@ -179,22 +179,53 @@ function renderGoalForm(prefillAmt, prefillYear){ // shared by first-time setup 
   const gc=$('goalCancel'); if(gc) gc.onclick=renderGoal;
   const gr=$('goalRemove'); if(gr) gr.onclick=()=>{ state.goal=null; lsSet('pt_goal',null); renderGoal(); refreshInsightsProjections(); };
 }
-/* Contribution rate the projection assumes: the average monthly cost of your own
-   real (non-dividend) buys, spread over the calendar span they cover. Needs at
-   least two distinct purchase months to mean anything as a "rate" rather than a
-   single data point — with fewer, the projection runs with $0/mo and says so. */
-function deriveMonthlyContribution(){
-  const buys=(state.lots||[]).filter(l=>!l.div && l.date);
-  if(!buys.length) return null;
-  const months=new Set(buys.map(l=>l.date.slice(0,7)));
-  if(months.size<2) return null;
-  const dates=buys.map(l=>new Date(l.date+'T12:00:00')).sort((a,b)=>a-b);
-  const first=dates[0], last=dates[dates.length-1];
-  const spanMonths=Math.max(1,(last.getFullYear()-first.getFullYear())*12+(last.getMonth()-first.getMonth())+1);
-  const total=buys.reduce((a,l)=>a+l.cost,0);
-  return total/spanMonths;
+/* ═══ THE HEADLINE PROJECTION — one definition, every surface ════════════════
+   Two screens used to answer the same question differently. Home's goal card ran
+   runMonteCarloProjection() with a contribution rate derived from lot history
+   (the average monthly cost of the owner's real non-dividend buys); Insights'
+   projection module ran the same engine at zero. On the demo dataset that is
+   ~100% versus 87% for one goal — same defect class as the Home-vs-Portfolio
+   total, the three theme-colour copies and the three hardcoded active states.
+
+   The owner's call: the MAIN projection excludes contributions. The headline
+   question is "what does my money do if I never add another dollar", so
+   monthlyContribution is 0 here permanently, and the ONLY place in the app a
+   contribution figure enters a projection is the Insights module's what-if
+   input — a number he types, never one inferred from past buying pace.
+
+   Both surfaces go through projectionParams()/runProjection() so there is no
+   second copy of the model constants and no second cache to drift. With a fixed
+   seed the engine is a pure function of its params, so a shared key is a
+   guarantee that two surfaces showing the same key show the same number, not
+   just a speed optimisation. */
+const PROJECTION_MODEL=Object.freeze({meanReal:0.07, sdReal:0.12, meanInfl:0.02, sdInfl:0.008, paths:10000, seed:20260101});
+function projectionParams(v0, years, goal, monthlyContribution){
+  return Object.assign({v0, years, goal:(goal>0?goal:null), monthlyContribution:Math.max(0,monthlyContribution||0)}, PROJECTION_MODEL);
 }
-let mcWorker=null, mcReqId=0, goalCalcKey=null, goalCalcResult=null;
+/* $50 value bucket so a price tick that moves the total by pennies replays the
+   cached run instead of re-simulating 10,000 paths — the tolerance renderGoal()
+   already used, kept, just moved next to the params it belongs to. */
+function projectionKey(p){ return `${p.goal}|${p.years}|${Math.round(p.v0/50)*50}|${p.monthlyContribution.toFixed(2)}`; }
+/* A MAP, not one slot: Home's headline run and the Insights what-if's own run are
+   both live at once, and renderAll() re-renders both on every price poll — a
+   single-slot cache would miss on both every tick and fire two 10,000-path runs
+   per poll. Capped at 8 entries, oldest evicted (insertion order), which is more
+   than the handful of distinct keys any one session produces. */
+const projCache=new Map();
+function runProjection(params){
+  const key=projectionKey(params);
+  const hit=projCache.get(key);
+  if(hit) return Promise.resolve(hit.result);
+  return runProbabilisticGoal(params).then(result=>{
+    projCache.set(key,{result, at:Date.now()});
+    if(projCache.size>8) projCache.delete(projCache.keys().next().value);
+    return result;
+  });
+}
+/* When this exact projection was last really computed (not merely re-rendered) —
+   Insights' "Computed X ago" line. 0 if it has never run. */
+function projectionComputedAt(params){ const e=projCache.get(projectionKey(params)); return e?e.at:0; }
+let mcWorker=null, mcReqId=0;
 function getMcWorker(){
   if(mcWorker===null && window.Worker){
     try{ mcWorker=new Worker('js/monte-carlo-worker.js'); }catch(_){ mcWorker=false; }
@@ -242,35 +273,25 @@ function renderGoal(){
     return;
   }
   const years=year-nowYear;
-  const contrib=deriveMonthlyContribution();
   body.innerHTML=`<div class="stack stack--tight">
     <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>Calculating…</span></div>
     ${bar}<p class="t-caption muted">Running 10,000 simulated paths… ${editLink}</p></div>`;
   $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
-  const params={
-    v0:t.value, years, monthlyContribution:contrib||0, goal,
-    meanReal:0.07, sdReal:0.12, meanInfl:0.02, sdInfl:0.008,
-    paths:10000, seed:20260101,
-  };
-  const key=`${goal}|${year}|${Math.round(t.value/50)*50}|${(contrib||0).toFixed(2)}`;
+  const params=projectionParams(t.value, years, goal, 0); // never a derived contribution — see PROJECTION_MODEL above
   const apply=result=>{
     if(!$('goalBody')||!state.goal||state.goal.amt!==goal||state.goal.year!==year) return; // stale by the time it resolves
     const pct=(result.probabilityOfGoal*100).toFixed(0);
-    const contribNote=contrib>0
-      ? `${fmt(contrib)}/mo, from your own buy history`
-      : `no future deposits (not enough purchase history to estimate a rate)`;
     body.innerHTML=`<div class="stack stack--tight">
       <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>${year}</span></div>
       ${bar}
       <p class="big-n" style="margin-top:2px">${pct}%<span style="font-size:14px;font-weight:500;color:var(--mut)"> chance by ${year}</span></p>
       <div class="chart-box chart-box--sheet"><div id="goalFan"></div></div>
-      <p class="t-caption muted">Assumes 7% ± 12%/yr real return, 2% ± 0.8%/yr inflation, ${contribNote}. Pre-tax. Not advice. ${editLink}</p>
+      <p class="t-caption muted">Assumes 7% ± 12%/yr real return, 2% ± 0.8%/yr inflation, no future deposits — see Insights to try a monthly amount. Pre-tax. Not advice. ${editLink}</p>
     </div>`;
     $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
     drawGoalFan(result.fan, goal, nowYear);
   };
-  if(key===goalCalcKey && goalCalcResult){ apply(goalCalcResult); return; }
-  runProbabilisticGoal(params).then(result=>{ goalCalcKey=key; goalCalcResult=result; apply(result); });
+  runProjection(params).then(apply);
 }
 /* The live-tick-safe half of the goal card: patches the "$X of $Y" figure and the
    progress bar's width in place from the current live total, without touching (or
@@ -297,11 +318,22 @@ function renderGoalProgress(){
    js/insights.js's renderProjMod(), pointed at Insights' #projFan mount instead. The
    chart instance is stashed on the element itself (el._lwcChart) rather than a single
    module-level variable, so two independent mount points can each hold their own
-   instance without a second copy of this function or a chart-instances map. */
+   instance without a second copy of this function or a chart-instances map.
+
+   Redraw guard: renderAll() runs on every price poll and re-applies the cached
+   projection result, which used to tear this chart down (el.innerHTML='') and
+   build a new one every tick — one empty frame per poll, on both mount points,
+   for a chart whose data had not changed. The fan only depends on the result
+   object, the goal and the theme, so remember which of those is on screen and
+   return early when they still match. Theme is in the key because the series
+   colours are read from CSS variables here, once, at build time. */
 function drawGoalFan(fan, goal, y0, targetId){
   const LC=window.LightweightCharts;
   const el=$(targetId||'goalFan'); if(!el||!LC) return;
+  const drawKey=`${y0}|${goal}|${document.documentElement.dataset.theme}|${state.view.priv?1:0}|${state.view.ccy}|${fan.p50[fan.p50.length-1]}`;
+  if(el._lwcChart && el._lwcKey===drawKey) return;
   if(el._lwcChart){ el._lwcChart.remove(); el._lwcChart=null; }
+  el._lwcKey=drawKey;
   el.innerHTML='';
   const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid');
   const priceFormatter=v=>state.view.priv?'':cfmt(v);

@@ -548,17 +548,17 @@ Not part of any phase. Pick these off when convenient.
 - **`rollUpTvNum()` never cancels an in-flight animation.** No
   `cancelAnimationFrame`; two price ticks close together start two rAF loops
   writing to `#tvNum` simultaneously. Cosmetic only.
-- **`TAB_ORDER` in `js/app.js` is hardcoded to three tabs.** Must be updated to
-  the five-tab order during R3/R4 or the view-transition direction will be wrong.
-- **Settings sheet cannot scroll.** Structural, pre-dates Phase 3.
-  `css/components.css:352` defines `.sheet__body { overflow-y:auto;
-  overscroll-behavior:contain }` but no element in `index.html` carries that
-  class, and only `#detailSheet` got an explicit override (line 1999). Every
-  JS-built sheet therefore has no scroll container. Affects Settings and likely
-  any other dynamically-created sheet. Settings is an overlay, not a tab, so
-  R1-R4 will not rebuild it — this needs its own fix.
-- `index.html` footer still shows v9.1.0 while `sw.js` and `CLAUDE.md` say
-  v9.2.x. Pre-existing version-string drift. `scripts/sync-version.sh` exists.
+- ~~**`TAB_ORDER` in `js/app.js` is hardcoded to three tabs.**~~ **RETIRED
+  2026-08-15** — [js/app.js:77](js/app.js:77) is the five-tab order
+  (`home, markets, portfolio, insights, following`). Verified by reading the
+  line, not the note.
+- ~~**Settings sheet cannot scroll.**~~ **RETIRED 2026-08-15** — measured, not
+  re-read: [index.html:638](index.html:638) carries `class="sheet__body"`, and
+  with the sheet open `#editSheetBody` computes `overflow-y: auto` with a
+  1297px `scrollHeight` in a 519px box. It scrolls. The note described the
+  markup as it was before `.sheet__body` was wired in.
+- ~~`index.html` footer version drift.~~ **RETIRED 2026-08-15** — `index.html`,
+  `sw.js` and `native/project.yml` all read the same version string.
 - `riskStats()` silently defaults beta to 1 when the user holds no VOO — there
   is no separate benchmark-history fetch path. Real gap: beta reads as 1.00 and
   looks like a computed value rather than a fallback. Either fetch the
@@ -566,3 +566,37 @@ Not part of any phase. Pick these off when convenient.
 - 1D/1W/2W chart ranges cannot paint under the baked offline demo data (1D has
   no intraday points; 1W/2W fall inside a single weekly-sample gap). Real online
   use is unaffected. Revisit if the seed snapshot is ever regenerated.
+
+### Found in the 2026-08-15 end-to-end verification pass, reproduced but NOT fixed
+
+- **The eleven Insights module cards cannot be opened from a keyboard.**
+  [index.html:482](index.html:482)-[index.html:594](index.html:594) — every
+  `<section class="card press mod">` (`#xirrModCard` … `#projModCard`) carries a
+  JS `onclick` that opens its sheet, and none carries `tabindex` or a `role`.
+  Verified live: `tabindex` and `role` are both `null` on all eleven. The
+  `#modGrid [data-mod]` tiles that `test/a11y.spec.js` covers ARE buttons, which
+  is why this never failed a test. Ten of the eleven pre-date this session.
+  **Not fixed:** `#projModCard` contains a live `<input>` (the what-if field), so
+  turning these into buttons or `tabindex="0"` targets needs a form-control
+  escape rule and one aria decision applied to all eleven at once — a design
+  call that wants its own verification pass, not the last hour of a session.
+- **Section labels render with nothing underneath on an empty portfolio.**
+  [index.html:591](index.html:591) — `<h2 class="section__label">Future</h2>` is
+  static markup while `#projModCard` is hidden by
+  [js/insights.js:1041](js/insights.js:1041) when `totals('all').value` is 0.
+  Verified by emptying `state.holdings`/`state.lots`: the tab renders
+  `RISK`/`INCOME & TAX`/`FUTURE` as bare headings. Pre-existing for the other
+  four sections; "Future" just joins them. Cosmetic, and the honest fix is one
+  rule for all five labels, not a special case for this one.
+- **`#projModAsOf` does not tick.** [js/insights.js:1033](js/insights.js:1033)
+  `projAsOfText()` is evaluated at render time only, so "Computed just now"
+  stays on screen until the next render rather than ageing to "2 min ago".
+  Needs a timer, which is a small ongoing cost for a caption; deferred rather
+  than added blind.
+- **The theme, privacy, currency, edit and refresh controls live only in the
+  Portfolio tab's appbar** ([index.html:303](index.html:303)-
+  [index.html:309](index.html:309)) — they are unreachable from Home, Markets,
+  Insights and Following. Confirmed by a click that timed out on every other
+  tab. Recorded as an observation, not a defect: this reads as a deliberate
+  five-tab-redesign placement, and moving global chrome is the owner's call.
+

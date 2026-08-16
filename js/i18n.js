@@ -190,8 +190,19 @@
        Projection sheet's own untranslated sentences (openCrashSheet,
        renderProjection — fixed above by renaming a shadowed `t` and wrapping
        the text, here just the dictionary entries). */
-    "At %1/month you arrive %2. Adding $100 more makes it %3.":
-      "Bei %1/Monat kommst du %2 an. Mit $100 mehr sind es %3.",
+    /* The month unit had no entry at all, so four call sites in js/insights.js
+       rendered an English unit inside a German sentence (renderRiskMod,
+       renderDDMod, renderContribMod's head and its goal line). Keyed WITH the
+       count rather than as a bare "month"/"months": test/i18n-coverage.spec.js
+       matches candidates by plain substring, and a bare "month" would flag every
+       "monthly" in any not-yet-translated sentence as a leak. A key containing
+       "%1" can never substring-match rendered text, so it stays precise. */
+    "%1 month": "%1 Monat",
+    "%1 months": "%1 Monate",
+    "%1 month early": "%1 Monat früher",
+    "%1 months early": "%1 Monate früher",
+    "At %1/month you arrive %2. Adding %3 more makes it %4.":
+      "Bei %1/Monat kommst du %2 an. Mit %3 mehr sind es %4.",
     "At %1/month you arrive %2.": "Bei %1/Monat kommst du %2 an.",
     "The other half of the story: <b>every one of these fully recovered</b> — in %1. Money you won't need for years can afford to ride it out; panic-selling at the bottom is the only move that makes the loss permanent.":
       "Die andere Hälfte der Geschichte: <b>jede einzelne davon hat sich vollständig erholt</b> — in %1. Geld, das du jahrelang nicht brauchst, kann die Durststrecke aussitzen; Panikverkäufe am Tiefpunkt sind der einzige Schritt, der den Verlust endgültig macht.",
@@ -318,6 +329,14 @@
     "Income & tax": "Erträge & Steuern",
     "Future": "Zukunft",
     "Under the hood": "Unter der Haube",
+    /* Section headings the ratchet never had a candidate for, found by reading
+       every visible <h2>/.section__label on each tab in DE rather than by
+       checking the known-English list — these four rendered English under
+       German headings on Home and Insights. */
+    "More": "Mehr",
+    "Stay on top": "Immer im Blick",
+    "Portfolio insights": "Portfolio-Analyse",
+    "Coming up": "Demnächst",
     "Portfolio Health": "Portfolio-Gesundheit",
     "Portfolio health": "Portfolio-Gesundheit",
     "Next moves": "Nächste Schritte",

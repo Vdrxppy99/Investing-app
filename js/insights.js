@@ -639,7 +639,7 @@ function renderDrawdownMod(){
       const rec=(d.recDate&&d.recoveryMonths!=null)?Math.max(1,Math.round(d.recoveryMonths)):null;
       const costB=`<b>${fmt(d.dropDollars)}</b>`;
       if(rec!=null){
-        const monthsB=`<b>${rec} ${rec===1?t`month`:t`months`}</b>`;
+        const rB=String(rec); const monthsB=`<b>${rec===1?t`${rB} month`:t`${rB} months`}</b>`;
         gl.innerHTML = d.boughtThrough
           ? `<span>${t`Cost ${costB} at the low. You were back to even in ${monthsB} — you kept buying through it.`}</span>`
           : `<span>${t`Cost ${costB} at the low. You were back to even in ${monthsB}.`}</span>`;
@@ -733,7 +733,7 @@ function renderXirrMod(){
       const baseDate=projectedGoalDate(t2.value-added), aheadDate=projectedGoalDate(t2.value);
       if(baseDate && aheadDate && baseDate.getTime()!==aheadDate.getTime()){
         const months=Math.max(1,Math.round(Math.abs(baseDate-aheadDate)/2629800000));
-        const monthsB=`<b>${months} ${months===1?t`month`:t`months`}</b>`;
+        const mB=String(months); const monthsB=`<b>${months===1?t`${mB} month`:t`${mB} months`}</b>`;
         gl.innerHTML=added>0
           ?`<span>${t`Your timing added ${'<b>'+fmt(added)+'</b>'} — about ${monthsB} off the goal date.`}</span>`
           :`<span>${t`Your timing cost you ${'<b>'+fmt(-added)+'</b>'} — about ${monthsB} later on the goal date.`}</span>`;
@@ -760,7 +760,7 @@ function renderContribMod(){
     let [y,m]=cur.split('-').map(Number); m++; if(m>12){m=1;y++;} cur=y+'-'+String(m).padStart(2,'0'); }
   const V=data.slice(-12), L=labels.slice(-12);
   card.hidden=false;
-  const head=$('contribModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`What you added`}</div><span class="mod__sub">${V.length} ${V.length===1?t`month`:t`months`}</span>`;
+  const head=$('contribModHead'); if(head) head.innerHTML=`<div class="stat__label">${t`What you added`}</div><span class="mod__sub">${V.length===1?t`${String(V.length)} month`:t`${String(V.length)} months`}</span>`;
   const total=V.reduce((a,v)=>a+v,0);
   const big=$('contribModBig'); if(big) big.textContent=fmt(total);
   const w=342,h=70,g=4,bw=(w-g*(V.length-1))/V.length,max=Math.max(...V,1);
@@ -787,11 +787,21 @@ function renderContribMod(){
     const paceDate=pmt>0?projectedGoalDateWithContribution(t2.value,pmt):null;
     if(baseDate && paceDate && baseDate>paceDate){
       const earlyMonths=Math.max(1,Math.round((baseDate-paceDate)/2629800000));
-      const pmtB=`<b>${fmt(pmt)}</b>`, earlyB=`<b>${earlyMonths} ${earlyMonths===1?t`month`:t`months`} early</b>`;
-      const moreDate=projectedGoalDateWithContribution(t2.value,pmt+100);
+      // "N months early" is ONE key, not a translated "months" glued to an
+      // untranslated "early" — German rendered "33 months early" inside an
+      // otherwise fully translated sentence before this.
+      const nB=String(earlyMonths);
+      const pmtB=`<b>${fmt(pmt)}</b>`, earlyB=`<b>${earlyMonths===1?t`${nB} month early`:t`${nB} months early`}</b>`;
+      // "another 100" is a round number in whatever currency is on screen, so the
+      // bump is 100 DISPLAY units converted back to the USD the maths runs in —
+      // not a literal "$100" (which read as dollars in euro mode, and stayed
+      // unmasked while every other figure in the same sentence was hidden).
+      const bumpUsd=100/rate();
+      const moreDate=projectedGoalDateWithContribution(t2.value,pmt+bumpUsd);
       const moreMonths=(moreDate && moreDate<paceDate) ? Math.max(1,Math.round((baseDate-moreDate)/2629800000)) : null;
+      const bumpB=`<b>${fmt(bumpUsd)}</b>`;
       gl.innerHTML = moreMonths!=null
-        ? `<span>${t`At ${pmtB}/month you arrive ${earlyB}. Adding $100 more makes it ${'<b>'+moreMonths+'</b>'}.`}</span>`
+        ? `<span>${t`At ${pmtB}/month you arrive ${earlyB}. Adding ${bumpB} more makes it ${'<b>'+moreMonths+'</b>'}.`}</span>`
         : `<span>${t`At ${pmtB}/month you arrive ${earlyB}.`}</span>`;
       gl.hidden=false;
     } else gl.hidden=true;
@@ -1008,28 +1018,26 @@ function renderPEMod(){
    as the default view, not a replacement of its code).
 
    MAIN run: monthlyContribution:0, always — "what my money does if I never add
-   another dollar" is the headline (the owner's own framing), not a rate derived
-   from past buying pace the way Home's goal card's deriveMonthlyContribution()
-   still does (a different, deliberately narrower question — "will THIS SPECIFIC
-   goal, at my past pace, land" — left alone, out of this session's scope). The
-   what-if input re-runs the SAME engine with a typed monthly amount — his
-   number, not a derived one — debounced (450ms) and run through the same Web
-   Worker path (runProbabilisticGoal(), js/app.js) so typing it never blocks the
-   main thread (Phase 4's INP work). Same constants Home's card already uses
-   (7%/12% real, 2%/0.8% inflation, 10,000 paths, a fixed seed so results don't
-   jitter run to run) — no new model, no new maths.
+   another dollar" is the headline (the owner's own framing). Home's goal card
+   used to run the same engine with a rate derived from lot history instead, so
+   one goal read ~100% there and 87% here; both surfaces now go through
+   js/app.js's projectionParams()/runProjection(), which is the single place the
+   model constants and the "no contributions in the headline" rule live. See the
+   PROJECTION_MODEL comment there — it is the source of truth, not this comment.
 
-   Memoized the same way Home's goal card is (key over goal/years/$50-rounded
-   value/contribution — see js/app.js renderGoal()'s own goalCalcKey), so typing
-   the SAME what-if value twice, or switching tabs and back with nothing
-   material changed, replays the cached result instead of re-running 10,000
-   paths. projModCalcAt records when a result was actually (re)computed, not
-   just rendered — investigated whether a fresh app open re-runs it (session
-   task 4): these are plain module-level variables, reset to null on every
-   page load, so YES, a fresh open always computes for real. It is not stale.
-   The actual problem was that nothing showed the owner WHEN it last ran —
-   #projModAsOf below is that, not an invented refresh control. */
-let projModCalcKey=null, projModCalcResult=null, projModCalcAt=null, projModWhatIfTimer=null;
+   The what-if input below re-runs that same engine with a typed monthly amount —
+   his number, never a derived one, and the only place in the app a contribution
+   figure enters a projection at all — debounced (450ms) and run through the same
+   Web Worker path so typing it never blocks the main thread (Phase 4's INP work).
+
+   Caching also lives in runProjection(), keyed by the params and shared with
+   Home. With a fixed seed the engine is a pure function of its params, so a
+   shared key is a guarantee that two surfaces showing the same key show the same
+   number, not just a speed optimisation. The cache is a plain module variable,
+   empty on every page load, so a fresh open always computes for real — it is
+   never stale. What was missing was showing WHEN it last ran; #projModAsOf reads
+   that timestamp back with projectionComputedAt(). */
+let projModWhatIfTimer=null, projModPendingKey=null;
 function projAsOfText(ts){
   if(!ts) return '';
   const age=Math.max(0,Math.round((Date.now()-ts)/1000));
@@ -1054,9 +1062,7 @@ function renderProjMod(){
   const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
   const nowYear=new Date().getFullYear();
   const years=(state.goal&&state.goal.year>nowYear)?state.goal.year-nowYear:10;
-  const params={v0:t2.value, years, monthlyContribution:contrib, goal,
-    meanReal:0.07, sdReal:0.12, meanInfl:0.02, sdInfl:0.008, paths:10000, seed:20260101};
-  const key=`${goal}|${years}|${Math.round(t2.value/50)*50}|${contrib.toFixed(2)}`;
+  const params=projectionParams(t2.value, years, goal, contrib);
   const head=$('projModHead');
   if(head){
     const yrsTxt=`${years} ${t`years`}`;
@@ -1069,7 +1075,7 @@ function renderProjMod(){
     const p50N=result.fan.p50[years], p10N=result.fan.p10[years], p90N=result.fan.p90[years];
     if(big) big.textContent = goal ? (result.probabilityOfGoal*100).toFixed(0)+'%' : fmt(p50N);
     drawGoalFan(result.fan, goal, nowYear, 'projFan');
-    const asOf=$('projModAsOf'); if(asOf) asOf.textContent=projAsOfText(projModCalcAt);
+    const asOf=$('projModAsOf'); if(asOf) asOf.textContent=projAsOfText(projectionComputedAt(params));
     const gl=$('projModGoalLine');
     if(gl){
       const yearB=`<b>${nowYear+years}</b>`, pmtB=contrib>0?`<b>${fmt(contrib)}</b>`:null;
@@ -1087,10 +1093,12 @@ function renderProjMod(){
       gl.hidden=false;
     }
   };
-  if(key===projModCalcKey && projModCalcResult){ apply(projModCalcResult); return; }
-  runProbabilisticGoal(params).then(result=>{
+  // The what-if input fires a fresh run on every debounce tick, and an earlier
+  // run can resolve after a later one — paint only the newest one asked for.
+  const myKey=projModPendingKey=projectionKey(params);
+  runProjection(params).then(result=>{
     if(!$('projModCard') || $('projModCard').hidden) return; // tab navigated away before the Worker replied
-    projModCalcKey=key; projModCalcResult=result; projModCalcAt=Date.now();
+    if(myKey!==projModPendingKey) return;
     apply(result);
   });
 }
