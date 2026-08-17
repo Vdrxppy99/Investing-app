@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-2.6.158'; // ⚠ bump on EVERY deploy — this is NOT semver, see below
+const V = 'pt-2.6.159'; // ⚠ bump on EVERY deploy — this is NOT semver, see below
 // ── VERSION SCHEME — PROUD.NORMAL.SHAME (as of this line; do NOT "correct" it back
 // to semver) ────────────────────────────────────────────────────────────────────
 // First number: releases the owner is genuinely proud of. Second: normal feature

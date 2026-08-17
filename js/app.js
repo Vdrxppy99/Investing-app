@@ -425,12 +425,13 @@ function drawGoalFan(fan, goal, y0, targetId, whatIf){
   el.innerHTML='';
   const brand=cvar('--brand'), soft=cvar('--brand-soft'), mut=cvar('--mut'), faint=cvar('--faint'), grid=cvar('--grid');
   const priceFormatter=v=>state.view.priv?'':cfmt(v);
+  const marginTop=0.14, marginBottom=0.06;
   const chart=LC.createChart(el,{
     autoSize:true,
     layout:{ background:{type:LC.ColorType.Solid,color:'transparent'}, textColor:mut,
              fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif", fontSize:10, attributionLogo:false },
     grid:{ vertLines:{visible:false}, horzLines:{color:grid} },
-    rightPriceScale:{ visible:true, borderVisible:false, scaleMargins:{top:0.14,bottom:0.06} },
+    rightPriceScale:{ visible:true, borderVisible:false, scaleMargins:{top:marginTop,bottom:marginBottom} },
     leftPriceScale:{ visible:false },
     timeScale:{ visible:true, borderVisible:false, fixLeftEdge:true, fixRightEdge:true, rightOffset:0,
       tickMarkFormatter:t=>String(t.year) },
@@ -448,10 +449,46 @@ function drawGoalFan(fan, goal, y0, targetId, whatIf){
   // line draws off the top of the pane.
   const lo=Math.min(...fan.p10), hi=Math.max(...fan.p90);
   const whatIfHi=whatIf?Math.max(...whatIf.fan.p50):-Infinity;
+  const rawMax=Math.max(hi, goal>0?goal:hi, whatIfHi), rawMin=Math.min(lo, goal>0?goal:lo);
+  // scaleMargins reserves marginTop of the PANE height as blank space above the
+  // top of whatever priceRange autoscaleInfoProvider returns — but the returned
+  // maxValue itself is exactly the highest drawn value with zero price-unit
+  // padding, so the highest point (the what-if line at a large monthly figure,
+  // reproduced live at $2000/mo) is drawn AT that margin boundary: all of the
+  // margin's pixels are spent getting from the container edge down to the data
+  // point, leaving nothing for the point's own stroke or the label drawn above
+  // it (fanLabelPrimitive's dy:-9). Confirmed empirically: changing scaleMargins
+  // after the fact moves the data point's own pixel position (topCoordY tracked
+  // getVisibleRange().to exactly in both cases) — margin is genuine screen space,
+  // it's just all already claimed by the time the highest point is reached.
+  // Fix: push maxValue itself above rawMax by a price-unit amount equal to a
+  // real pixel budget (half the thickest line's stroke + the label's own glyph
+  // height, measured via canvas — not eyeballed — + a few px buffer), converted
+  // to price units via the pane's actual render geometry. tsHeight comes from
+  // the chart itself (stable immediately after createChart, verified: 28px for
+  // this exact fontSize/border config, before any series or data exist) rather
+  // than a hardcoded axis-height guess.
+  const tsHeight=chart.timeScale().height()||28;
+  const paneRenderPx=Math.max(1, (el.clientHeight-tsHeight)*(1-marginTop-marginBottom));
+  const labelCtx=drawGoalFan._measureCtx||(drawGoalFan._measureCtx=document.createElement('canvas').getContext('2d'));
+  labelCtx.font=`650 11px 'Inter',-apple-system,BlinkMacSystemFont,sans-serif`;
+  const labelMetrics=labelCtx.measureText('Goal $0,123.45/mo');
+  const labelPx=(Number.isFinite(labelMetrics.actualBoundingBoxAscent)&&Number.isFinite(labelMetrics.actualBoundingBoxDescent))
+    ? labelMetrics.actualBoundingBoxAscent+labelMetrics.actualBoundingBoxDescent : 11*1.3;
+  const strokeHalfPx=1; // p50's own lineWidth (2px) is the thickest candidate for the top point
+  const headroomPx=strokeHalfPx+labelPx+4;
+  // Expanding maxValue also expands the total span mapped into the same
+  // paneRenderPx, which would eat back part of a naively-added headroom (a
+  // pricePerPx computed from the PRE-expansion span overstates the padding a
+  // post-expansion pixel is worth). Solved exactly rather than approximated:
+  // headroomPrice*paneRenderPx/(rawSpan+headroomPrice) === headroomPx.
+  const rawSpan=Math.max(1e-9, rawMax-rawMin);
+  const headroomPrice=headroomPx*rawSpan/Math.max(1, paneRenderPx-headroomPx);
+  const maxValue=rawMax+headroomPrice;
   const p50=chart.addSeries(LC.LineSeries,{ color:brand, lineWidth:2,
     crosshairMarkerVisible:true, crosshairMarkerRadius:3.5,
     crosshairMarkerBackgroundColor:brand, priceLineVisible:false, lastValueVisible:false,
-    autoscaleInfoProvider:()=>({ priceRange:{ minValue:Math.min(lo, goal>0?goal:lo), maxValue:Math.max(hi, goal>0?goal:hi, whatIfHi) } }) });
+    autoscaleInfoProvider:()=>({ priceRange:{ minValue:rawMin, maxValue } }) });
   p50.setData(fan.years.map((y,i)=>({time:times[i], value:fan.p50[i]})));
   // p25/p75 is optional so a result object cached from before js/monte-carlo.js
   // grew the quartiles still draws the outer band rather than throwing.
