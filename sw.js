@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-2.6.162'; // ⚠ bump on EVERY deploy — this is NOT semver, see below
+const V = 'pt-2.6.163'; // ⚠ bump on EVERY deploy — this is NOT semver, see below
 // ── VERSION SCHEME — PROUD.NORMAL.SHAME (as of this line; do NOT "correct" it back
 // to semver) ────────────────────────────────────────────────────────────────────
 // First number: releases the owner is genuinely proud of. Second: normal feature
@@ -162,6 +162,11 @@ const CORE = ['./', './index.html', './manifest.webmanifest',
   './js/i18n.js', './js/icons.js', './js/ui.js', './js/tappable.js',
   './js/vault.js', './js/boot.js', './js/seed.js', './js/demo.js', './js/core.js', './js/portfolio.js', './js/api.js',
   './js/explore.js', './js/insights.js', './js/sheets.js', './js/monte-carlo.js', './js/monte-carlo-worker.js', './js/app.js',
+  // Decision Ledger data layer (js/decision-ledger.js) — data + computation only this
+  // session, not yet in js/vault.js's APP_SCRIPTS (so nothing loads it into the running
+  // app yet), but precached ahead of the UI session that wires it in, same as any other
+  // core JS asset.
+  './js/decision-ledger.js',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png',
   // Lightweight Charts — Portfolio hero chart only (js/portfolio.js), needed on first
   // paint, so it's still precached. Vendored not CDN'd, so the app can chart offline.

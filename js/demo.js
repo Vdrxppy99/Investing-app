@@ -20,24 +20,35 @@ function buildDemoStore(){
 
   // fictional purchase lots — a mature, diversified index portfolio built up over ~3 years.
   // costs are computed from the real historical price on each date, so gains look authentic.
+  // Every lot used to be acc:'brok', which — now that js/seed.js's ACCOUNT_KIND marks
+  // 'brok' as the self-directed account — would have made the demo 100% discretionary
+  // and had the Decision Ledger score every single lot, misrepresenting the feature (the
+  // owner's real portfolio is mostly advisor-allocated). Reassigned per lot below: broad
+  // index funds (VOO/VTI/VXUS/VXF) go to 'main' (advised — a believable allocator's
+  // picks), leaving VYM/BRK-B in 'brok' (self — the more selective, non-market-cap-
+  // weighted choices) as the demo's few genuine decisions. No symbol is split across both
+  // accounts, so the aggregation below needs no restructuring beyond reading `acc` off
+  // each lot instead of hardcoding it. ONLY `acc` changed here — sym/qty/cost/date are
+  // exactly as before (verified: test/golden/golden-master.json does not move, since
+  // rows('all')/totals('all') sum by symbol across every account regardless of `acc`).
   const lotDefs = [
-    ['VOO', D(2023, 2, 14), 34], ['VOO', D(2023, 8, 15), 22], ['VOO', D(2024, 2, 20), 18],
-    ['VOO', D(2024, 9, 10), 20], ['VOO', D(2025, 3, 17), 16], ['VOO', D(2025, 11, 4), 12],
-    ['VTI', D(2023, 4, 11), 26], ['VTI', D(2024, 6, 4), 18],
-    ['VXUS', D(2023, 3, 21), 120], ['VXUS', D(2024, 8, 13), 90], ['VXUS', D(2025, 5, 6), 70],
-    ['VYM', D(2023, 7, 11), 34], ['VYM', D(2025, 1, 14), 28],
-    ['VXF', D(2024, 1, 23), 22],
-    ['BRK-B', D(2023, 5, 9), 9], ['BRK-B', D(2024, 10, 15), 6]
+    ['VOO', D(2023, 2, 14), 34, 'main'], ['VOO', D(2023, 8, 15), 22, 'main'], ['VOO', D(2024, 2, 20), 18, 'main'],
+    ['VOO', D(2024, 9, 10), 20, 'main'], ['VOO', D(2025, 3, 17), 16, 'main'], ['VOO', D(2025, 11, 4), 12, 'main'],
+    ['VTI', D(2023, 4, 11), 26, 'main'], ['VTI', D(2024, 6, 4), 18, 'main'],
+    ['VXUS', D(2023, 3, 21), 120, 'main'], ['VXUS', D(2024, 8, 13), 90, 'main'], ['VXUS', D(2025, 5, 6), 70, 'main'],
+    ['VYM', D(2023, 7, 11), 34, 'brok'], ['VYM', D(2025, 1, 14), 28, 'brok'],
+    ['VXF', D(2024, 1, 23), 22, 'main'],
+    ['BRK-B', D(2023, 5, 9), 9, 'brok'], ['BRK-B', D(2024, 10, 15), 6, 'brok']
   ];
-  const lots = lotDefs.map(([sym, ms, qty]) => {
+  const lots = lotDefs.map(([sym, ms, qty, acc]) => {
     const px = priceAt(sym, ms);
-    return { acc: 'brok', sym, date: iso(ms), qty, cost: +(qty * px).toFixed(2) };
+    return { acc, sym, date: iso(ms), qty, cost: +(qty * px).toFixed(2) };
   });
 
   // aggregate lots into positions
   const hmap = {};
   for (const l of lots){
-    const h = hmap[l.sym] || (hmap[l.sym] = { acc: 'brok', sym: l.sym, qty: 0, cost: 0 });
+    const h = hmap[l.sym] || (hmap[l.sym] = { acc: l.acc, sym: l.sym, qty: 0, cost: 0 });
     h.qty = +(h.qty + l.qty).toFixed(6); h.cost = +(h.cost + l.cost).toFixed(2);
   }
   const holdings = Object.values(hmap);

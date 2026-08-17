@@ -1,0 +1,25 @@
+{
+  "_comment": "A hand-built response shaped to match Yahoo's well-documented (but unofficial/undocumented) v8/finance/chart JSON — this sandbox is IP-blocked by Yahoo (DATA-SOURCES.md), so this could not be captured from a live call this session. Shape confidence: indicators.adjclose[0].adjclose as an array parallel to indicators.quote[0].close, present by default for daily-interval requests with no extra query param, is long-standing behavior of this exact endpoint (the same field the yfinance Python library reads). close and adjclose are DELIBERATELY different values below so a parser test can prove it reads adjclose specifically, not close. Six points (not fewer) so the response also clears the real code's >5-point truncated-response guard, same threshold js/api.js's fetchHistory() uses.",
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "VTI",
+          "regularMarketPrice": 219.5,
+          "chartPreviousClose": 200.9
+        },
+        "timestamp": [1704229200, 1704315600, 1704402000, 1706821200, 1712001600, 1717444800],
+        "indicators": {
+          "quote": [
+            { "close": [199.8, 200.9, 201.4, 208.2, 214.0, 219.5], "open": [199.0, 199.9, 200.6, 207.5, 213.2, 218.0], "high": [200.5, 201.6, 202.1, 209.0, 214.8, 220.3], "low": [198.6, 199.5, 200.0, 207.0, 212.5, 217.8], "volume": [3200000, 2900000, 3050000, 3100000, 2950000, 3100000] }
+          ],
+          "adjclose": [
+            { "adjclose": [200, 201, 201.5, 208.8, 214.6, 220] }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

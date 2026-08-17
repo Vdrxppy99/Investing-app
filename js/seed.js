@@ -1,6 +1,21 @@
 'use strict';
 /* ============ SEED DATA (from Vanguard, 07/01/2026 04:15 PM ET) ============ */
 const ACCOUNTS = { main:'Main Account', brok:'Brokerage' };
+/* Which Vanguard account is advisor-managed vs. self-directed — resolved the
+   hard way (a prior session STOPPED here rather than guess): the owner
+   matched `main`/`brok` against his real Vanguard statements by exact share
+   quantity, 2026-08-18 —
+     main → Vanguard acct 48186273, "Advised accounts"
+            (VOO 2.7455, VTI 28.4363, VXF 3.3408, VXUS 102.5996)
+     brok → Vanguard acct 71473189, "Self-managed accounts"
+            (VOO 1.0382, VXUS 2.6244, VYM 3.1760, BRK-B 10)
+   A PARALLEL map, deliberately not a change to ACCOUNTS' own shape (string
+   labels) — this app has no module system and one global scope, so widening
+   ACCOUNTS' values from strings to objects risks silently breaking every
+   existing `ACCOUNTS[acc]` consumer that expects a display label. Read by
+   js/decision-ledger.js to decide which lots are the owner's own discretionary
+   picks, as opposed to the advisor's allocation. */
+const ACCOUNT_KIND = { main:'advised', brok:'self' };
 const NAMES = {
   'VOO':'Vanguard S&P 500 ETF', 'VTI':'Vanguard Total Stock Market ETF',
   'VXF':'Vanguard Extended Market ETF', 'VXUS':'Vanguard Total Intl Stock ETF',
