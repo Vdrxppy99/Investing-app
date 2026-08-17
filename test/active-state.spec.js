@@ -51,6 +51,18 @@ test('exactly one control is lit in every selection group after every possible c
   await page.locator('.tabbar__item[data-page="home"]').click();
   await assertOneLitPerClick(page, '#moverToggle button', 'Daily Movers toggle');
 
+  await page.locator('.tabbar__item[data-page="insights"]').click();
+  await page.waitForTimeout(300); // projModCard render (renderInsights -> renderProjMod)
+  await assertOneLitPerClick(page, '#projHorizonSeg button', 'Insights projection horizon toggle');
+  // Real-effect check, same reasoning as #screenSeg below: the lit-count sweep
+  // above would still pass with the control completely unwired to renderProjMod
+  // (a click that does nothing never goes double-lit either). Confirm the
+  // sub-caption's own year count actually tracks the clicked horizon.
+  await page.locator('#projHorizonSeg button[data-y="30"]').click();
+  await expect(page.locator('#projModHead .mod__sub')).toContainText('30');
+  await page.locator('#projHorizonSeg button[data-y="5"]').click();
+  await expect(page.locator('#projModHead .mod__sub')).toContainText('5');
+
   await page.locator('.tabbar__item[data-page="markets"]').click();
   await assertOneLitPerClick(page, '#screenSeg button', 'Markets screener toggle');
   // The lit-count check above would still pass with #screenSeg completely unwired

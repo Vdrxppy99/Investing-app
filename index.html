@@ -373,7 +373,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.159</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.160</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->
@@ -598,16 +598,41 @@
          goal-gated card or one tap deep behind Insights' OLD #moreList entry
          (js/insights.js's openProjSheet — a separate, weaker deterministic
          4/7/10%-scenario chart with no percentile bands; left in place, still
-         reachable by tap for its adjustable 5/10/20y view). MAIN run always uses
-         monthlyContribution:0 — "what my money does if I never add another
-         dollar" (the owner's own framing), not a rate derived from past buying
-         pace. The what-if input re-runs the SAME engine with a typed monthly
-         amount, debounced, in the Web Worker (js/app.js's runProbabilisticGoal(),
-         unchanged) so typing it never blocks the main thread. -->
+         reachable by tap for its adjustable 5/10/20y view).
+
+         Session 6 (owner-specified scope change, not a bug fix): this card is a
+         VALUE projection now, not a goal check. It used to show a probability of
+         reaching state.goal's target — the owner kept misreading that percentage
+         as something else, because what he actually wants here is "what will
+         this be worth". Goal tracking (the percentage chance, the target date)
+         moved to Home's own goal card (js/app.js renderGoal()) where the target
+         amount/year already live; this card carries no goal reference at all.
+         #projHorizonSeg (5/10/20/30y, default 10) picks how far out the headline
+         and chart look. MAIN run always uses monthlyContribution:0 — "what my
+         money does if I never add another dollar" (the owner's own framing), not
+         a rate derived from past buying pace. The what-if input re-runs the SAME
+         engine with a typed monthly amount, debounced, in the Web Worker
+         (js/app.js's runProbabilisticGoal(), unchanged) so typing it never blocks
+         the main thread. -->
     <h2 class="section__label">Future</h2>
     <section class="card press mod" id="projModCard" hidden>
       <div class="card__head" id="projModHead"></div>
+      <!-- No hardcoded aria-selected here — js/insights.js's renderProjMod()
+           paints .on/aria-selected from projModHorizon on every render, same
+           "state set at render time" rule #metricSeg/#rangeSeg/#moverToggle
+           already follow (see js/app.js's syncSel comment for the bug class a
+           markup-hardcoded default causes). -->
+      <div class="seg" id="projHorizonSeg" role="tablist" aria-label="Projection horizon">
+        <button class="seg__item" data-y="5" role="tab">5Y</button>
+        <button class="seg__item" data-y="10" role="tab">10Y</button>
+        <button class="seg__item" data-y="20" role="tab">20Y</button>
+        <button class="seg__item" data-y="30" role="tab">30Y</button>
+      </div>
       <div class="t-display" id="projModBig"></div>
+      <!-- The uncertainty this card exists to keep visible — a lone median with
+           no spread is the false-precision failure the goal-percentage headline
+           used to produce in a different form. -->
+      <p class="t-caption muted" id="projModRange"></p>
       <div class="chart-box chart-box--sheet"><div id="projFan"></div></div>
       <!-- The what-if control. It used to be an inline "Add [0] /month" — a dim,
            right-aligned 0 in a faint box, which the owner read as disabled
@@ -629,7 +654,6 @@
       </div>
       <p class="whatif__result" id="projWhatIfResult" hidden></p>
       <p class="t-caption faint" id="projModAsOf"></p>
-      <div class="goalline" id="projModGoalLine" hidden></div>
     </section>
 
     <h2 class="section__label">More</h2>

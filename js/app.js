@@ -285,11 +285,42 @@ function renderGoal(){
       <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>${year}</span></div>
       ${bar}
       <p class="big-n" style="margin-top:2px">${pct}%<span style="font-size:14px;font-weight:500;color:var(--mut)"> chance by ${year}</span></p>
+      <p class="t-caption muted" id="goalMedianLine"></p>
       <div class="chart-box chart-box--sheet"><div id="goalFan"></div></div>
       <p class="t-caption muted">Assumes 7% ± 12%/yr real return, 2% ± 0.8%/yr inflation, no future deposits — see Insights to try a monthly amount. Pre-tax. Not advice. ${editLink}</p>
     </div>`;
     $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
     drawGoalFan(result.fan, goal, nowYear);
+    // Session 6: the projected date the median path itself reaches the goal —
+    // separate from probabilityOfGoal above (odds of reaching it BY the target
+    // year), and separate from the target year the owner picked. Resolved as
+    // its own runProjection() call, independent of `params` above and painted
+    // into #goalMedianLine once it resolves, rather than gating the pct/bar/
+    // chart the user is actually waiting on behind a second 10,000-path run.
+    // Always searched over a fixed 30-year cap regardless of `years` (the
+    // target could be closer or further out than that), never extrapolated
+    // past it — "if the median path doesn't reach it within 30 years, say so"
+    // (owner requirement). goal:null/monthlyContribution:0 since only the
+    // fan's own p50 series is read here, never probabilityOfGoal — which also
+    // means this run's params can land on the exact same cache key
+    // js/insights.js's renderProjMod() base run uses for its own 30y/no-goal/
+    // no-contribution question, when the portfolio value matches (see that
+    // file's comment on runProjection()'s shared cache).
+    const capParams=projectionParams(t.value, 30, null, 0);
+    runProjection(capParams).then(capResult=>{
+      const el=$('goalMedianLine');
+      if(!el || !state.goal || state.goal.amt!==goal || state.goal.year!==year) return; // stale by the time it resolves
+      const capP50=capResult.fan.p50;
+      let hitYear=null;
+      for(let i=0;i<capP50.length;i++){ if(capP50[i]>=goal){ hitYear=i; break; } }
+      // window.t, not t — this function's own `t` (above) is totals('all'),
+      // shadowing the global i18n tag function for this whole scope. Confirmed
+      // live: a bare t`…` here throws "t is not a function" instead of silently
+      // falling back to English.
+      el.innerHTML = hitYear!=null
+        ? window.t`The median path reaches your goal around ${`<b>${nowYear+hitYear}</b>`}.`
+        : window.t`The median path doesn't reach your goal within 30 years.`;
+    });
   };
   runProjection(params).then(apply);
 }

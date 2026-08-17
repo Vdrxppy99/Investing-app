@@ -167,14 +167,13 @@
     "years": "Jahre",
     "/mo added": "/Monat dazu",
     "no more deposits": "keine weiteren Einzahlungen",
-    "Adding %1/month, you have a %2 chance of reaching %3 by %4.":
-      "Bei %1/Monat zusätzlich hast du eine %2-Chance, %3 bis %4 zu erreichen.",
-    "With no more deposits, you have a %1 chance of reaching %2 by %3.":
-      "Ohne weitere Einzahlungen hast du eine %1-Chance, %2 bis %3 zu erreichen.",
-    "Adding %1/month, the median path reaches %2 by %3 — likely range %4.":
-      "Bei %1/Monat zusätzlich erreicht der mittlere Pfad %2 bis %3 — wahrscheinliche Spanne %4.",
-    "With no more deposits, the median path reaches %1 by %2 — likely range %3.":
-      "Ohne weitere Einzahlungen erreicht der mittlere Pfad %1 bis %2 — wahrscheinliche Spanne %3.",
+    /* Session 6: the projection card's own goal-relative line ("With no more
+       deposits, you have a %1 chance..."/"...the median path reaches %1 by %2
+       — likely range %3.") is gone along with #projModGoalLine — that framing
+       moved to Home's goal card, see the two new entries near "chance by"
+       below. "Likely range %1" replaces it here: the card's own p10-p90 line
+       under the median headline, no goal involved. */
+    "Likely range %1": "Wahrscheinliche Spanne %1",
     /* The what-if control's own label and result line. The label is static text in
        index.html (post-render dictionary pass); the sentence is a t() template. */
     "What if I add monthly": "Was, wenn ich monatlich einzahle",
@@ -184,6 +183,14 @@
     "Computed %1s ago": "Vor %1s berechnet",
     "Computed %1 min ago": "Vor %1 Min. berechnet",
     "Computed %1": "Berechnet am %1",
+    /* Home's goal card (js/app.js renderGoal()) — the projected date the MEDIAN
+       path itself reaches the goal, separate from the probability-by-target-
+       year line above it (that line is untranslated English pre-existing —
+       flagged, not fixed, this session; see the session close-out note). */
+    "The median path reaches your goal around %1.":
+      "Der mittlere Pfad erreicht dein Ziel etwa %1.",
+    "The median path doesn't reach your goal within 30 years.":
+      "Der mittlere Pfad erreicht dein Ziel nicht innerhalb von 30 Jahren.",
 
     /* ── Leaks the projection module's new dictionary candidates exposed ──────
        "years" and "/month" becoming candidates (above) surfaced two PRE-EXISTING

@@ -1017,27 +1017,44 @@ function renderPEMod(){
    reachable by tap for its adjustable 5/10/20y view; this module supersedes it
    as the default view, not a replacement of its code).
 
-   MAIN run: monthlyContribution:0, always — "what my money does if I never add
-   another dollar" is the headline (the owner's own framing). Home's goal card
-   used to run the same engine with a rate derived from lot history instead, so
-   one goal read ~100% there and 87% here; both surfaces now go through
-   js/app.js's projectionParams()/runProjection(), which is the single place the
-   model constants and the "no contributions in the headline" rule live. See the
-   PROJECTION_MODEL comment there — it is the source of truth, not this comment.
+   Session 6 (owner-specified scope change): this card answers "what will this
+   be worth", not "will I hit my goal" — that framing (a probability headline,
+   the goal line) moved to Home's own goal card, which already owns the target
+   amount/year. #projHorizonSeg (5/10/20/30y, default projModHorizon=10) picks
+   how far out the headline/range/chart look.
 
-   The what-if input below re-runs that same engine with a typed monthly amount —
-   his number, never a derived one, and the only place in the app a contribution
-   figure enters a projection at all — debounced (450ms) and run through the same
-   Web Worker path so typing it never blocks the main thread (Phase 4's INP work).
+   MAIN run: monthlyContribution:0 AND goal:null, always — "what my money does
+   if I never add another dollar" is the headline (the owner's own framing).
+   Always run at PROJ_MOD_YEARS (30), the longest horizon a button offers, and
+   RE-SLICE the resulting fan for whichever shorter horizon is selected
+   (sliceFan()) rather than re-running the simulation — monte-carlo.js computes
+   percentiles at every year 0..years from the same paths, so year 5's p10/p50/
+   p90 inside a 30-year run are identical to what a standalone 5-year run would
+   produce (same seed, same sequential per-path draws up to that year); slicing
+   is exact, not an approximation, and it means switching horizon is instant —
+   no new 10,000-path run. Both surfaces (this card, Home's goal card) still go
+   through js/app.js's projectionParams()/runProjection(), the single place the
+   model constants live — see the PROJECTION_MODEL comment there.
 
-   Caching also lives in runProjection(), keyed by the params and shared with
-   Home. With a fixed seed the engine is a pure function of its params, so a
-   shared key is a guarantee that two surfaces showing the same key show the same
-   number, not just a speed optimisation. The cache is a plain module variable,
-   empty on every page load, so a fresh open always computes for real — it is
-   never stale. What was missing was showing WHEN it last ran; #projModAsOf reads
-   that timestamp back with projectionComputedAt(). */
-let projModWhatIfTimer=null, projModPendingKey=null;
+   The what-if input below re-runs that same engine (still at PROJ_MOD_YEARS,
+   also re-sliced) with a typed monthly amount — his number, never a derived
+   one, and the only place in the app a contribution figure enters a projection
+   at all — debounced (450ms) and run through the same Web Worker path so
+   typing it never blocks the main thread (Phase 4's INP work).
+
+   Caching lives in runProjection(), keyed by the params. With a fixed seed the
+   engine is a pure function of its params, so a shared key is a guarantee two
+   surfaces showing the same key show the same number, not just a speed
+   optimisation — this card's base params (goal:null, monthlyContribution:0,
+   years:30) happen to be exactly what Home's goal card also requests for its
+   own "does the median path reach the goal within 30 years" line (renderGoal()
+   in js/app.js), so the two runs share one cache entry when portfolio values
+   match, incidentally. The cache is a plain module variable, empty on every
+   page load, so a fresh open always computes for real — it is never stale.
+   What was missing was showing WHEN it last ran; #projModAsOf reads that
+   timestamp back with projectionComputedAt(). */
+const PROJ_MOD_YEARS=30;
+let projModHorizon=10, projModWhatIfTimer=null, projModPendingKey=null;
 function projAsOfText(ts){
   if(!ts) return '';
   const age=Math.max(0,Math.round((Date.now()-ts)/1000));
@@ -1046,6 +1063,13 @@ function projAsOfText(ts){
   if(age<5400) return t`Computed ${Math.round(age/60)} min ago`;
   return t`Computed ${new Date(ts).toLocaleString(appLocale(),{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`;
 }
+// Truncates every series in a fan to years 0..horizon — see the exactness note
+// in the block comment above for why this is a slice, not an approximation.
+function sliceFan(fan, horizon){
+  const n=horizon+1;
+  return { years:fan.years.slice(0,n), p10:fan.p10.slice(0,n), p25:fan.p25.slice(0,n),
+    p50:fan.p50.slice(0,n), p75:fan.p75.slice(0,n), p90:fan.p90.slice(0,n) };
+}
 function renderProjMod(){
   const card=$('projModCard'); if(!card) return;
   const t2=totals('all');
@@ -1053,23 +1077,28 @@ function renderProjMod(){
   card.hidden=false;
   // Taps through to the OLD deterministic 5/10/20y chart's sheet — same
   // "mod card opens the fuller detail view" convention every other surfaced
-  // module uses — EXCEPT inside .whatif: the input has to stay interactive,
-  // not be swallowed by the card's own click-to-open-sheet handler when its
-  // own click event bubbles up.
-  card.onclick=e=>{ if(!e.target.closest('.whatif')) openProjSheet(); };
+  // module uses — EXCEPT inside .whatif or the horizon control: both have to
+  // stay interactive, not be swallowed by the card's own click-to-open-sheet
+  // handler when their own click event bubbles up.
+  card.onclick=e=>{ if(!e.target.closest('.whatif') && !e.target.closest('#projHorizonSeg')) openProjSheet(); };
+  const seg=$('projHorizonSeg');
+  if(seg) seg.querySelectorAll('button').forEach(b=>{
+    const sel=+b.dataset.y===projModHorizon;
+    b.classList.toggle('on', sel);
+    b.setAttribute('aria-selected', sel?'true':'false');
+  });
   const input=$('projWhatIfInput');
   const contrib=input?Math.max(0,parseFloat(input.value)||0):0;
-  const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
   const nowYear=new Date().getFullYear();
-  const years=(state.goal&&state.goal.year>nowYear)?state.goal.year-nowYear:10;
-  // TWO sets of params, always. `base` is the headline question — "what my money
-  // does if I never add another dollar" — and is the ONLY one Home's goal card
-  // ever builds (js/app.js renderGoal(), hardcoded 0), which is what keeps the two
-  // surfaces on one shared cache key. `params` is the what-if's own derived run;
-  // when the input is empty the two are identical and collapse to one cache hit,
-  // so the extra call costs nothing in the default state.
-  const base=projectionParams(t2.value, years, goal, 0);
-  const params=projectionParams(t2.value, years, goal, contrib);
+  const years=projModHorizon;
+  // TWO sets of params, always, both at the full PROJ_MOD_YEARS run — `base` is
+  // the headline question, "what my money does if I never add another dollar",
+  // and `params` is the what-if's own derived run; when the input is empty the
+  // two are identical and collapse to one cache hit, so the extra call costs
+  // nothing in the default state. Neither ever carries a goal — see the block
+  // comment above.
+  const base=projectionParams(t2.value, PROJ_MOD_YEARS, null, 0);
+  const params=projectionParams(t2.value, PROJ_MOD_YEARS, null, contrib);
   const head=$('projModHead');
   if(head){
     const yrsTxt=`${years} ${t`years`}`;
@@ -1080,13 +1109,16 @@ function renderProjMod(){
   }
   const apply=(baseResult, whatIfResult)=>{
     if($('projModCard')===null || $('projModCard').hidden) return; // gone/hidden by the time the Worker replies
+    const bFan=sliceFan(baseResult.fan, years);
     const big=$('projModBig');
-    // #projModBig, its sub-caption and the fan's base cone are always this run — they
-    // never respond to the what-if input. See DESIGN-TARGET.md's "one projection, one
-    // answer" requirement and test/projection-consistency.spec.js.
-    const p50N=baseResult.fan.p50[years], p10N=baseResult.fan.p10[years], p90N=baseResult.fan.p90[years];
-    if(big) big.textContent = goal ? (baseResult.probabilityOfGoal*100).toFixed(0)+'%' : fmt(p50N);
-    drawGoalFan(baseResult.fan, goal, nowYear, 'projFan', whatIfResult?{fan:whatIfResult.fan, contrib}:null);
+    // #projModBig, its sub-caption, #projModRange and the fan's base cone are always
+    // this run — they never respond to the what-if input. See DESIGN-TARGET.md's "one
+    // projection, one answer" requirement and test/projection-consistency.spec.js.
+    const p50N=bFan.p50[years], p10N=bFan.p10[years], p90N=bFan.p90[years];
+    if(big) big.textContent = fmt(p50N);
+    const range=$('projModRange');
+    if(range) range.innerHTML = t`Likely range ${`<b>${fmt(p10N)}–${fmt(p90N)}</b>`}`;
+    drawGoalFan(bFan, null, nowYear, 'projFan', whatIfResult?{fan:sliceFan(whatIfResult.fan, years), contrib}:null);
     /* What the typed amount is actually worth, in one sentence, against the
        no-deposit run rather than in the abstract — the delta is the answer the
        input is being asked for. Absent (not zeroed) when the input is empty:
@@ -1095,7 +1127,7 @@ function renderProjMod(){
     const res=$('projWhatIfResult');
     if(res){
       if(contrib>0 && whatIfResult){
-        const whatIfP50N=whatIfResult.fan.p50[years];
+        const whatIfP50N=sliceFan(whatIfResult.fan, years).p50[years];
         const gain=whatIfP50N-p50N;
         const pmtB=`<b>${fmt(contrib)}</b>`, reachB=`<b>${fmt(whatIfP50N)}</b>`, gainB=`<b>${fmt(gain)}</b>`;
         res.innerHTML=t`Adding ${pmtB}/month reaches ${reachB} — ${gainB} more than with no deposits.`;
@@ -1103,20 +1135,6 @@ function renderProjMod(){
       } else { res.innerHTML=''; res.hidden=true; }
     }
     const asOf=$('projModAsOf'); if(asOf) asOf.textContent=projAsOfText(projectionComputedAt(base));
-    const gl=$('projModGoalLine');
-    if(gl){
-      // Pinned to the base run too, same reason as the sub-caption above — the
-      // goal-relative sentence is part of the headline, not a what-if output.
-      const yearB=`<b>${nowYear+years}</b>`;
-      if(goal){
-        const pctB=`<b>${(baseResult.probabilityOfGoal*100).toFixed(0)}%</b>`, goalB=`<b>${fmt(goal)}</b>`;
-        gl.innerHTML = `<span>${t`With no more deposits, you have a ${pctB} chance of reaching ${goalB} by ${yearB}.`}</span>`;
-      } else {
-        const p50B=`<b>${fmt(p50N)}</b>`, rangeB=`<b>${fmt(p10N)}–${fmt(p90N)}</b>`;
-        gl.innerHTML = `<span>${t`With no more deposits, the median path reaches ${p50B} by ${yearB} — likely range ${rangeB}.`}</span>`;
-      }
-      gl.hidden=false;
-    }
   };
   // The what-if input fires a fresh run on every debounce tick, and an earlier
   // run can resolve after a later one — paint only the newest one asked for.
@@ -1143,6 +1161,19 @@ if($('projWhatIfPresets')) $('projWhatIfPresets').querySelectorAll('[data-amt]')
     const input=$('projWhatIfInput'); if(!input) return;
     input.value = b.dataset.amt;
     clearTimeout(projModWhatIfTimer);
+    renderProjMod();
+  };
+});
+// Horizon control — bound once at load (static markup in index.html), same
+// convention as the what-if presets above. No aria-selected/`.on` written here
+// at bind time: renderProjMod() paints that on every render from
+// projModHorizon, so there is exactly one place selection state is set (see
+// index.html's #projHorizonSeg comment and syncSel's in js/app.js for the bug
+// class a markup-hardcoded default causes).
+if($('projHorizonSeg')) $('projHorizonSeg').querySelectorAll('button').forEach(b=>{
+  b.onclick=e=>{
+    e.stopPropagation(); // the card itself opens the projection sheet on click
+    projModHorizon=+b.dataset.y;
     renderProjMod();
   };
 });
