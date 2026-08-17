@@ -65,6 +65,31 @@ async function collectFigures(page) {
     }));
     const risk = riskStats();
     const health = healthScore();
+    // Projection figures — added session 7, closing the gap flagged in the prior
+    // session's report ("golden master doesn't cover the projection card, so its
+    // currency headline has no regression guard"). Called directly against the
+    // pure engine (runMonteCarloProjection(), js/monte-carlo.js) rather than
+    // through the async Worker path (runProjection()/runProbabilisticGoal()) —
+    // same fixed seed either way (PROJECTION_MODEL.seed, js/app.js), but this
+    // stays synchronous and never depends on Worker support in the test runner.
+    // #projModCard's own base params: v0 = the real demo total, 30-year run,
+    // no goal, no contribution — see js/insights.js's PROJ_MOD_YEARS comment.
+    const projFan = runMonteCarloProjection(projectionParams(t.value, 30, null, 0)).fan;
+    const projection = {};
+    for (const h of [5, 10, 20, 30]) {
+      projection[h] = {
+        p10: +projFan.p10[h].toFixed(2),
+        p50: +projFan.p50[h].toFixed(2),
+        p90: +projFan.p90[h].toFixed(2),
+      };
+    }
+    // Home's goal probability — a FIXED goal/year, independent of whatever
+    // state.goal the demo dataset ships (js/demo.js's pt_goal has an amount but
+    // no year, so it can't answer "chance by year" on its own; same {amt,year}
+    // test/projection-consistency.spec.js's GOAL constant already uses, for one
+    // less magic number in the suite).
+    const goalYears = 2036 - new Date().getFullYear();
+    const goalProbability = +(runMonteCarloProjection(projectionParams(t.value, goalYears, 200000, 0)).probabilityOfGoal * 100).toFixed(2);
     return {
       totals: {
         value: +t.value.toFixed(2),
@@ -86,6 +111,8 @@ async function collectFigures(page) {
       holdings,
       holdingsCount: holdings.length,
       totalValText: document.getElementById('tvNum').textContent,
+      projection,
+      goalProbability,
     };
   });
 }

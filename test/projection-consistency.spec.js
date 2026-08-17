@@ -1,34 +1,63 @@
 'use strict';
-/* Session 6 rewrite (owner-specified scope change, not a bug fix): Insights'
+/* Rewritten twice already (sessions 5 and 6) — this header exists so a third
+ * rewrite doesn't happen casually. Read it before touching a test below.
+ *
+ * ── Why this file exists at all ──────────────────────────────────────────
+ * Home's goal card and Insights' projection card both run the SAME Monte
+ * Carlo engine (js/monte-carlo.js runMonteCarloProjection(), via
+ * projectionParams()/runProjection() in js/app.js). Two real regressions have
+ * shipped from that sharing so far: (a) the two surfaces once built params
+ * differently and showed different odds for the same goal (100% vs 87% on
+ * the demo dataset — the original reason this file was created); (b) session
+ * 6's rewrite of #projModCard introduced a `const t=totals('all')` in
+ * renderGoal() that shadowed the global t() tag, which silently broke (threw,
+ * caught only by manual browser testing, not by this suite) the first time a
+ * new t`` call was added inside that function. Every test below exists to
+ * make one of these regressions, or one shaped like it, fail loudly instead
+ * of shipping quietly.
+ *
+ * ── What each test protects ──────────────────────────────────────────────
+ * 1. "Home's goal card shows exactly the probability the shared engine
+ *    computes" — the ORIGINAL regression (a). Home's rendered #goalBody
+ *    percentage must equal a fresh, independent call into the same engine
+ *    for the same inputs. This is the one the task brief asked to be "a real
+ *    test, not a console print" — it already was one (added session 6); this
+ *    session (7) added test 1b below, which pins the SAME invariant to the
+ *    frozen golden-master fixture instead of a live recomputation, so a
+ *    silent change to PROJECTION_MODEL/the engine itself — not just a
+ *    Home-vs-engine mismatch — also fails a test, not just golden.spec.js.
+ * 1b. "…also matches the golden-master's frozen figure" — session 7. Ties
+ *     the rendered DOM directly to test/golden/golden-master.json's
+ *     `goalProbability` key (added this session, see test/helpers.js
+ *     collectFigures()), so a regression in either the render path or the
+ *     golden fixture itself shows up here too, not only in golden.spec.js.
+ * 2. "The headline run excludes contributions on both surfaces" — the
+ *    owner's explicit requirement that monthlyContribution is always 0 in
+ *    the headline number on both cards; the what-if input is the only place
+ *    a contribution figure enters a projection at all.
+ * 3. "#projModBig is pinned to the zero-contribution run…" — regression
+ *    guard for a UX flip the owner made session 5→6: the headline must NOT
+ *    move when the what-if input is typed into; only its own result sentence
+ *    and a dashed chart line may respond. Also checks Home's probability is
+ *    unmoved by activity on a completely unrelated card.
+ * 4. "switching the projection horizon re-slices…" — session 6's performance
+ *    invariant: monte-carlo.js computes every year's percentiles from the
+ *    same simulated paths, so changing #projHorizonSeg must never grow
+ *    projCache (a new cache entry would mean a wasted 10,000-path re-run).
+ *
+ * Session 6 (owner-specified scope change, not a bug fix): Insights'
  * projection card (#projModCard) stopped answering "will I hit my goal" and
  * now answers "what will this be worth" — a currency median + p10-p90 range
  * at a chosen horizon, no goal reference anywhere on the card. The percentage-
  * chance-of-goal framing this file used to compare across two surfaces now
  * lives ONLY on Home's own goal card (#goalBody/#goalPct, js/app.js
  * renderGoal()), which already owns the target amount/year.
- *
- * What this file still guards, updated for the new shape:
- *  1. Home's goal probability is exactly what the shared engine
- *     (projectionParams()/runProjection()) computes for the same inputs —
- *     "moved, not recomputed differently" per the owner's brief.
- *  2. The headline run excludes contributions on BOTH surfaces — Home's goal
- *     card in words, Insights' card in its sub-caption (no goal line to check
- *     anymore, and #projModGoalLine no longer exists in the DOM at all).
- *  3. #projModBig is pinned to the zero-contribution run; the what-if input's
- *     only two outputs are its own result sentence and the dashed chart
- *     overlay — unchanged principle, now measured in dollars instead of a
- *     percentage — and Home's own probability (a completely separate
- *     question now, not a shared cache key) is unmoved by it.
- *  4. NEW: switching the horizon (5/10/20/30y) re-slices the one 30-year
- *     simulation instead of triggering a fresh 10,000-path run — monte-
- *     carlo.js computes every year's percentiles from the same paths, so a
- *     shorter horizon's numbers are an exact slice, not an approximation. See
- *     js/insights.js's PROJ_MOD_YEARS/sliceFan() comment for why.
  */
 const { test, expect } = require('@playwright/test');
 const { FROZEN_TIME, blockExternalNetwork, unlockDemo } = require('./helpers');
+const golden = require('./golden/golden-master.json');
 
-const GOAL = { amt: 200000, year: 2036 };
+const GOAL = { amt: 200000, year: 2036 }; // matches test/helpers.js collectFigures()'s fixed goal fixture exactly
 
 test.beforeEach(async ({ page }) => {
   await blockExternalNetwork(page);
@@ -58,6 +87,23 @@ test('Home\'s goal card shows exactly the probability the shared engine computes
   // eslint-disable-next-line no-console
   console.log(`Home #goalBody: ${home}% · direct runProjection(): ${direct}%`);
   expect(+home).toBe(direct);
+});
+
+// Session 7: pins the same invariant to the FROZEN golden-master fixture
+// (test/golden/golden-master.json's `goalProbability`, captured by
+// test/helpers.js collectFigures() at this exact FROZEN_TIME/demo dataset/
+// GOAL) instead of a fresh live recomputation — the test above would still
+// pass if the engine itself silently drifted (both sides of that comparison
+// call the SAME code), since it only proves Home agrees with itself. This one
+// catches a drift in the engine or its model constants too, the same way
+// golden.spec.js does for every other financial figure — this was the exact
+// gap the prior session's report named ("the headline is now a currency value
+// with no regression guard on it").
+test('Home\'s goal probability matches the golden-master\'s frozen figure', async ({ page }) => {
+  const home = pct(await page.locator('#goalBody').innerText());
+  // eslint-disable-next-line no-console
+  console.log(`Home #goalBody: ${home}% · golden-master goalProbability: ${golden.goalProbability}%`);
+  expect(+home).toBe(Math.round(golden.goalProbability));
 });
 
 test('the headline run excludes contributions on both surfaces', async ({ page }) => {

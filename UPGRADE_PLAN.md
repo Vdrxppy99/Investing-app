@@ -599,4 +599,16 @@ Not part of any phase. Pick these off when convenient.
   Insights and Following. Confirmed by a click that timed out on every other
   tab. Recorded as an observation, not a defect: this reads as a deliberate
   five-tab-redesign placement, and moving global chrome is the owner's call.
+- **`test/i18n-coverage.spec.js` cannot detect a brand-new untranslated string
+  in a JS template literal — confirmed by reading `englishCandidates()`
+  ([test/i18n-coverage.spec.js:64](test/i18n-coverage.spec.js:64)): its
+  candidate list is built ONLY from existing `window.i18nDE` dictionary keys
+  plus static text scraped from `index.html`, never from parsing `.js` source.
+  A raw English sentence hardcoded into a template literal (no dictionary
+  entry, not present as static HTML) is invisible to it by construction —
+  which is exactly how `js/app.js` `renderGoal()`'s "chance by ⟨year⟩" shipped
+  several sessions reporting "0 leaks" while sitting untranslated (root cause:
+  a `t` shadowing bug, fixed 2026-08-17 — see CHANGELOG.md). Closing this gap
+  needs a real JS/template-literal scan, not a rendered-DOM diff; not attempted
+  this session.
 

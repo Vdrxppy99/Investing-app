@@ -185,12 +185,17 @@
     "Computed %1": "Berechnet am %1",
     /* Home's goal card (js/app.js renderGoal()) — the projected date the MEDIAN
        path itself reaches the goal, separate from the probability-by-target-
-       year line above it (that line is untranslated English pre-existing —
-       flagged, not fixed, this session; see the session close-out note). */
+       year line above it. That line ("chance by %1") was raw English until
+       this session — not a missing t() wrap, a t() wrap that would have
+       THROWN: renderGoal()'s own `const t=totals('all')` shadowed the global
+       t() tag for the whole function (fixed this session, renamed to `tot`).
+       See UPGRADE_PLAN.md's Backlog for whether the i18n-coverage checker
+       would ever have caught this on its own. */
     "The median path reaches your goal around %1.":
       "Der mittlere Pfad erreicht dein Ziel etwa %1.",
     "The median path doesn't reach your goal within 30 years.":
       "Der mittlere Pfad erreicht dein Ziel nicht innerhalb von 30 Jahren.",
+    "chance by %1": "Chance bis %1",
 
     /* ── Leaks the projection module's new dictionary candidates exposed ──────
        "years" and "/month" becoming candidates (above) surfaced two PRE-EXISTING

@@ -244,15 +244,21 @@ function runProbabilisticGoal(params){
 }
 function renderGoal(){
   const body=$('goalBody'); const pctEl=$('goalPct'); if(!body) return;
-  const t=totals('all');
+  // Named `tot`, not `t` — this function's body composes t`` translated
+  // sentences below (fixed this session: a bare `const t=totals('all')` here
+  // silently shadowed the global i18n tag function for the whole scope, so
+  // every t`` call in this function threw "t is not a function" instead of
+  // falling back to English — same convention openCrashSheet() already uses
+  // in js/insights.js for the same reason).
+  const tot=totals('all');
   if(!state.goal || !(state.goal.amt>0)){ renderGoalForm(0); return; }
-  const goal=state.goal.amt, year=state.goal.year, pctRaw=t.value/goal;
+  const goal=state.goal.amt, year=state.goal.year, pctRaw=tot.value/goal;
   if(pctEl) pctEl.textContent=(Math.min(999,pctRaw*100)).toFixed(0)+'%';
   const bar=`<div class="goalbar"><i style="--w:${(Math.min(1,pctRaw)*100).toFixed(1)}%"></i></div>`;
   const editLink=`<a href="#" id="goalEdit">Change goal</a>`;
-  if(t.value>=goal){
+  if(tot.value>=goal){
     body.innerHTML=`<div class="stack stack--tight">
-      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span class="pos">Reached</span></div>
+      <div class="goalrow"><span>${fmt(tot.value)} of ${fmt(goal)}</span><span class="pos">Reached</span></div>
       ${bar}<p class="t-caption muted">🎉 Goal reached. ${editLink}</p></div>`;
     $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
     return;
@@ -260,31 +266,31 @@ function renderGoal(){
   const nowYear=new Date().getFullYear();
   if(!(year>0)){
     body.innerHTML=`<div class="stack stack--tight">
-      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>—</span></div>
+      <div class="goalrow"><span>${fmt(tot.value)} of ${fmt(goal)}</span><span>—</span></div>
       ${bar}<p class="t-caption muted">Set a target year to see your odds of getting there. ${editLink}</p></div>`;
     $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
     return;
   }
   if(year<=nowYear){
     body.innerHTML=`<div class="stack stack--tight">
-      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>—</span></div>
+      <div class="goalrow"><span>${fmt(tot.value)} of ${fmt(goal)}</span><span>—</span></div>
       ${bar}<p class="t-caption muted">Target year ${year} has passed — update it to see a projection. ${editLink}</p></div>`;
     $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
     return;
   }
   const years=year-nowYear;
   body.innerHTML=`<div class="stack stack--tight">
-    <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>Calculating…</span></div>
+    <div class="goalrow"><span>${fmt(tot.value)} of ${fmt(goal)}</span><span>Calculating…</span></div>
     ${bar}<p class="t-caption muted">Running 10,000 simulated paths… ${editLink}</p></div>`;
   $('goalEdit').onclick=e=>{ e.preventDefault(); renderGoalForm(goal, year); };
-  const params=projectionParams(t.value, years, goal, 0); // never a derived contribution — see PROJECTION_MODEL above
+  const params=projectionParams(tot.value, years, goal, 0); // never a derived contribution — see PROJECTION_MODEL above
   const apply=result=>{
     if(!$('goalBody')||!state.goal||state.goal.amt!==goal||state.goal.year!==year) return; // stale by the time it resolves
     const pct=(result.probabilityOfGoal*100).toFixed(0);
     body.innerHTML=`<div class="stack stack--tight">
-      <div class="goalrow"><span>${fmt(t.value)} of ${fmt(goal)}</span><span>${year}</span></div>
+      <div class="goalrow"><span>${fmt(tot.value)} of ${fmt(goal)}</span><span>${year}</span></div>
       ${bar}
-      <p class="big-n" style="margin-top:2px">${pct}%<span style="font-size:14px;font-weight:500;color:var(--mut)"> chance by ${year}</span></p>
+      <p class="big-n" style="margin-top:2px">${pct}%<span style="font-size:14px;font-weight:500;color:var(--mut)"> ${t`chance by ${year}`}</span></p>
       <p class="t-caption muted" id="goalMedianLine"></p>
       <div class="chart-box chart-box--sheet"><div id="goalFan"></div></div>
       <p class="t-caption muted">Assumes 7% ± 12%/yr real return, 2% ± 0.8%/yr inflation, no future deposits — see Insights to try a monthly amount. Pre-tax. Not advice. ${editLink}</p>
@@ -306,20 +312,16 @@ function renderGoal(){
     // js/insights.js's renderProjMod() base run uses for its own 30y/no-goal/
     // no-contribution question, when the portfolio value matches (see that
     // file's comment on runProjection()'s shared cache).
-    const capParams=projectionParams(t.value, 30, null, 0);
+    const capParams=projectionParams(tot.value, 30, null, 0);
     runProjection(capParams).then(capResult=>{
       const el=$('goalMedianLine');
       if(!el || !state.goal || state.goal.amt!==goal || state.goal.year!==year) return; // stale by the time it resolves
       const capP50=capResult.fan.p50;
       let hitYear=null;
       for(let i=0;i<capP50.length;i++){ if(capP50[i]>=goal){ hitYear=i; break; } }
-      // window.t, not t — this function's own `t` (above) is totals('all'),
-      // shadowing the global i18n tag function for this whole scope. Confirmed
-      // live: a bare t`…` here throws "t is not a function" instead of silently
-      // falling back to English.
       el.innerHTML = hitYear!=null
-        ? window.t`The median path reaches your goal around ${`<b>${nowYear+hitYear}</b>`}.`
-        : window.t`The median path doesn't reach your goal within 30 years.`;
+        ? t`The median path reaches your goal around ${`<b>${nowYear+hitYear}</b>`}.`
+        : t`The median path doesn't reach your goal within 30 years.`;
     });
   };
   runProjection(params).then(apply);
