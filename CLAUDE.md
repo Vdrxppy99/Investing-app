@@ -40,6 +40,37 @@ Welcome Claude! This document maintains project context and state so both **Clau
   - **`ACCOUNTS` is two entries** (`Main Account`, `Brokerage`) in `js/seed.js`. The six types added in v9.1.0 (Roth IRA, 401(k), Crypto Vault, …) are US-specific and the owner holds neither, so they were reverted. This is deliberate, not a regression.
 - **Active Task / Goal**: v9.2.0 refactor complete. Every pure financial function (XIRR, modified Dietz, volatility/beta/max drawdown, tax-lot short/long-term split, same-buys-in-VOO benchmark) is verified against independently-derived expected values in [test/phase1/math.spec.js](test/phase1/math.spec.js), cross-checked with the `backtesting` skill's Python oracle where applicable — see that file's header comment for the exact derivations. The one disagreement found (`riskStats()` annualizing with a hardcoded 252 regardless of actual sampling interval) is fixed in `js/insights.js`; see the comments there and above `xirr()` in `js/core.js` for the day-count/annualization/stdev conventions used throughout.
 
+## Traps & Gotchas
+- **Demo-mode figures from two different manual page loads are not comparable.**
+  `refreshAll(false).then(schedulePoll)` ([js/app.js:1090](js/app.js:1090)) fires
+  a live price fetch on every boot — it is not gated on `window.DEMO_MODE` — so a
+  browser session with real network access can have that fetch land (or fail)
+  differently at every reload, changing the portfolio total and everything
+  derived from it. A figure read by manually driving the app in a browser is
+  comparable ONLY to other figures captured in that SAME page load; never
+  compute a ratio, a delta, or a "before vs. after" across two separate manual
+  reloads. Capture both halves of any comparison in one session, or use the
+  seeded test harness instead — it IS seeded/deterministic, confirmed by
+  reading the code rather than assumed: [test/helpers.js:7](test/helpers.js:7)
+  freezes the clock to a fixed instant (`FROZEN_TIME`, via
+  `page.clock.setFixedTime`) and [test/helpers.js:21](test/helpers.js:21)
+  (`blockExternalNetwork()`) blocks every live price host, so quotes always
+  fall back to the same baked `SEED_QUOTES` snapshot regardless of when the
+  suite runs. Found the hard way in the 2026-08-17 session: a printed table of
+  projected medians was divided by a `v0` from a *different* reload than the
+  one that produced the medians, producing a confident but false "decaying
+  growth rate" finding — see CHANGELOG.md's v2.6.161 entry for the full
+  reconstruction.
+- **A green `test/i18n-coverage.spec.js` run is not evidence that JS-emitted
+  strings are translated.** Its candidate list comes only from existing
+  `window.i18nDE` dictionary keys and static `index.html` text
+  ([test/i18n-coverage.spec.js:64](test/i18n-coverage.spec.js:64)) — it never
+  parses `.js` source, so a hardcoded English string living only inside a JS
+  template literal is invisible to it until it already has a dictionary entry.
+  See UPGRADE_PLAN.md's Backlog for the full finding and the `renderGoal()`
+  string that shipped several "0 leaks" sessions untranslated because of
+  exactly this blind spot.
+
 ## Dual Assistant Sync Log
 - **2026-07-29**: Set up `.agents/AGENTS.md` and `CLAUDE.md` to establish a synchronized development workflow between Antigravity and Claude.
 - **2026-07-29**: Upgraded to **v9.1.0**:
