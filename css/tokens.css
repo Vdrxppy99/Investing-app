@@ -338,6 +338,12 @@
      ═══════════════════════════════════════════════════════════════════════════ */
   :root, :root[data-theme="dark"] {
     --brand: var(--primary);
+    /* DESIGN-TARGET.md names the tinted brand fill --brand-soft; this repo had only
+       ever spelled it --primary-tint (byte-identical: rgba(124,108,255,.14) dark,
+       and its own derived light value). Aliased rather than duplicated so the two
+       names can never drift, and so the fan chart can read the token the brief
+       names without a literal rgba() in js/app.js. */
+    --brand-soft: var(--primary-tint);
     --green: var(--gain);
     --red: var(--loss);
     --mut: var(--text-muted);

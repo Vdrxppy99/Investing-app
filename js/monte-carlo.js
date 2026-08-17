@@ -72,12 +72,19 @@
       if (hit) goalHits++;
     }
 
-    const fan = { years: [], p10: [], p50: [], p90: [] };
+    /* p25/p75 are additive (the p10/p50/p90 figures every caller already reads are
+       untouched): drawGoalFan() paints the inner quartile band over the outer decile
+       band with the SAME fill, so the middle half of the distribution reads about
+       twice as dense. Without them the cone is one flat wash with no indication of
+       where the mass actually sits. */
+    const fan = { years: [], p10: [], p25: [], p50: [], p75: [], p90: [] };
     for (let y = 0; y <= T; y++) {
       const sorted = Array.from(pathsByYear[y]).sort((a, b) => a - b);
       fan.years.push(y);
       fan.p10.push(percentileSorted(sorted, 0.10));
+      fan.p25.push(percentileSorted(sorted, 0.25));
       fan.p50.push(percentileSorted(sorted, 0.50));
+      fan.p75.push(percentileSorted(sorted, 0.75));
       fan.p90.push(percentileSorted(sorted, 0.90));
     }
 

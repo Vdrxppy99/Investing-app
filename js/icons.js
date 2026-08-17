@@ -44,6 +44,11 @@
     send: '<path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
     message: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/>',
     eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7"/><circle cx="12" cy="12" r="3"/>',
+    /* Relocated from js/app.js, where privacy mode kept its own two <svg> strings
+       and wrote them straight into #privBtn.innerHTML — markup without
+       aria-hidden="true", which is exactly what css/base.css's icon rule keys on.
+       Same drawing, now reached the way every other icon is. */
+    eyeOff: '<path d="M10.6 5.1A11.3 11.3 0 0 1 12 5c7 0 11 7 11 7a18.4 18.4 0 0 1-2.2 3.2M6.6 6.6C3.4 8.6 1 12 1 12s4 7.5 11 7.5a11 11 0 0 0 5.4-1.4"/><path d="M9.9 9.9a3.2 3.2 0 0 0 4.5 4.5"/><path d="M3 3l18 18"/>',
     externalLink: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
 
     /* theme */
@@ -56,6 +61,9 @@
     pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>',
     target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
     dollar: '<path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    /* The currency toggle's other half. It used to replace #ccyBtn's whole
+       contents with a "$"/"€" text glyph, so that button had no <svg> at all. */
+    euro: '<path d="M4 10h12"/><path d="M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/>',
     layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m6.08 11-3.48 1.58a1 1 0 0 0 0 1.83l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9a1 1 0 0 0 0-1.83L17.9 11"/>',
     calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
 

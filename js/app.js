@@ -327,6 +327,94 @@ function renderGoalProgress(){
    object, the goal and the theme, so remember which of those is on screen and
    return early when they still match. Theme is in the key because the series
    colours are read from CSS variables here, once, at build time. */
+/* ── The percentile cone, as a filled band ──────────────────────────────────
+   Reported defect: p10 and p90 rendered as thin dashed grey LineSeries with
+   nothing between them, so the module read as three unrelated guide lines
+   rather than one distribution. Lightweight Charts has no band series and an
+   AreaSeries fills from its line down to the BOTTOM of the pane, not to a
+   second series — so the cone cannot be expressed with the built-in series
+   types without painting an opaque mask over the lower half, and a mask would
+   then make the p25–p75 overlay impossible. A series primitive gets the
+   library's own coordinate converters and paints the polygons itself, beneath
+   the series (zOrder 'bottom').
+
+   Both bands use the SAME fill, painted twice where they overlap, so the middle
+   half of the distribution reads roughly twice as dense. No stroke on either
+   band edge: the band is the mark, the p50 line is the only line.
+
+   Colour is passed in already resolved by the caller (cvar() off :root), which
+   is what keeps the theme toggle repainting — see drawGoalFan()'s drawKey. */
+function fanBandPrimitive(times, bands, fill){
+  let host=null;
+  const view={
+    zOrder:()=>'bottom',
+    renderer:()=>({ draw(target){
+      if(!host) return;
+      const ts=host.chart.timeScale(), series=host.series;
+      target.useBitmapCoordinateSpace(scope=>{
+        const ctx=scope.context, hr=scope.horizontalPixelRatio, vr=scope.verticalPixelRatio;
+        ctx.save();
+        ctx.fillStyle=fill;
+        for(const b of bands){
+          const pts=[];
+          for(let i=0;i<times.length;i++){
+            const x=ts.timeToCoordinate(times[i]);
+            const hi=series.priceToCoordinate(b.hi[i]), lo=series.priceToCoordinate(b.lo[i]);
+            if(x==null||hi==null||lo==null) continue;
+            pts.push([x*hr, hi*vr, lo*vr]);
+          }
+          if(pts.length<2) continue;
+          ctx.beginPath();
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]);
+          for(let i=pts.length-1;i>=0;i--) ctx.lineTo(pts[i][0], pts[i][2]);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      });
+    }})
+  };
+  return { attached(p){ host=p; }, detached(){ host=null; }, updateAllViews(){}, paneViews(){ return [view]; } };
+}
+/* Direct labels at the right edge — the end of the band (p90 above, p10 below)
+   and the goal line's own value. Drawn in MEDIA coordinate space so the 11px
+   type is 11 CSS px on every device pixel ratio rather than 11 bitmap pixels.
+   Priority order is goal, then p90, then p10, and a label whose baseline lands
+   within one line-height of an already-placed one is dropped — which is what
+   makes the brief's "if they collide, drop the p10 label, not both" fall out
+   rather than needing a special case. */
+function fanLabelPrimitive(lastTime, entries){
+  let host=null;
+  const view={
+    zOrder:()=>'top',
+    renderer:()=>({ draw(target){
+      if(!host) return;
+      const ts=host.chart.timeScale(), series=host.series;
+      target.useMediaCoordinateSpace(scope=>{
+        const ctx=scope.context;
+        const xEnd=ts.timeToCoordinate(lastTime);
+        if(xEnd==null) return;
+        const x=Math.min(xEnd, scope.mediaSize.width)-4;
+        ctx.save();
+        ctx.textAlign='right';
+        ctx.textBaseline='middle';
+        const placed=[];
+        for(const e of entries){
+          const y=series.priceToCoordinate(e.value);
+          if(y==null || !e.text) continue;
+          if(placed.some(p=>Math.abs(p-y)<13)) continue;
+          placed.push(y);
+          ctx.font=`${e.weight} 11px 'Inter',-apple-system,BlinkMacSystemFont,sans-serif`;
+          ctx.fillStyle=e.color;
+          ctx.fillText(e.text, x, Math.max(7, Math.min(scope.mediaSize.height-7, y+e.dy)));
+        }
+        ctx.restore();
+      });
+    }})
+  };
+  return { attached(p){ host=p; }, detached(){ host=null; }, updateAllViews(){}, paneViews(){ return [view]; } };
+}
 function drawGoalFan(fan, goal, y0, targetId){
   const LC=window.LightweightCharts;
   const el=$(targetId||'goalFan'); if(!el||!LC) return;
@@ -335,7 +423,7 @@ function drawGoalFan(fan, goal, y0, targetId){
   if(el._lwcChart){ el._lwcChart.remove(); el._lwcChart=null; }
   el._lwcKey=drawKey;
   el.innerHTML='';
-  const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid');
+  const brand=cvar('--brand'), soft=cvar('--brand-soft'), mut=cvar('--mut'), faint=cvar('--faint'), grid=cvar('--grid');
   const priceFormatter=v=>state.view.priv?'':cfmt(v);
   const chart=LC.createChart(el,{
     autoSize:true,
@@ -350,22 +438,34 @@ function drawGoalFan(fan, goal, y0, targetId){
     localization:{ priceFormatter },
   });
   const asTime=y=>({ year:y0+y, month:1, day:1 });
-  const p90=chart.addSeries(LC.LineSeries,{ color:mut, lineWidth:1, lineStyle:LC.LineStyle.Dashed,
-    crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false });
-  p90.setData(fan.years.map((y,i)=>({time:asTime(y), value:fan.p90[i]})));
-  const p10=chart.addSeries(LC.LineSeries,{ color:mut, lineWidth:1, lineStyle:LC.LineStyle.Dashed,
-    crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false });
-  p10.setData(fan.years.map((y,i)=>({time:asTime(y), value:fan.p10[i]})));
-  const p50=chart.addSeries(LC.AreaSeries,{ lineColor:brand, lineWidth:2,
-    topColor:`rgba(${brandRgb},.18)`, bottomColor:`rgba(${brandRgb},0)`,
+  const times=fan.years.map(asTime);
+  // p10/p90 no longer exist as series, so the price scale can no longer see them.
+  // Widen the p50 series' own autoscale to cover the whole cone (and the goal
+  // line, which sits outside it whenever the goal is a stretch) — otherwise the
+  // band is clipped at the top and the goal line falls off the chart entirely.
+  const lo=Math.min(...fan.p10), hi=Math.max(...fan.p90);
+  const p50=chart.addSeries(LC.LineSeries,{ color:brand, lineWidth:2,
     crosshairMarkerVisible:true, crosshairMarkerRadius:3.5,
-    crosshairMarkerBackgroundColor:brand, priceLineVisible:false, lastValueVisible:false });
-  p50.setData(fan.years.map((y,i)=>({time:asTime(y), value:fan.p50[i]})));
+    crosshairMarkerBackgroundColor:brand, priceLineVisible:false, lastValueVisible:false,
+    autoscaleInfoProvider:()=>({ priceRange:{ minValue:Math.min(lo, goal>0?goal:lo), maxValue:Math.max(hi, goal>0?goal:hi) } }) });
+  p50.setData(fan.years.map((y,i)=>({time:times[i], value:fan.p50[i]})));
+  // p25/p75 is optional so a result object cached from before js/monte-carlo.js
+  // grew the quartiles still draws the outer band rather than throwing.
+  const bands=[{lo:fan.p10, hi:fan.p90}];
+  if(fan.p25 && fan.p75) bands.push({lo:fan.p25, hi:fan.p75});
+  p50.attachPrimitive(fanBandPrimitive(times, bands, soft));
   if(goal>0){
-    const goalLine=chart.addSeries(LC.LineSeries,{ color:cvar('--warn'), lineWidth:1.2, lineStyle:LC.LineStyle.Dashed,
-      crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false });
+    const goalLine=chart.addSeries(LC.LineSeries,{ color:mut, lineWidth:1, lineStyle:LC.LineStyle.Dashed,
+      crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false,
+      autoscaleInfoProvider:()=>null });
     goalLine.setData(fan.years.map(y=>({time:asTime(y), value:goal})));
   }
+  const n=fan.years.length-1;
+  p50.attachPrimitive(fanLabelPrimitive(times[n], [
+    goal>0 ? {value:goal, text:`${t`Goal`} ${cfmt(goal)}`, color:mut, weight:650, dy:-9} : {},
+    {value:fan.p90[n], text:cfmt(fan.p90[n]), color:faint, weight:600, dy:0},
+    {value:fan.p10[n], text:cfmt(fan.p10[n]), color:faint, weight:600, dy:0},
+  ]));
   chart.timeScale().setVisibleLogicalRange({ from:0, to:fan.years.length-1 });
   el._lwcChart=chart;
 }
@@ -736,35 +836,79 @@ $('screenSeg').querySelectorAll('button').forEach(b=>{
     document.querySelectorAll('#page-markets [data-screen-panel]').forEach(p=>{ p.hidden = p.dataset.screenPanel!==b.dataset.screen; });
   };
 });
-$('ccyBtn').onclick = ()=>{ state.view.ccy = state.view.ccy==='USD'?'EUR':'USD'; lsSet('pt_ccy',state.view.ccy); renderAll(); };
-/* privacy mode — mask YOUR dollar amounts (••••••), keep percentages + market prices */
-const EYE_OPEN = `<svg viewBox="0 0 24 24"><path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"/><circle cx="12" cy="12" r="3.2"/></svg>`;
-const EYE_OFF  = `<svg viewBox="0 0 24 24"><path d="M10.6 5.1A11.3 11.3 0 0 1 12 5c7 0 11 7 11 7a18.4 18.4 0 0 1-2.2 3.2M6.6 6.6C3.4 8.6 1 12 1 12s4 7.5 11 7.5a11 11 0 0 0 5.4-1.4"/><path d="M9.9 9.9a3.2 3.2 0 0 0 4.5 4.5"/><path d="M3 3l18 18"/></svg>`;
-function paintPriv(){
-  $('privBtn').innerHTML = state.view.priv ? EYE_OFF : EYE_OPEN;
-  $('privBtn').title = state.view.priv ? 'Show amounts' : 'Hide amounts';
+/* ── The three global view controls: hide amounts, theme, currency ───────────
+   Two defects, one mechanism.
+
+   (a) They rendered as solid black shapes. css/base.css's icon rule is scoped to
+   `svg[aria-hidden="true"]` — correctly, so chart <text> stops inheriting a
+   stroke — but all three buttons destroyed that markup at runtime: privBtn and
+   themeBtn overwrote innerHTML with their own hand-rolled <svg> strings (no
+   aria-hidden), and js/portfolio.js's renderHeader() replaced #ccyBtn's contents
+   with a "$"/"€" TEXT glyph, leaving no <svg> at all. The rule never matched, so
+   the icons fell back to the UA defaults: fill #000, stroke none. Measured, not
+   inferred. The fix is that nothing writes icon markup any more — each button
+   keeps the one sprite <svg aria-hidden="true"> index.html ships and only its
+   <use href> changes, so the attribute the CSS contract keys on cannot be
+   written away again.
+
+   (b) All three lived only in the Portfolio appbar, so they were unreachable
+   from Home. index.html now carries the same group there. Instances are
+   addressed by data-act and never by id, and there is exactly ONE painter and
+   ONE click handler per control, so the two copies cannot drift apart — the
+   thing that goes wrong the moment a control is duplicated. */
+function paintAct(act, icon, label, pressed){
+  document.querySelectorAll(`[data-act="${act}"]`).forEach(b=>{
+    const u=b.querySelector('svg > use');
+    if(u) u.setAttribute('href','#i-'+icon);
+    b.setAttribute('aria-label', label);
+    if(pressed===undefined) b.removeAttribute('aria-pressed');
+    else b.setAttribute('aria-pressed', pressed?'true':'false');
+  });
 }
-$('privBtn').onclick = ()=>{
-  state.view.priv=!state.view.priv; lsSet('pt_priv', state.view.priv);
-  paintPriv(); renderAll();
-};
-paintPriv();
-$("themeBtn").innerHTML = document.documentElement.dataset.theme==="dark" ? `<svg viewBox='0 0 24 24'><path d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/></svg>` : `<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>`;
-$('themeBtn').onclick = ()=>{
-  const t = document.documentElement.dataset.theme==='dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = t; lsSet('pt_theme', t);
-  $("themeBtn").innerHTML = t==="dark" ? `<svg viewBox='0 0 24 24'><path d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/></svg>` : `<svg viewBox='0 0 24 24'><circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/></svg>`;
-  // index.html now ships a light AND a dark theme-color <meta>, picked automatically by
-  // prefers-color-scheme for the pre-JS/launch-screen case — but an explicit in-app
-  // toggle must win over the OS signal once the user has actually chosen, so both tags
-  // get overwritten to the SAME value: whichever --canvas just became active. cvar()
-  // reads it live off :root, so this can never hold a value that disagrees with
-  // css/tokens.css (the single source of truth CLAUDE.md requires) the way the old
-  // hardcoded #0b0f0d/#f3f7f4 pair did.
-  const themeColor = cvar('--canvas');
-  document.querySelectorAll('meta[name=theme-color]').forEach(m=>m.setAttribute('content', themeColor));
-  renderAll(); // charts re-read the tokens
-};
+/* privacy mode — mask YOUR dollar amounts (••••••), keep percentages + market prices */
+function paintPriv(){
+  paintAct('priv', state.view.priv?'eye-off':'eye', state.view.priv?'Show amounts':'Hide amounts', state.view.priv);
+}
+/* A stable action label plus aria-pressed for the state, rather than a label that
+   flips: "Toggle theme, pressed" is what a screen reader should say in dark mode. */
+function paintTheme(){
+  paintAct('theme', document.documentElement.dataset.theme==='dark'?'moon':'sun', 'Toggle theme',
+    document.documentElement.dataset.theme==='dark');
+}
+/* Not a pressed/unpressed toggle — two peer currencies — so the label names the
+   destination and there is no aria-pressed to misread. */
+function paintCcy(){
+  paintAct('ccy', state.view.ccy==='USD'?'dollar':'euro', state.view.ccy==='USD'?'Switch to euros':'Switch to dollars');
+}
+/* One delegated listener for all three, on both appbars. Delegation rather than a
+   per-element binding so a control added to a third appbar needs no JS change,
+   and so there is no second binding pass that could bind one instance and miss
+   another. */
+document.addEventListener('click', e=>{
+  const b=e.target.closest && e.target.closest('[data-act]'); if(!b) return;
+  if(b.dataset.act==='priv'){
+    state.view.priv=!state.view.priv; lsSet('pt_priv', state.view.priv);
+    paintPriv(); renderAll();
+  } else if(b.dataset.act==='theme'){
+    const t = document.documentElement.dataset.theme==='dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = t; lsSet('pt_theme', t);
+    paintTheme();
+    // index.html now ships a light AND a dark theme-color <meta>, picked automatically by
+    // prefers-color-scheme for the pre-JS/launch-screen case — but an explicit in-app
+    // toggle must win over the OS signal once the user has actually chosen, so both tags
+    // get overwritten to the SAME value: whichever --canvas just became active. cvar()
+    // reads it live off :root, so this can never hold a value that disagrees with
+    // css/tokens.css (the single source of truth CLAUDE.md requires) the way the old
+    // hardcoded #0b0f0d/#f3f7f4 pair did.
+    const themeColor = cvar('--canvas');
+    document.querySelectorAll('meta[name=theme-color]').forEach(m=>m.setAttribute('content', themeColor));
+    renderAll(); // charts re-read the tokens
+  } else if(b.dataset.act==='ccy'){
+    state.view.ccy = state.view.ccy==='USD'?'EUR':'USD'; lsSet('pt_ccy',state.view.ccy);
+    paintCcy(); renderAll();
+  }
+});
+paintPriv(); paintTheme(); paintCcy();
 function animateTotal(){ // one-time count-up on launch
   if(state.view.priv) return; // nothing to count up behind the mask
   if(matchMedia('(prefers-reduced-motion: reduce)').matches) return; // final number is already on screen

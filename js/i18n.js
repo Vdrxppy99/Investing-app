@@ -175,6 +175,11 @@
       "Bei %1/Monat zusätzlich erreicht der mittlere Pfad %2 bis %3 — wahrscheinliche Spanne %4.",
     "With no more deposits, the median path reaches %1 by %2 — likely range %3.":
       "Ohne weitere Einzahlungen erreicht der mittlere Pfad %1 bis %2 — wahrscheinliche Spanne %3.",
+    /* The what-if control's own label and result line. The label is static text in
+       index.html (post-render dictionary pass); the sentence is a t() template. */
+    "What if I add monthly": "Was, wenn ich monatlich einzahle",
+    "Adding %1/month reaches %2 — %3 more than with no deposits.":
+      "Mit %1/Monat erreichst du %2 — %3 mehr als ohne Einzahlungen.",
     "Computed just now": "Gerade eben berechnet",
     "Computed %1s ago": "Vor %1s berechnet",
     "Computed %1 min ago": "Vor %1 Min. berechnet",
@@ -419,8 +424,14 @@
     "Refresh": "Aktualisieren",
     "Refresh prices": "Kurse aktualisieren",
     "Hide amounts": "Beträge ausblenden",
+    /* The other three states these controls now write into aria-label from
+       js/app.js's paintPriv()/paintCcy() — "Switch currency" stays for any
+       markup that still ships it as the initial attribute value. */
+    "Show amounts": "Beträge einblenden",
     "Toggle theme": "Design wechseln",
     "Switch currency": "Währung wechseln",
+    "Switch to euros": "Auf Euro umstellen",
+    "Switch to dollars": "Auf Dollar umstellen",
     "Edit holdings": "Positionen bearbeiten",
 
     /* ── assistant ───────────────────────────────────────────────────────── */

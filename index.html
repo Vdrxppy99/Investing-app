@@ -216,8 +216,22 @@
      is computed by js/app.js / js/portfolio.js / js/insights.js exactly as before,
      just given a front door instead of being orphaned. -->
 <div id="page-home" class="page">
+  <!-- The three global view controls. They were reachable only from the Portfolio
+       appbar, which meant that on Home — the tab the app lands on, and which shows
+       the portfolio total, today's delta and every figure in Price highlights —
+       there was no way to hide amounts, change theme or switch currency. All three
+       change state globally, so they belong on every screen that shows an amount.
+       Addressed by data-act, not id: js/app.js paints and binds EVERY [data-act]
+       instance from one place, so a second copy of a button cannot drift out of
+       sync with the first (see paintAct there). The ids stay on the Portfolio
+       instances only, for the existing direct references. -->
   <div class="appbar">
     <h1 class="t-title" id="homeTitle" tabindex="-1">Home</h1>
+    <div class="appbar__actions">
+      <button data-act="priv" class="iconbtn" aria-label="Hide amounts"><svg aria-hidden="true"><use href="#i-eye"/></svg></button>
+      <button data-act="theme" class="iconbtn" aria-label="Toggle theme"><svg aria-hidden="true"><use href="#i-moon"/></svg></button>
+      <button data-act="ccy" class="iconbtn" aria-label="Switch to euros"><svg aria-hidden="true"><use href="#i-dollar"/></svg></button>
+    </div>
   </div>
   <div class="greet" id="homeGreet"></div>
   <p class="t-caption muted" id="homeCountdown"></p>
@@ -301,9 +315,9 @@
   <div class="appbar">
     <h1 class="t-title" id="pfTitle" tabindex="-1">Portfolio</h1>
     <div class="appbar__actions">
-      <button id="privBtn" class="iconbtn" aria-label="Hide amounts"><svg aria-hidden="true"><use href="#i-eye"/></svg></button>
-      <button id="themeBtn" class="iconbtn" aria-label="Toggle theme"><svg aria-hidden="true"><use href="#i-moon"/></svg></button>
-      <button id="ccyBtn" class="iconbtn" aria-label="Switch currency"><svg aria-hidden="true"><use href="#i-dollar"/></svg></button>
+      <button id="privBtn" data-act="priv" class="iconbtn" aria-label="Hide amounts"><svg aria-hidden="true"><use href="#i-eye"/></svg></button>
+      <button id="themeBtn" data-act="theme" class="iconbtn" aria-label="Toggle theme"><svg aria-hidden="true"><use href="#i-moon"/></svg></button>
+      <button id="ccyBtn" data-act="ccy" class="iconbtn" aria-label="Switch to euros"><svg aria-hidden="true"><use href="#i-dollar"/></svg></button>
       <button id="editBtn" class="iconbtn" aria-label="Edit holdings"><svg aria-hidden="true"><use href="#i-settings"/></svg></button>
       <button id="refreshBtn" class="iconbtn" aria-label="Refresh prices"><svg aria-hidden="true"><use href="#i-refresh"/></svg></button>
     </div>
@@ -359,7 +373,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.156</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.157</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->
@@ -595,11 +609,25 @@
       <div class="card__head" id="projModHead"></div>
       <div class="t-display" id="projModBig"></div>
       <div class="chart-box chart-box--sheet"><div id="projFan"></div></div>
+      <!-- The what-if control. It used to be an inline "Add [0] /month" — a dim,
+           right-aligned 0 in a faint box, which the owner read as disabled
+           placeholder text and never tapped. Same input, same handler; what
+           changed is the affordance: a section label ABOVE it rather than a word
+           beside it, a real 44px field with a currency prefix, and three preset
+           chips, which are what make it discoverable without reading anything. -->
       <div class="whatif">
-        <label for="projWhatIfInput">Add</label>
-        <input id="projWhatIfInput" type="number" inputmode="decimal" min="0" step="50" placeholder="0" aria-label="What-if monthly contribution">
-        <span>/month</span>
+        <label class="section__label whatif__label" for="projWhatIfInput">What if I add monthly</label>
+        <div class="whatif__field">
+          <span class="whatif__prefix" aria-hidden="true">$</span>
+          <input id="projWhatIfInput" type="number" inputmode="decimal" min="0" step="50" placeholder="0">
+        </div>
+        <div class="whatif__presets" id="projWhatIfPresets">
+          <button type="button" class="chip chip--primary" data-amt="100" data-no-i18n>$100</button>
+          <button type="button" class="chip chip--primary" data-amt="250" data-no-i18n>$250</button>
+          <button type="button" class="chip chip--primary" data-amt="500" data-no-i18n>$500</button>
+        </div>
       </div>
+      <p class="whatif__result" id="projWhatIfResult" hidden></p>
       <p class="t-caption faint" id="projModAsOf"></p>
       <div class="goalline" id="projModGoalLine" hidden></div>
     </section>

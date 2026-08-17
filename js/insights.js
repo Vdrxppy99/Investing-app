@@ -1062,6 +1062,10 @@ function renderProjMod(){
   const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
   const nowYear=new Date().getFullYear();
   const years=(state.goal&&state.goal.year>nowYear)?state.goal.year-nowYear:10;
+  // `base` (monthlyContribution:0) is what Home's own goal card runs, so the two
+  // surfaces stay on one shared cache key; `params` is the what-if's own derived
+  // run — when the input is empty the two collapse to one cache hit.
+  const base=projectionParams(t2.value, years, goal, 0);
   const params=projectionParams(t2.value, years, goal, contrib);
   const head=$('projModHead');
   if(head){
@@ -1069,12 +1073,25 @@ function renderProjMod(){
     const contribTxt=contrib>0?`${fmt(contrib)}${t`/mo added`}`:t`no more deposits`;
     head.innerHTML=`<div class="stat__label">${t`Where this is headed`}</div><span class="mod__sub">${esc(yrsTxt)} · ${esc(contribTxt)}</span>`;
   }
-  const apply=result=>{
+  const apply=(baseResult, result)=>{
     if($('projModCard')===null || $('projModCard').hidden) return; // gone/hidden by the time the Worker replies
     const big=$('projModBig');
     const p50N=result.fan.p50[years], p10N=result.fan.p10[years], p90N=result.fan.p90[years];
     if(big) big.textContent = goal ? (result.probabilityOfGoal*100).toFixed(0)+'%' : fmt(p50N);
     drawGoalFan(result.fan, goal, nowYear, 'projFan');
+    // Beneath the input, the delta against the no-deposit run — the answer the
+    // input is actually being asked for. Absent (not zeroed) when it's empty:
+    // "$0 more than with no deposits" is noise.
+    const res=$('projWhatIfResult');
+    if(res){
+      if(contrib>0){
+        const baseP50N=baseResult.fan.p50[years];
+        const gain=p50N-baseP50N;
+        const pmtB=`<b>${fmt(contrib)}</b>`, reachB=`<b>${fmt(p50N)}</b>`, gainB=`<b>${fmt(gain)}</b>`;
+        res.innerHTML=t`Adding ${pmtB}/month reaches ${reachB} — ${gainB} more than with no deposits.`;
+        res.hidden=false;
+      } else { res.innerHTML=''; res.hidden=true; }
+    }
     const asOf=$('projModAsOf'); if(asOf) asOf.textContent=projAsOfText(projectionComputedAt(params));
     const gl=$('projModGoalLine');
     if(gl){
@@ -1096,16 +1113,29 @@ function renderProjMod(){
   // The what-if input fires a fresh run on every debounce tick, and an earlier
   // run can resolve after a later one — paint only the newest one asked for.
   const myKey=projModPendingKey=projectionKey(params);
-  runProjection(params).then(result=>{
+  Promise.all([runProjection(base), runProjection(params)]).then(([baseResult, result])=>{
     if(!$('projModCard') || $('projModCard').hidden) return; // tab navigated away before the Worker replied
     if(myKey!==projModPendingKey) return;
-    apply(result);
+    apply(baseResult, result);
   });
 }
 if($('projWhatIfInput')) $('projWhatIfInput').oninput=()=>{
   clearTimeout(projModWhatIfTimer);
   projModWhatIfTimer=setTimeout(renderProjMod, 450);
 };
+/* Preset chips — the discoverability half of the fix. They write into the same
+   input and go through the same debounced path as typing, so there is still one
+   code path from "a number is in that field" to a re-run. Bound once at load
+   (the markup is static in index.html), not re-bound per render. */
+if($('projWhatIfPresets')) $('projWhatIfPresets').querySelectorAll('[data-amt]').forEach(b=>{
+  b.onclick=e=>{
+    e.stopPropagation(); // the card itself opens the projection sheet on click
+    const input=$('projWhatIfInput'); if(!input) return;
+    input.value = b.dataset.amt;
+    clearTimeout(projModWhatIfTimer);
+    renderProjMod();
+  };
+});
 /* The "More" list — every remaining Insights feature, demoted to a compact
    disclose row (js/ui.js's own comment: "how a demoted module is reached on
    mobile" — built in R1 for exactly this). Meta text reuses the same formulas

@@ -280,24 +280,58 @@
   }
   .goalline b { color: var(--text); font-weight: var(--w-semibold); }
 
-  /* The projection module's what-if input (session 5) — inline, not a full-width
-     .field/.input (that pattern is for a form, this is one number inside a
-     sentence). Text label + suffix are static (js/i18n.js dictionary entries,
-     same convention as "Sector exposure"/"Portfolio P/E"'s static labels) —
-     only the input's own value is dynamic, and inputs are never translated. */
-  .whatif { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-3); font-size: var(--t-caption); color: var(--text-muted); }
+  /* The projection module's what-if control (session 5, reworked).
+     It was an inline "Add [ 0 ] /month": a 84px box with a right-aligned grey 0
+     and no label above it, which reads as a disabled placeholder rather than an
+     input — the owner's report was that there was "nowhere to enter
+     contributions" when in fact the field had been there all along. So this is
+     an affordance fix, not a new feature: same #projWhatIfInput, same handler.
+     Stacked (label / field / presets) instead of inline, a full-width field so
+     it can't be mistaken for a read-out, and the preset chips doing the real
+     discovery work — a chip that says $250 explains the control at a glance in
+     a way no placeholder can. */
+  .whatif { margin-top: var(--s-4); }
+  .whatif__label { margin-bottom: var(--s-2); }
+  .whatif__field { position: relative; }
+  .whatif__prefix {
+    position: absolute;
+    left: var(--s-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
   .whatif input {
-    width: 84px;
-    height: var(--tap);
-    padding: 0 var(--s-2);
-    background: var(--surface-2);
-    border: var(--hairline) solid var(--border-control);
-    border-radius: var(--r-input);
+    width: 100%;
+    min-height: var(--tap);
+    /* left room for the prefix; 16px is inherited from base.css's iOS-zoom floor */
+    padding: 0 var(--s-3) 0 calc(var(--s-3) + var(--s-4));
+    background: var(--surface);
+    border: var(--hairline) solid var(--line);
+    border-radius: var(--r-tile-sm);
     color: var(--text);
     font-weight: var(--w-semibold);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
+    font-variant-numeric: tabular-nums lining-nums;
   }
+  .whatif input::placeholder { color: var(--text-faint); opacity: 1; }
+  /* The border has to move too — base.css's focus ring alone sits OUTSIDE the
+     box and, on a field this quiet, doesn't read as "you are typing in here".
+     border-radius is restated because base.css's own :focus-visible sets
+     --r-input; this rule is in the components layer, so it wins. */
+  .whatif input:focus-visible {
+    border-color: var(--primary);
+    border-radius: var(--r-tile-sm);
+  }
+  .whatif__presets { display: flex; gap: var(--s-2); margin-top: var(--s-2); }
+  .whatif__presets .chip { flex: 0 0 auto; font-variant-numeric: tabular-nums lining-nums; }
+  .whatif__result {
+    margin-top: var(--s-3);
+    margin-bottom: var(--s-2);
+    font-size: var(--t-body);
+    line-height: var(--lh-body);
+    color: var(--text-muted);
+  }
+  .whatif__result b { color: var(--text); font-weight: var(--w-semibold); }
 
   /* Sequential single-hue ramp — sector exposure, ordered by magnitude. Opacity over one
      hue (not a lightness-stepped ramp) to match design/target/insights-v2.html's own

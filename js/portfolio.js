@@ -41,7 +41,11 @@ function renderHeader(){
   const arrow = t.day>=0 ? '▲' : '▼';
   $('todayLine').innerHTML = `<span class="${cls(t.day)} n">${arrow} ${fmtSign(t.day)} · ${fmtPct(dayPct)}</span>`
     + `<span class="hero__alltime">all time <b class="${cls(allTimePct)} n">${fmtPct(allTimePct)}</b></span>`;
-  $('ccyBtn').textContent = state.view.ccy==='USD' ? '$' : '€';
+  // Was `$('ccyBtn').textContent = '$'|'€'`, which replaced the button's <svg>
+  // with a bare text glyph — the reason #ccyBtn had no icon at all. paintCcy()
+  // (js/app.js) swaps the sprite's <use href> on EVERY instance of the control
+  // instead, so Home's copy stays in sync with Portfolio's.
+  if(typeof paintCcy==='function') paintCcy();
   // keep the pinned glass bar in sync with live ticks (it's visible on every non-Portfolio tab)
   if($('miniBar').classList.contains('show') && typeof paintMiniBar==='function') paintMiniBar();
 }
