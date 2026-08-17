@@ -1,4 +1,6 @@
 'use strict';
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('@playwright/test');
 const { FROZEN_TIME, blockExternalNetwork, unlockDemo } = require('./helpers');
 
@@ -68,4 +70,107 @@ test('exactly one control is lit in every selection group after every possible c
   // driven from.
   await page.setViewportSize({ width: 1280, height: 900 });
   await assertOneLitPerClick(page, '.rail-nav__item', 'rail nav');
+});
+
+// ── The three duplicated Home/Portfolio appbar controls (priv/theme/ccy) ────
+// Coverage for the trap this repo has shipped three times: a hardcoded-and-
+// never-cleared active state (see the block comment above). These controls are
+// a fourth instance of the underlying risk — TWO markup copies of the same
+// state, painted from one function (paintAct(), js/app.js) — so they get their
+// own tests rather than being folded into assertOneLitPerClick, which only
+// understands single-group "exactly one lit" selection, not a boolean toggle
+// mirrored across two DOM locations.
+const VIEW_CONTROLS = ['priv', 'theme', 'ccy'];
+
+test('the priv/theme/ccy buttons carry no hardcoded pressed/label state in markup', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const buttonRe = /<button[^>]*data-act="(priv|theme|ccy)"[^>]*>/g;
+  let m, count = 0;
+  while ((m = buttonRe.exec(html))) {
+    count++;
+    // aria-pressed is written only at runtime by paintAct() — a value baked into
+    // the markup is exactly the "hardcoded, never cleared" failure mode this test
+    // exists to catch, even if it happens to match the true default on first paint.
+    expect(m[0], `${m[1]} button must not hardcode aria-pressed in markup: ${m[0]}`).not.toMatch(/aria-pressed=/);
+  }
+  expect(count, 'expected 3 controls x 2 appbars (Home, Portfolio)').toBe(6);
+});
+
+test('on load, the priv/theme/ccy controls reflect the app\'s actual state on both appbars', async ({ page }) => {
+  await unlockDemo(page);
+  const actual = await page.evaluate(() => ({
+    priv: state.view.priv,
+    dark: document.documentElement.dataset.theme === 'dark',
+    usd: state.view.ccy === 'USD',
+  }));
+  for (const pageId of ['page-home', 'page-portfolio']) {
+    const priv = page.locator(`#${pageId} [data-act="priv"]`);
+    await expect(priv, `${pageId} priv aria-pressed`).toHaveAttribute('aria-pressed', String(actual.priv));
+    await expect(priv.locator('use'), `${pageId} priv icon`).toHaveAttribute('href', actual.priv ? '#i-eye-off' : '#i-eye');
+
+    const theme = page.locator(`#${pageId} [data-act="theme"]`);
+    await expect(theme, `${pageId} theme aria-pressed`).toHaveAttribute('aria-pressed', String(actual.dark));
+    await expect(theme.locator('use'), `${pageId} theme icon`).toHaveAttribute('href', actual.dark ? '#i-moon' : '#i-sun');
+
+    const ccy = page.locator(`#${pageId} [data-act="ccy"]`);
+    await expect(ccy, `${pageId} ccy label`).toHaveAttribute('aria-label', actual.usd ? 'Switch to euros' : 'Switch to dollars');
+    await expect(ccy.locator('use'), `${pageId} ccy icon`).toHaveAttribute('href', actual.usd ? '#i-dollar' : '#i-euro');
+  }
+});
+
+test('toggling priv/theme/ccy from Home stays in sync with Portfolio, and vice versa', async ({ page }) => {
+  await unlockDemo(page);
+
+  async function readInstance(pageId, act) {
+    const btn = page.locator(`#${pageId} [data-act="${act}"]`);
+    return {
+      pressed: await btn.getAttribute('aria-pressed'),
+      label: await btn.getAttribute('aria-label'),
+      href: await btn.locator('use').getAttribute('href'),
+    };
+  }
+
+  // Home -> Portfolio: Home is already the landing tab, so click straight away.
+  for (const act of VIEW_CONTROLS) {
+    await page.locator(`#page-home [data-act="${act}"]`).click();
+    const home = await readInstance('page-home', act);
+    await page.locator('.tabbar__item[data-page="portfolio"]').click();
+    const pf = await readInstance('page-portfolio', act);
+    expect(pf, `${act}: Portfolio out of sync with Home after toggling from Home`).toEqual(home);
+    await page.locator('.tabbar__item[data-page="home"]').click();
+  }
+
+  // Portfolio -> Home: toggle each control back from the Portfolio instance.
+  await page.locator('.tabbar__item[data-page="portfolio"]').click();
+  for (const act of VIEW_CONTROLS) {
+    await page.locator(`#page-portfolio [data-act="${act}"]`).click();
+    const pf = await readInstance('page-portfolio', act);
+    await page.locator('.tabbar__item[data-page="home"]').click();
+    const home = await readInstance('page-home', act);
+    expect(home, `${act}: Home out of sync with Portfolio after toggling from Portfolio`).toEqual(pf);
+    await page.locator('.tabbar__item[data-page="portfolio"]').click();
+  }
+});
+
+// Regression guard for the bug just fixed: privBtn/themeBtn/ccyBtn used to have
+// their innerHTML overwritten at runtime with hand-rolled <svg> strings (or, for
+// ccy, a bare "$"/"€" text glyph) carrying no aria-hidden — which is exactly the
+// attribute css/base.css's `svg[aria-hidden="true"] { fill:none; stroke:currentColor }`
+// rule keys on, so the icons rendered as solid black UA-default shapes. Nothing
+// should write icon markup via innerHTML again; only <use href> may change.
+test('priv/theme/ccy icons are sprite <svg aria-hidden="true"> with fill:none and a real stroke, on both instances', async ({ page }) => {
+  await unlockDemo(page);
+  for (const pageId of ['page-home', 'page-portfolio']) {
+    for (const act of VIEW_CONTROLS) {
+      const svg = page.locator(`#${pageId} [data-act="${act}"] > svg`);
+      await expect(svg, `${pageId} ${act} svg count`).toHaveCount(1);
+      await expect(svg, `${pageId} ${act} aria-hidden`).toHaveAttribute('aria-hidden', 'true');
+      const style = await svg.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { fill: cs.fill, stroke: cs.stroke };
+      });
+      expect(style.fill, `${pageId} ${act} fill`).toBe('none');
+      expect(style.stroke, `${pageId} ${act} stroke`).not.toBe('none');
+    }
+  }
 });

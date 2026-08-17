@@ -1062,61 +1062,71 @@ function renderProjMod(){
   const goal=(state.goal&&state.goal.amt>0)?state.goal.amt:null;
   const nowYear=new Date().getFullYear();
   const years=(state.goal&&state.goal.year>nowYear)?state.goal.year-nowYear:10;
-  // `base` (monthlyContribution:0) is what Home's own goal card runs, so the two
-  // surfaces stay on one shared cache key; `params` is the what-if's own derived
-  // run — when the input is empty the two collapse to one cache hit.
+  // TWO sets of params, always. `base` is the headline question — "what my money
+  // does if I never add another dollar" — and is the ONLY one Home's goal card
+  // ever builds (js/app.js renderGoal(), hardcoded 0), which is what keeps the two
+  // surfaces on one shared cache key. `params` is the what-if's own derived run;
+  // when the input is empty the two are identical and collapse to one cache hit,
+  // so the extra call costs nothing in the default state.
   const base=projectionParams(t2.value, years, goal, 0);
   const params=projectionParams(t2.value, years, goal, contrib);
   const head=$('projModHead');
   if(head){
     const yrsTxt=`${years} ${t`years`}`;
-    const contribTxt=contrib>0?`${fmt(contrib)}${t`/mo added`}`:t`no more deposits`;
-    head.innerHTML=`<div class="stat__label">${t`Where this is headed`}</div><span class="mod__sub">${esc(yrsTxt)} · ${esc(contribTxt)}</span>`;
+    // Always "no more deposits" — the headline card is pinned to the zero-contribution
+    // run (owner requirement: the primary output is growth with NO deposits), so its own
+    // sub-caption can't say "$250/mo added" while the number above it ignores that $250.
+    head.innerHTML=`<div class="stat__label">${t`Where this is headed`}</div><span class="mod__sub">${esc(yrsTxt)} · ${esc(t`no more deposits`)}</span>`;
   }
-  const apply=(baseResult, result)=>{
+  const apply=(baseResult, whatIfResult)=>{
     if($('projModCard')===null || $('projModCard').hidden) return; // gone/hidden by the time the Worker replies
     const big=$('projModBig');
-    const p50N=result.fan.p50[years], p10N=result.fan.p10[years], p90N=result.fan.p90[years];
-    if(big) big.textContent = goal ? (result.probabilityOfGoal*100).toFixed(0)+'%' : fmt(p50N);
-    drawGoalFan(result.fan, goal, nowYear, 'projFan');
-    // Beneath the input, the delta against the no-deposit run — the answer the
-    // input is actually being asked for. Absent (not zeroed) when it's empty:
-    // "$0 more than with no deposits" is noise.
+    // #projModBig, its sub-caption and the fan's base cone are always this run — they
+    // never respond to the what-if input. See DESIGN-TARGET.md's "one projection, one
+    // answer" requirement and test/projection-consistency.spec.js.
+    const p50N=baseResult.fan.p50[years], p10N=baseResult.fan.p10[years], p90N=baseResult.fan.p90[years];
+    if(big) big.textContent = goal ? (baseResult.probabilityOfGoal*100).toFixed(0)+'%' : fmt(p50N);
+    drawGoalFan(baseResult.fan, goal, nowYear, 'projFan', whatIfResult?{fan:whatIfResult.fan, contrib}:null);
+    /* What the typed amount is actually worth, in one sentence, against the
+       no-deposit run rather than in the abstract — the delta is the answer the
+       input is being asked for. Absent (not zeroed) when the input is empty:
+       "$0 more than with no deposits" is noise. This sentence, plus the dashed
+       median line drawGoalFan() just drew, are the what-if's ONLY two outputs. */
     const res=$('projWhatIfResult');
     if(res){
-      if(contrib>0){
-        const baseP50N=baseResult.fan.p50[years];
-        const gain=p50N-baseP50N;
-        const pmtB=`<b>${fmt(contrib)}</b>`, reachB=`<b>${fmt(p50N)}</b>`, gainB=`<b>${fmt(gain)}</b>`;
+      if(contrib>0 && whatIfResult){
+        const whatIfP50N=whatIfResult.fan.p50[years];
+        const gain=whatIfP50N-p50N;
+        const pmtB=`<b>${fmt(contrib)}</b>`, reachB=`<b>${fmt(whatIfP50N)}</b>`, gainB=`<b>${fmt(gain)}</b>`;
         res.innerHTML=t`Adding ${pmtB}/month reaches ${reachB} — ${gainB} more than with no deposits.`;
         res.hidden=false;
       } else { res.innerHTML=''; res.hidden=true; }
     }
-    const asOf=$('projModAsOf'); if(asOf) asOf.textContent=projAsOfText(projectionComputedAt(params));
+    const asOf=$('projModAsOf'); if(asOf) asOf.textContent=projAsOfText(projectionComputedAt(base));
     const gl=$('projModGoalLine');
     if(gl){
-      const yearB=`<b>${nowYear+years}</b>`, pmtB=contrib>0?`<b>${fmt(contrib)}</b>`:null;
+      // Pinned to the base run too, same reason as the sub-caption above — the
+      // goal-relative sentence is part of the headline, not a what-if output.
+      const yearB=`<b>${nowYear+years}</b>`;
       if(goal){
-        const pctB=`<b>${(result.probabilityOfGoal*100).toFixed(0)}%</b>`, goalB=`<b>${fmt(goal)}</b>`;
-        gl.innerHTML = contrib>0
-          ? `<span>${t`Adding ${pmtB}/month, you have a ${pctB} chance of reaching ${goalB} by ${yearB}.`}</span>`
-          : `<span>${t`With no more deposits, you have a ${pctB} chance of reaching ${goalB} by ${yearB}.`}</span>`;
+        const pctB=`<b>${(baseResult.probabilityOfGoal*100).toFixed(0)}%</b>`, goalB=`<b>${fmt(goal)}</b>`;
+        gl.innerHTML = `<span>${t`With no more deposits, you have a ${pctB} chance of reaching ${goalB} by ${yearB}.`}</span>`;
       } else {
         const p50B=`<b>${fmt(p50N)}</b>`, rangeB=`<b>${fmt(p10N)}–${fmt(p90N)}</b>`;
-        gl.innerHTML = contrib>0
-          ? `<span>${t`Adding ${pmtB}/month, the median path reaches ${p50B} by ${yearB} — likely range ${rangeB}.`}</span>`
-          : `<span>${t`With no more deposits, the median path reaches ${p50B} by ${yearB} — likely range ${rangeB}.`}</span>`;
+        gl.innerHTML = `<span>${t`With no more deposits, the median path reaches ${p50B} by ${yearB} — likely range ${rangeB}.`}</span>`;
       }
       gl.hidden=false;
     }
   };
   // The what-if input fires a fresh run on every debounce tick, and an earlier
   // run can resolve after a later one — paint only the newest one asked for.
+  // Keyed off `params` (not `base`) so a newly-typed amount is always "the"
+  // pending request, even though the base run is what actually paints the headline.
   const myKey=projModPendingKey=projectionKey(params);
-  Promise.all([runProjection(base), runProjection(params)]).then(([baseResult, result])=>{
+  Promise.all([runProjection(base), contrib>0?runProjection(params):null]).then(([baseResult, whatIfResult])=>{
     if(!$('projModCard') || $('projModCard').hidden) return; // tab navigated away before the Worker replied
     if(myKey!==projModPendingKey) return;
-    apply(baseResult, result);
+    apply(baseResult, whatIfResult);
   });
 }
 if($('projWhatIfInput')) $('projWhatIfInput').oninput=()=>{

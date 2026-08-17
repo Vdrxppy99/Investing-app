@@ -59,20 +59,45 @@ test('the headline run excludes contributions on BOTH surfaces', async ({ page }
   await expect(page.locator('#projModGoalLine')).toContainText('no more deposits');
 });
 
-test('the what-if input is the only place a contribution changes the number', async ({ page }) => {
+// Flipped 2026-08-16 (owner, this session). Originally asserted `after > before`:
+// #projModBig moved when the what-if input was filled. That encoded the module's
+// behaviour from BEFORE the owner specified this card — his requirement is that
+// the primary output is growth with NO deposits, and the typed contribution is a
+// secondary what-if. A headline that moves with the input has no stable "no more
+// deposits" answer visible anywhere, which is exactly the failure he asked to
+// avoid. The what-if's only two outputs are now #projWhatIfResult (a sentence)
+// and a dashed median line drawn on the chart (js/app.js drawGoalFan()).
+test('#projModBig is pinned to the zero-contribution run; the what-if only adds its own result line and chart overlay', async ({ page }) => {
   await page.locator('.tabbar__item[data-page="insights"]').click();
   await page.waitForTimeout(1500);
   const before = pct(await page.locator('#projModBig').innerText());
+  const seriesBefore = await page.evaluate(() => document.getElementById('projFan')._lwcChart.panes()[0].getSeries().length);
+  await expect(page.locator('#projWhatIfResult')).toBeHidden();
 
   await page.locator('#projWhatIfInput').fill('1500');
   await page.waitForTimeout(1600);
   const after = pct(await page.locator('#projModBig').innerText());
-  expect(Number(after)).toBeGreaterThan(Number(before)); // adding money can only help
+  expect(after).toBe(before); // the headline never responds to the what-if input
+
+  // …but its own two outputs did appear.
+  await expect(page.locator('#projWhatIfResult')).toBeVisible();
+  await expect(page.locator('#projWhatIfResult')).toContainText('more than with no deposits');
+  const seriesAfter = await page.evaluate(() => document.getElementById('projFan')._lwcChart.panes()[0].getSeries().length);
+  expect(seriesAfter).toBe(seriesBefore + 1); // the dashed what-if median line
 
   // Home is unmoved by it — the what-if is a local question, not a setting.
   await page.locator('.tabbar__item[data-page="home"]').click();
   await page.waitForTimeout(1200);
   expect(pct(await page.locator('#goalBody').innerText())).toBe(before);
+
+  // Clearing the input removes both what-if outputs.
+  await page.locator('.tabbar__item[data-page="insights"]').click();
+  await page.waitForTimeout(1200);
+  await page.locator('#projWhatIfInput').fill('');
+  await page.waitForTimeout(1600);
+  await expect(page.locator('#projWhatIfResult')).toBeHidden();
+  const seriesCleared = await page.evaluate(() => document.getElementById('projFan')._lwcChart.panes()[0].getSeries().length);
+  expect(seriesCleared).toBe(seriesBefore);
 });
 
 test('both surfaces read one shared cache, so they cannot drift apart', async ({ page }) => {

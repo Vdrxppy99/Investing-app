@@ -80,8 +80,10 @@ above.** `redesign/contrast-check.mjs --strict` is the arbiter.
 10-10.5px / 700 section label, letter-spacing .06-.09em, uppercase
 ```
 
-Every number uses `font-variant-numeric: tabular-nums lining` and
-`letter-spacing: -.02em`.
+Every number uses `font-variant-numeric: tabular-nums lining-nums` and
+`letter-spacing: -.02em`. (`lining` alone is not a valid keyword — the parser
+drops the whole declaration. Corrected 2026-08-16 after it silently dropped
+tabular-nums from every number in the app; see CHANGELOG.)
 
 ### Shape and space
 

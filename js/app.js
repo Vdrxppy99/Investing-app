@@ -415,10 +415,10 @@ function fanLabelPrimitive(lastTime, entries){
   };
   return { attached(p){ host=p; }, detached(){ host=null; }, updateAllViews(){}, paneViews(){ return [view]; } };
 }
-function drawGoalFan(fan, goal, y0, targetId){
+function drawGoalFan(fan, goal, y0, targetId, whatIf){
   const LC=window.LightweightCharts;
   const el=$(targetId||'goalFan'); if(!el||!LC) return;
-  const drawKey=`${y0}|${goal}|${document.documentElement.dataset.theme}|${state.view.priv?1:0}|${state.view.ccy}|${fan.p50[fan.p50.length-1]}`;
+  const drawKey=`${y0}|${goal}|${document.documentElement.dataset.theme}|${state.view.priv?1:0}|${state.view.ccy}|${fan.p50[fan.p50.length-1]}|${whatIf?whatIf.contrib:0}|${whatIf?whatIf.fan.p50[whatIf.fan.p50.length-1]:0}`;
   if(el._lwcChart && el._lwcKey===drawKey) return;
   if(el._lwcChart){ el._lwcChart.remove(); el._lwcChart=null; }
   el._lwcKey=drawKey;
@@ -443,11 +443,15 @@ function drawGoalFan(fan, goal, y0, targetId){
   // Widen the p50 series' own autoscale to cover the whole cone (and the goal
   // line, which sits outside it whenever the goal is a stretch) — otherwise the
   // band is clipped at the top and the goal line falls off the chart entirely.
+  // The what-if median (when present) can outrun the base cone's own p90 on a
+  // large contribution, so it has to be in this same autoscale or its dashed
+  // line draws off the top of the pane.
   const lo=Math.min(...fan.p10), hi=Math.max(...fan.p90);
+  const whatIfHi=whatIf?Math.max(...whatIf.fan.p50):-Infinity;
   const p50=chart.addSeries(LC.LineSeries,{ color:brand, lineWidth:2,
     crosshairMarkerVisible:true, crosshairMarkerRadius:3.5,
     crosshairMarkerBackgroundColor:brand, priceLineVisible:false, lastValueVisible:false,
-    autoscaleInfoProvider:()=>({ priceRange:{ minValue:Math.min(lo, goal>0?goal:lo), maxValue:Math.max(hi, goal>0?goal:hi) } }) });
+    autoscaleInfoProvider:()=>({ priceRange:{ minValue:Math.min(lo, goal>0?goal:lo), maxValue:Math.max(hi, goal>0?goal:hi, whatIfHi) } }) });
   p50.setData(fan.years.map((y,i)=>({time:times[i], value:fan.p50[i]})));
   // p25/p75 is optional so a result object cached from before js/monte-carlo.js
   // grew the quartiles still draws the outer band rather than throwing.
@@ -460,9 +464,20 @@ function drawGoalFan(fan, goal, y0, targetId){
       autoscaleInfoProvider:()=>null });
     goalLine.setData(fan.years.map(y=>({time:asTime(y), value:goal})));
   }
+  // The what-if's own line, drawn over the base cone — its only two outputs are
+  // this line and the result sentence beneath the control (js/insights.js
+  // renderProjMod()). Brand, not mut/faint, so it reads as "your typed scenario"
+  // rather than as another statistical guide line.
+  if(whatIf){
+    const whatIfLine=chart.addSeries(LC.LineSeries,{ color:brand, lineWidth:1.5, lineStyle:LC.LineStyle.Dashed,
+      crosshairMarkerVisible:false, priceLineVisible:false, lastValueVisible:false,
+      autoscaleInfoProvider:()=>null });
+    whatIfLine.setData(fan.years.map((y,i)=>({time:times[i], value:whatIf.fan.p50[i]})));
+  }
   const n=fan.years.length-1;
   p50.attachPrimitive(fanLabelPrimitive(times[n], [
     goal>0 ? {value:goal, text:`${t`Goal`} ${cfmt(goal)}`, color:mut, weight:650, dy:-9} : {},
+    whatIf ? {value:whatIf.fan.p50[n], text:`+${fmt(whatIf.contrib)}/mo`, color:brand, weight:650, dy:-9} : {},
     {value:fan.p90[n], text:cfmt(fan.p90[n]), color:faint, weight:600, dy:0},
     {value:fan.p10[n], text:cfmt(fan.p10[n]), color:faint, weight:600, dy:0},
   ]));

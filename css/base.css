@@ -44,7 +44,7 @@
        finance app can have. DESIGN.md §3. */
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum" 1;
-    font-variant-numeric: tabular-nums lining;
+    font-variant-numeric: tabular-nums lining-nums;
 
     /* Chrome is not selectable; real content re-enables it below. Stops the
        long-press text selection that immediately reads as "this is a webpage". */
@@ -127,7 +127,7 @@
   .hval, .hpl, .hinfo, .mval, .table td, .table th, .gtable td, .gtable th,
   .heatmap td, .heatmap th, .hero__total, .stat__value, .row__value,
   .big-n, .sub-n, .pctpill, .prpill, .daypill, .krow > span:last-child {
-    font-variant-numeric: tabular-nums lining;
+    font-variant-numeric: tabular-nums lining-nums;
     font-feature-settings: "tnum" 1, "lnum" 1;
   }
 

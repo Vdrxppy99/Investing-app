@@ -1356,7 +1356,7 @@
   .mv-pct {
     font-size: var(--t-caption);
     font-weight: var(--w-semibold);
-    font-variant-numeric: tabular-nums lining;
+    font-variant-numeric: tabular-nums lining-nums;
     margin-bottom: var(--s-1);
   }
   .mv-bar {
@@ -2282,7 +2282,7 @@
     font-weight: var(--w-bold);
     font-size: var(--t-caption);
     letter-spacing: -0.01em;
-    font-variant-numeric: tabular-nums lining;
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   /* ── Allocation strip — DESIGN-TARGET's replacement for the allocation
@@ -2578,7 +2578,7 @@
     table-layout: fixed;
     border-collapse: separate;
     border-spacing: var(--s-1);
-    font-variant-numeric: tabular-nums lining;
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   .heatmap th {
