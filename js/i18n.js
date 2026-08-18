@@ -391,6 +391,34 @@
        are already J, so the year-total column has to stay distinguishable. */
     "Yr": "Jahr",
 
+    /* ── Decision Ledger (js/insights.js renderDecisionLedgerMod(), new module —
+       js/decision-ledger.js's data layer shipped a session earlier with no UI).
+       Every key below is a `t` tagged-template key, not test/i18n-coverage.spec.js
+       candidate text (that scan can't see JS template literals at all — see
+       CLAUDE.md's Traps & Gotchas). The honesty-line keys are pre-written per
+       singular/plural combination rather than built at runtime: t()'s key IS the
+       literal template shape, so a dynamically-assembled string can never match a
+       dictionary entry — see dlCountLine()'s own comment. */
+    "Your decisions vs %1": "Deine Entscheidungen vs. %1",
+    "Every purchase so far went through your advisor's allocation — there's nothing self-directed to score yet.":
+      "Jeder bisherige Kauf lief über die Allokation deines Beraters — es gibt noch nichts Eigenständiges zu bewerten.",
+    "%1 decision over %2 month — far too little to mean anything yet":
+      "%1 Entscheidung über %2 Monat — viel zu wenig, um etwas zu bedeuten",
+    "%1 decision over %2 months — far too little to mean anything yet":
+      "%1 Entscheidung über %2 Monate — viel zu wenig, um etwas zu bedeuten",
+    "%1 decisions over %2 month — far too little to mean anything yet":
+      "%1 Entscheidungen über %2 Monat — viel zu wenig, um etwas zu bedeuten",
+    "%1 decisions over %2 months — far too little to mean anything yet":
+      "%1 Entscheidungen über %2 Monate — viel zu wenig, um etwas zu bedeuten",
+    "%1 decision over %2 month": "%1 Entscheidung über %2 Monat",
+    "%1 decision over %2 months": "%1 Entscheidung über %2 Monate",
+    "%1 decisions over %2 month": "%1 Entscheidungen über %2 Monat",
+    "%1 decisions over %2 months": "%1 Entscheidungen über %2 Monate",
+    "%1 price unavailable": "%1 Preis nicht verfügbar",
+    "%1 prices unavailable": "%1 Preise nicht verfügbar",
+    "Worth now": "Heute wert",
+    "If it had bought %1 instead": "Hätte er stattdessen %1 gekauft",
+
     /* ── coach items (js/insights.js coachItems) ─────────────────────────────
        These were never in the dictionary, so they rendered English under German
        card titles ("Nächste Schritte" above "Know your risk"). Bodies that carry

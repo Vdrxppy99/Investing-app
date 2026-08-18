@@ -373,7 +373,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.163</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.164</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->
@@ -510,6 +510,38 @@
       <div class="stat__label">Monthly returns</div>
       <div id="hmBody"></div>
     </div>
+
+    <!-- Decision Ledger — DESIGN-TARGET.md dataviz module, js/decision-ledger.js's
+         computation (self-directed lots vs. buying the benchmark instead) surfaced
+         for the first time (v2.6.163 shipped the data layer only). Own section
+         label rather than living under "Performance" above: it scores a different
+         thing (the owner's own discretionary picks, not the whole portfolio) — see
+         js/decision-ledger.js's header comment for the full method. The label names
+         the benchmark, which is configurable, so — like #worthModHead/#riskModHead's
+         own dynamic card heads — it can't be static markup the i18n coverage-scan
+         walker translates; js/insights.js's renderDecisionLedgerMod() writes it via
+         t() at render time, same convention, just also covering the label itself.
+         Hidden until its own (async — a network+cache fetch, unlike every other
+         module here) data resolves, same "hidden until data exists" rule every
+         other module card already follows. -->
+    <h2 class="section__label" id="dlSecLabel" hidden><span id="dlSecLabelText"></span></h2>
+    <section class="card mod" id="decisionLedgerCard" hidden>
+      <div class="t-display" id="dlBig"></div>
+      <!-- The honesty line DESIGN-TARGET.md requires when the sample is small or
+           young — deliberately .t-body (12.5px), not .t-caption (11.5px, the size
+           every footnote/goalline in this file uses): the owner was explicit that
+           this line must not read as a footnote, since the feature's honesty
+           depends on it being seen. -->
+      <p class="t-body muted" id="dlHonesty"></p>
+      <ul class="dlrows" id="dlRows"></ul>
+      <!-- Unresolved (no price on one side) — its own labelled group, excluded from
+           the headline total, never a fabricated figure. -->
+      <div id="dlUnresolvedWrap" hidden>
+        <div class="mod__sub" id="dlUnresolvedLabel"></div>
+        <ul class="dlrows dlrows--static" id="dlUnresolvedRows"></ul>
+      </div>
+      <p class="t-body muted" id="dlEmpty" hidden></p>
+    </section>
 
     <h2 class="section__label">Risk</h2>
     <section class="card press mod" id="riskModCard" hidden>

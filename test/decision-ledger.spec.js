@@ -165,6 +165,35 @@ test('sample size and oldest-decision age count every identified decision, resol
   expect(r.oldestDecisionAgeMonths).toBeLessThan(12.5);
 });
 
+// ── Same symbol held in BOTH an advised and a self-directed account ────────
+// v2.6.163 never exercised this shape (every demo symbol lived in exactly one
+// account) — the owner's real portfolio holds VOO and VXUS in both. The risk:
+// if anything upstream ever grouped lots by symbol BEFORE filtering on
+// account kind, the advised lot's dollars would leak into the scored total,
+// or get summed/averaged with the self-directed lot's. computeDecisionLedger
+// filters lot-by-lot (`decisions = lots.filter(l => accountKind[l.acc]==='self')`)
+// with no symbol-keyed intermediate, so this is expected to already pass —
+// this test exists to guard that property going forward.
+test('a symbol held in both accounts: only the self-directed lot produces a row', () => {
+  const lots = [
+    { acc: 'main', sym: 'AAPL', date: '2023-11-01', qty: 3, cost: 300 }, // advised — not the owner's choice
+    { acc: 'brok', sym: 'AAPL', date: '2024-01-02', qty: 5, cost: 1000 }, // self-directed — the actual decision
+  ];
+  const r = computeDecisionLedger({ lots, accountKind: ACCOUNT_KIND, priceHistory, benchmark: 'VTI', asOfMs: ASOF_MS });
+
+  expect(r.sampleSize).toBe(1); // the advised lot never becomes a "decision" at all
+  expect(r.rows.length).toBe(1);
+  const row = r.rows[0];
+  // the row's cost/date must be the self-directed lot's alone — not a sum (1300),
+  // not an average, not the advised lot's (300 / 2023-11-01)
+  expect(row.cost).toBe(1000);
+  expect(row.dateUsed).toBe('2024-01-02');
+  expect(row.actual).toBeCloseTo(1500, 6); // 1000 * (150/100), same worked-example prices
+  expect(row.counterfactual).toBeCloseTo(1100, 6);
+  expect(row.gap).toBeCloseTo(400, 6);
+  expect(r.totals.cost).toBeCloseTo(1000, 6); // NOT 1300
+});
+
 // ── Yahoo v8/finance/chart adjusted-close parsing, against a saved fixture ──
 // This sandbox is IP-blocked by Yahoo (DATA-SOURCES.md) — parsing is tested
 // against test/fixtures/yahoo-chart-adjclose.json, a response shaped to match

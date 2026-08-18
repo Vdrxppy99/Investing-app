@@ -186,3 +186,49 @@ test('priv/theme/ccy icons are sprite <svg aria-hidden="true"> with fill:none an
     }
   }
 });
+
+// ── Decision Ledger row disclosure (js/insights.js paintDecisionLedgerMod()) ────
+// Not a "one lit per group" selection control like the rest of this file — each
+// row's aria-expanded is independent, more than one can be open at once. The
+// standing risk this file guards against still applies in a different shape here:
+// aria-expanded is written fresh by dlRowHtml() on every render rather than baked
+// into static markup, so this is the regression guard for that staying true —
+// toggling one row must never touch a sibling's state, and a second click must
+// return the SAME row to closed, not leave it stuck lit.
+test('Decision Ledger rows: aria-expanded starts false, toggling one row never touches a sibling, and a second click closes it again', async ({ page }) => {
+  await blockExternalNetwork(page);
+  await page.clock.setFixedTime(FROZEN_TIME);
+  await unlockDemo(page);
+  await page.locator('.tabbar__item[data-page="insights"]').click();
+  await expect(page.locator('#decisionLedgerCard')).toBeVisible({ timeout: 15000 });
+
+  // Two resolved rows, painted directly (same technique test/decision-ledger-ui.spec.js
+  // uses) — every price host is network-blocked in this harness, so the real fetch
+  // resolves all-unresolved and never produces a resolved .dlrow to click.
+  await page.evaluate(() => paintDecisionLedgerMod({
+    benchmark: 'VTI',
+    rows: [
+      { sym: 'AAPL', dateUsed: '2024-01-02', cost: 1000, actual: 1500, counterfactual: 1100, gap: 400, gapPct: 40 },
+      { sym: 'MSFT', dateUsed: '2024-02-01', cost: 800, actual: 900, counterfactual: 950, gap: -50, gapPct: -6.25 },
+    ],
+    totals: { cost: 1800, actual: 2400, counterfactual: 2050, gap: 350, gapPct: 19.44 },
+    unresolved: { count: 0, items: [] },
+    sampleSize: 2,
+    oldestDecisionAgeMonths: 20,
+  }));
+
+  const rows = page.locator('#dlRows .dlrow');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toHaveAttribute('aria-expanded', 'false');
+  await expect(rows.nth(1)).toHaveAttribute('aria-expanded', 'false');
+
+  await rows.nth(0).click();
+  await expect(rows.nth(0)).toHaveAttribute('aria-expanded', 'true');
+  await expect(rows.nth(1), 'sibling row must stay closed').toHaveAttribute('aria-expanded', 'false');
+  const detail0 = page.locator('#' + (await rows.nth(0).getAttribute('aria-controls')));
+  await expect(detail0).toBeVisible();
+
+  await rows.nth(0).click();
+  await expect(rows.nth(0)).toHaveAttribute('aria-expanded', 'false');
+  await expect(detail0).toBeHidden();
+});

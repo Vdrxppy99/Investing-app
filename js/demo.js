@@ -26,16 +26,22 @@ function buildDemoStore(){
   // owner's real portfolio is mostly advisor-allocated). Reassigned per lot below: broad
   // index funds (VOO/VTI/VXUS/VXF) go to 'main' (advised — a believable allocator's
   // picks), leaving VYM/BRK-B in 'brok' (self — the more selective, non-market-cap-
-  // weighted choices) as the demo's few genuine decisions. No symbol is split across both
-  // accounts, so the aggregation below needs no restructuring beyond reading `acc` off
-  // each lot instead of hardcoding it. ONLY `acc` changed here — sym/qty/cost/date are
-  // exactly as before (verified: test/golden/golden-master.json does not move, since
-  // rows('all')/totals('all') sum by symbol across every account regardless of `acc`).
+  // weighted choices) as the demo's few genuine decisions.
+  // v2.6.164: the owner's REAL portfolio holds VOO and VXUS in both accounts — a shape
+  // v2.6.163 never exercised (no symbol was split across both). The most recent VOO lot
+  // and the most recent VXUS lot are reassigned main->brok below to reproduce it, so the
+  // Decision Ledger module runs against this case in the live app, not only in
+  // test/decision-ledger.spec.js's synthetic fixture. ONLY those two lots' `acc` changed —
+  // sym/qty/cost/date are exactly as before, and rows('all')/totals('all') sum by symbol
+  // across every account regardless of `acc`, so the golden master cannot move (verified:
+  // test/golden.spec.js green, diff empty). The hmap aggregation below DOES still need
+  // restructuring for this case — a per-symbol map with one `acc` field can no longer
+  // represent VOO/VXUS's per-account split — see the comment on `hmap` just below.
   const lotDefs = [
     ['VOO', D(2023, 2, 14), 34, 'main'], ['VOO', D(2023, 8, 15), 22, 'main'], ['VOO', D(2024, 2, 20), 18, 'main'],
-    ['VOO', D(2024, 9, 10), 20, 'main'], ['VOO', D(2025, 3, 17), 16, 'main'], ['VOO', D(2025, 11, 4), 12, 'main'],
+    ['VOO', D(2024, 9, 10), 20, 'main'], ['VOO', D(2025, 3, 17), 16, 'main'], ['VOO', D(2025, 11, 4), 12, 'brok'],
     ['VTI', D(2023, 4, 11), 26, 'main'], ['VTI', D(2024, 6, 4), 18, 'main'],
-    ['VXUS', D(2023, 3, 21), 120, 'main'], ['VXUS', D(2024, 8, 13), 90, 'main'], ['VXUS', D(2025, 5, 6), 70, 'main'],
+    ['VXUS', D(2023, 3, 21), 120, 'main'], ['VXUS', D(2024, 8, 13), 90, 'main'], ['VXUS', D(2025, 5, 6), 70, 'brok'],
     ['VYM', D(2023, 7, 11), 34, 'brok'], ['VYM', D(2025, 1, 14), 28, 'brok'],
     ['VXF', D(2024, 1, 23), 22, 'main'],
     ['BRK-B', D(2023, 5, 9), 9, 'brok'], ['BRK-B', D(2024, 10, 15), 6, 'brok']
@@ -45,10 +51,16 @@ function buildDemoStore(){
     return { acc, sym, date: iso(ms), qty, cost: +(qty * px).toFixed(2) };
   });
 
-  // aggregate lots into positions
+  // aggregate lots into positions — keyed by sym+acc, not sym alone: VOO and VXUS
+  // are now split across both accounts (see lotDefs comment above), and a single
+  // `acc` field per symbol would silently drop one account's shares from any
+  // acc-filtered view (js/core.js's rows(acc) merges these back into one row per
+  // symbol for the 'all' view via its own `accs` sub-map, so this split costs
+  // nothing there — verified: golden master unmoved).
   const hmap = {};
   for (const l of lots){
-    const h = hmap[l.sym] || (hmap[l.sym] = { acc: l.acc, sym: l.sym, qty: 0, cost: 0 });
+    const key = l.sym + '|' + l.acc;
+    const h = hmap[key] || (hmap[key] = { acc: l.acc, sym: l.sym, qty: 0, cost: 0 });
     h.qty = +(h.qty + l.qty).toFixed(6); h.cost = +(h.cost + l.cost).toFixed(2);
   }
   const holdings = Object.values(hmap);

@@ -486,6 +486,7 @@ function renderInsights(){
   renderProjMod();
   renderModGrid();
   renderHeatmap();
+  renderDecisionLedgerMod();
   renderMoreList();
 }
 /* One single-stat tile: Volatility. XIRR, vs VOO, Beta, Max drawdown, Contributions,
@@ -1560,6 +1561,98 @@ function renderHeatmap(){
     html+=any?`<td class="${cls(yr-1)}" style="font-weight:700">${((yr-1)*100).toFixed(1)}</td></tr>`:'<td></td></tr>';
   }
   $('hmBody').innerHTML=html+'</tbody></table></div>';
+}
+/* ============ Decision Ledger — DESIGN-TARGET.md dataviz module ============
+   js/decision-ledger.js is pure data + computation (see its own header for the
+   method and the adjusted-close reasoning); this is the only place that turns
+   its output into UI. Unlike every other render*Mod() in this file, its data
+   comes from getDecisionLedger() — a network+cache fetch, not something already
+   sitting in `state` — so it's kicked off here but paints asynchronously,
+   whenever it resolves; nothing else in renderInsights() waits on it. */
+let dlRunId=0; // a slow fetch from a stale render must never paint over a newer one
+function renderDecisionLedgerMod(){
+  if(typeof getDecisionLedger!=='function' || !$('decisionLedgerCard')) return;
+  const runId=++dlRunId;
+  getDecisionLedger({}).then(r=>{ if(runId===dlRunId) paintDecisionLedgerMod(r); }).catch(()=>{});
+}
+function dlDateLabel(d){ return new Date(d+'T12:00:00').toLocaleDateString(appLocale(),{year:'numeric',month:'short',day:'numeric'}); }
+// Every branch is its own literal `t` template — the tagged template's key IS
+// the literal string shape (see js/i18n.js's t()), so a runtime-built template
+// can't be looked up in DE; singular/plural has to pick among pre-written ones.
+function dlCountLine(n, months, warn){
+  const mo=Math.round(months), oneD=n===1, oneM=mo===1;
+  if(warn){
+    if(oneD&&oneM) return t`${n} decision over ${mo} month — far too little to mean anything yet`;
+    if(oneD) return t`${n} decision over ${mo} months — far too little to mean anything yet`;
+    if(oneM) return t`${n} decisions over ${mo} month — far too little to mean anything yet`;
+    return t`${n} decisions over ${mo} months — far too little to mean anything yet`;
+  }
+  if(oneD&&oneM) return t`${n} decision over ${mo} month`;
+  if(oneD) return t`${n} decision over ${mo} months`;
+  if(oneM) return t`${n} decisions over ${mo} month`;
+  return t`${n} decisions over ${mo} months`;
+}
+function dlUnresolvedLine(n){ return n===1 ? t`${n} price unavailable` : t`${n} prices unavailable`; }
+// The detail panel is rendered upfront (hidden), not created on first click —
+// aria-controls must point to a real element from the start, not one that only
+// exists after the row has already been activated once.
+function dlRowHtml(row, benchmark, i){
+  return `<li><button type="button" class="dlrow press" aria-expanded="false" aria-controls="dlrowDetail${i}" data-i="${i}">`
+    +badgeHtml(row.sym,true)
+    +`<span class="dlrow-mid"><span class="dlrow-sym">${esc(row.sym.replace('-','.'))}</span><span class="dlrow-date">${esc(dlDateLabel(row.dateUsed))}</span></span>`
+    +`<span class="dlrow-right"><span class="dlrow-invested">${esc(fmt(row.cost))}</span><span class="dlrow-gap ${cls(row.gap)}">${esc(fmtSign(row.gap))} · ${esc(fmtPct(row.gapPct))}</span></span>`
+    +`</button>`
+    +`<div class="dlrow-detail" id="dlrowDetail${i}" hidden>`
+      +`<div class="krow"><span>${t`Worth now`}</span><span>${esc(fmt(row.actual))}</span></div>`
+      +`<div class="krow"><span>${t`If it had bought ${benchmark} instead`}</span><span>${esc(fmt(row.counterfactual))}</span></div>`
+    +`</div></li>`;
+}
+function paintDecisionLedgerMod(r){
+  const secLabel=$('dlSecLabel'), secLabelText=$('dlSecLabelText'), card=$('decisionLedgerCard'),
+        big=$('dlBig'), honesty=$('dlHonesty'), rowsEl=$('dlRows'),
+        unwrap=$('dlUnresolvedWrap'), unlabel=$('dlUnresolvedLabel'), unrows=$('dlUnresolvedRows'),
+        empty=$('dlEmpty');
+  if(!secLabel||!secLabelText||!card||!big||!honesty||!rowsEl||!unwrap||!unlabel||!unrows||!empty || !r) return;
+
+  secLabelText.textContent=t`Your decisions vs ${r.benchmark}`;
+  secLabel.hidden=false; card.hidden=false;
+
+  if(r.sampleSize===0){
+    big.hidden=true; honesty.hidden=true; rowsEl.hidden=true; unwrap.hidden=true;
+    empty.hidden=false;
+    empty.textContent=t`Every purchase so far went through your advisor's allocation — there's nothing self-directed to score yet.`;
+    return;
+  }
+  empty.hidden=true; big.hidden=false; honesty.hidden=false; rowsEl.hidden=false;
+
+  const warn = r.sampleSize<10 || (r.oldestDecisionAgeMonths!=null && r.oldestDecisionAgeMonths<36);
+  honesty.textContent=dlCountLine(r.sampleSize, r.oldestDecisionAgeMonths||0, warn);
+
+  if(r.totals.cost>0){ big.textContent=fmtSign(r.totals.gap); big.className='t-display '+cls(r.totals.gap); }
+  else { big.textContent='—'; big.className='t-display'; }
+
+  const sorted=r.rows.slice().sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
+  rowsEl.innerHTML=sorted.map((row,i)=>dlRowHtml(row, r.benchmark, i)).join('');
+  rowsEl.querySelectorAll('.dlrow').forEach(btn=>{
+    btn.onclick=()=>{
+      const open=btn.getAttribute('aria-expanded')==='true';
+      btn.setAttribute('aria-expanded', open?'false':'true');
+      const detail=$(btn.getAttribute('aria-controls'));
+      if(detail) detail.hidden=open;
+    };
+  });
+
+  if(r.unresolved.count>0){
+    unwrap.hidden=false;
+    unlabel.textContent=dlUnresolvedLine(r.unresolved.count);
+    unrows.innerHTML=r.unresolved.items.map(it=>
+      `<li class="dlrow-static">`
+      +badgeHtml(it.sym,true)
+      +`<span class="dlrow-mid"><span class="dlrow-sym">${esc(it.sym.replace('-','.'))}</span><span class="dlrow-date">${esc(dlDateLabel(it.date))}</span></span>`
+      +`<span class="dlrow-right"><span class="dlrow-invested">${esc(fmt(it.cost))}</span></span>`
+      +`</li>`
+    ).join('');
+  } else { unwrap.hidden=true; unrows.innerHTML=''; }
 }
 function renderContribChart(){
   const el=$('contribChart'); if(!window.Chart) return;

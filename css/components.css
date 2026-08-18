@@ -288,6 +288,59 @@
   }
   .goalline b { color: var(--text); font-weight: var(--w-semibold); }
 
+  /* ── Decision Ledger rows (js/insights.js renderDecisionLedgerMod()) ──────
+     Same row anatomy as .hrow/.mrow (squircle tile + mid + right column) but a
+     real <button>, not a delegated-click <div> (js/tappable.js) — the tap here
+     reveals a detail panel, and the project already has eleven <section onclick>
+     cards with no keyboard path in; a fourth reuse of that pattern here would
+     make it a twelfth. Native <button> gets Enter/Space activation for free. */
+  .dlrows { list-style: none; margin: var(--s-3) 0 0; padding: 0; }
+  .dlrow, .dlrow-static {
+    display: flex;
+    align-items: center;
+    gap: var(--row-gap);
+    width: 100%;
+    min-height: var(--tap);
+    padding: var(--row-pad-y) 0;
+    border-bottom: var(--hairline) solid var(--divider);
+    text-align: left;
+    background: none;
+  }
+  .dlrows li:last-child .dlrow,
+  .dlrows li:last-child.dlrow-static { border-bottom: none; }
+  .dlrow[aria-expanded="true"] { background: var(--surface-2); }
+  .dlrow-mid { flex: 1 1 auto; min-width: 0; }
+  .dlrow-sym {
+    display: block;
+    font-size: var(--t-label);
+    font-weight: var(--w-semibold);
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dlrow-date { display: block; font-size: var(--t-caption); color: var(--text-muted); }
+  .dlrow-right { text-align: right; flex-shrink: 0; }
+  .dlrow-invested {
+    display: block;
+    font-size: var(--t-caption);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .dlrow-gap {
+    display: block;
+    font-size: var(--t-label);
+    font-weight: var(--w-bold);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  /* Detail panel — indented under the tile so it reads as "belonging" to the row
+     above it, same krow key/value anatomy the sheet bodies already use. */
+  .dlrow-detail {
+    padding: 0 0 var(--s-3) calc(32px + var(--row-gap));
+    display: flex;
+    flex-direction: column;
+  }
+
   /* The projection module's what-if control (session 5, reworked).
      It was an inline "Add [ 0 ] /month": a 84px box with a right-aligned grey 0
      and no label above it, which reads as a disabled placeholder rather than an
