@@ -2,12 +2,13 @@
    daily market-open/close lock-screen reports, intraday mover alerts (alerts.js),
    and the app's edge quote proxy (GET /q — quotes.js).
 
-   KV keys:  token    — bearer token, trust-on-first-use (single user)
+   KV keys:  token    — LEGACY bearer token, read-only (never written); CLIENT_TOKEN secret is the source of truth
              sub      — the phone's push subscription
              snapshot — {holdings:[{sym,qty}], cash, prices:{sym:{price,prev}}, ts} synced by the app
              last     — {open:'YYYY-MM-DD', close:'YYYY-MM-DD'} so a report never sends twice
              moved    — {date, syms:[…]} so an intraday ±2% mover alerts once per day
-   Secrets:  VAPID_PRIVATE_JWK · VAPID_SUB · ADMIN_TOKEN     Vars: VAPID_PUB
+             rl:restore:<hour> — cross-isolate /restore brute-force counter
+   Secrets:  VAPID_PRIVATE_JWK · VAPID_SUB · ADMIN_TOKEN · CLIENT_TOKEN     Vars: VAPID_PUB
 
    Crons fire in UTC and US DST moves — so each report has TWO crons (EDT + EST slot)
    and the ET wall-clock window check below picks whichever is correct that day. */
@@ -96,34 +97,118 @@ async function sendMonthly(env) {
   return { sent: 'monthly', status: res.status };
 }
 
-/* /restore brute-force brake — per-isolate, resets hourly (fine for a single-user API) */
+/* ── /restore brute-force brake ──────────────────────────────────────────────
+   /restore is the ONE unauthenticated POST route: the passcode-derived tag is the
+   whole credential, so a guesser only ever needs to hit this endpoint. Two layers:
+
+   1. rlOk() — per-isolate memory counter. Free, no KV write. It absorbs one client
+      hammering one isolate, which also bounds how many KV writes an attacker can
+      force out of us (KV free tier is 1000 writes/day).
+   2. rlKvOk() — the REAL ceiling, and the reason this is no longer per-isolate.
+      One KV key per UTC hour holding the global attempt count plus a per-coarse-IP
+      count:  rl:restore:<hourEpoch> → { n: <total>, b: { "<bucket>": <count> } }
+      KV is an account-level namespace, not isolate memory: every isolate in every
+      colo reads and writes the SAME key, so the count survives isolate recycling
+      and is shared across a distributed attacker's connections. The old
+      `let rlN = 0` reset to 0 for each new isolate, which is precisely the thing a
+      distributed attacker gets for free. expirationTtl retires old hour buckets.
+
+   Honest limit, stated so nobody over-trusts it: KV is eventually consistent (a
+   read can be ~60s stale) and this is a read-modify-write, so a simultaneous burst
+   can overshoot the ceiling by roughly one propagation window before every colo
+   sees the higher count. It is a hard brake, not a lock. A Durable Object would be
+   exactly consistent; that needs a DO binding + migration in wrangler.jsonc and is
+   the upgrade path if this ever proves insufficient. */
 let rlN = 0, rlT = 0;
 const rlOk = () => { const n = Date.now(); if (n - rlT > 3600e3) { rlT = n; rlN = 0; } return ++rlN <= 20; };
 
-/* auth: single-user trust-on-first-use bearer token (+ ADMIN_TOKEN for maintenance/tests) */
+const RL_IP_MAX = 5, RL_GLOBAL_MAX = 20, RL_BUCKETS_MAX = 200;
+const rlKey = () => 'rl:restore:' + Math.floor(Date.now() / 3600e3);
+/* coarse client-IP bucket — /24 for IPv4, /48 for IPv6, so an attacker rotating
+   addresses inside one subnet still shares a counter */
+function rlBucket(req) {
+  const ip = (req.headers.get('cf-connecting-ip') || '').trim();
+  if (!ip) return 'unknown';
+  return ip.includes(':') ? ip.split(':').slice(0, 3).join(':') + '::/48'
+                          : ip.split('.').slice(0, 3).join('.') + '.0/24';
+}
+/* true = caller may proceed to the tag comparison. Reads the shared counter FIRST
+   and returns false WITHOUT writing and WITHOUT comparing once a ceiling is hit —
+   so a blocked attacker cannot burn our KV write quota either. */
+async function rlKvOk(env, req) {
+  const key = rlKey(), b = rlBucket(req);
+  let st;
+  try { st = await env.KV.get(key, 'json'); } catch (_) { return true; } // KV unreachable → memory brake only
+  st = (st && typeof st === 'object') ? st : { n: 0, b: {} };
+  if (!st.b || typeof st.b !== 'object') st.b = {};
+  if ((st.n || 0) >= RL_GLOBAL_MAX) return false;
+  if ((st.b[b] || 0) >= RL_IP_MAX) return false;
+  st.n = (st.n || 0) + 1;
+  // cap the bucket map so a spoofed-IP flood can't grow the value unboundedly
+  if (st.b[b] !== undefined || Object.keys(st.b).length < RL_BUCKETS_MAX) st.b[b] = (st.b[b] || 0) + 1;
+  try { await env.KV.put(key, JSON.stringify(st), { expirationTtl: 7200 }); } catch (_) {}
+  return true;
+}
+/* a CORRECT passcode clears that bucket's count, so the owner restoring a new phone
+   after a couple of typos is never locked out by his own successful restore */
+async function rlKvClear(env, req) {
+  const key = rlKey(), b = rlBucket(req);
+  try {
+    const st = await env.KV.get(key, 'json');
+    if (st && st.b && st.b[b] !== undefined) { delete st.b[b]; await env.KV.put(key, JSON.stringify(st), { expirationTtl: 7200 }); }
+  } catch (_) {}
+}
+
+/* auth: single-user bearer token (+ ADMIN_TOKEN for maintenance/tests) */
 const tEq = (a, b) => {
   if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
   let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
 };
-async function auth(env, req, register) {
+/* Source of truth is the CLIENT_TOKEN secret (see worker/README.md — the owner sets
+   it with `wrangler secret put CLIENT_TOKEN`). A deployed secret cannot be evicted,
+   cannot be read back, and cannot be claimed by whoever calls first.
+
+   Trust-on-first-use is GONE. It used to be that an absent or evicted KV `token`
+   key let the next caller register whatever bearer they liked — and three routes
+   (/subscribe, /backup, /ask) passed register=true, so an unauthenticated stranger
+   could mint himself a token there and then walk into every guarded route,
+   including /test and its push senders. There is no longer any code path that
+   WRITES the KV token key, so there is nothing to claim.
+
+   An ALREADY-claimed KV token is still accepted, so the owner's current install
+   keeps working the moment this deploys, before he has set the secret. That is a
+   read-only legacy check, never a registration. */
+async function auth(env, req) {
   const h = req.headers.get('authorization') || '';
   const tok = h.startsWith('Bearer ') ? h.slice(7).trim() : '';
   if (tok.length < 24) return false;
   if (env.ADMIN_TOKEN && tEq(tok, env.ADMIN_TOKEN)) return true;
+  if (env.CLIENT_TOKEN && tEq(tok, env.CLIENT_TOKEN)) return true;
   const cur = await env.KV.get('token');
-  if (!cur) { if (!register) return false; await env.KV.put('token', tok); return true; }
-  return tEq(cur, tok);
+  return !!cur && tEq(cur, tok);   // absent/evicted KV ⇒ deny, never claim
 }
 
+/* Unknown origin ⇒ NO Access-Control-Allow-Origin at all. It used to fall back to
+   ORIGINS[0], which told an attacker's page "the deployed PWA is allowed" — useless
+   to that page, but it also meant every response looked CORS-approved to any cache
+   sitting in front of us. Omitting the header is the correct answer: the browser
+   blocks the read, and Vary: Origin stops a cached allowed-origin response being
+   handed to a different one. Non-browser callers (curl, wrangler tail) send no
+   Origin, get no header, and are unaffected — CORS is not authentication. */
 const corsFor = req => {
   const o = req.headers.get('origin') || '';
-  return {
-    'Access-Control-Allow-Origin': ORIGINS.includes(o) ? o : ORIGINS[0],
+  const h = {
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization,content-type'
+    'Access-Control-Allow-Headers': 'authorization,content-type',
+    'Vary': 'Origin'
   };
+  if (ORIGINS.includes(o)) h['Access-Control-Allow-Origin'] = o;
+  return h;
 };
+/* The complete pre-auth POST allowlist. Adding a path here makes it world-callable. */
+const PRE_AUTH_POST = new Set(['/restore']);
+
 const j = (obj, status, cors) => new Response(JSON.stringify(obj), { status: status || 200, headers: { 'content-type': 'application/json', ...cors } });
 
 export default {
@@ -137,15 +222,23 @@ export default {
       return new Response('portfolio-push ok', { headers: cors });
     }
     if (req.method !== 'POST') return j({ error: 'method not allowed' }, 405, cors);
-    if (path === '/restore') { // new phone, no bearer yet — the passcode-derived tag IS the auth
-      if (!rlOk()) return j({ error: 'too many tries — wait an hour' }, 429, cors);
+    /* Deny by default. This Set is the COMPLETE list of POST routes served before
+       auth() — everything else falls through to the gate below, so a route added
+       later is authenticated unless somebody deliberately adds it here. Nothing in
+       here may reach sendWebPush() or sendReport(); /restore reads one KV key and
+       returns ciphertext. */
+    if (PRE_AUTH_POST.has(path)) { // new phone, no bearer yet — the passcode-derived tag IS the auth
+      // ceiling checked BEFORE the body is read and BEFORE tEq runs
+      if (!rlOk() || !await rlKvOk(env, req)) return j({ error: 'too many tries — wait an hour' }, 429, cors);
       let b; try { b = await req.json(); } catch (_) { return j({ error: 'bad json' }, 400, cors); }
       const bk = await env.KV.get('backup', 'json');
       if (!bk || !b || !tEq(bk.tag, String(b.tag || ''))) return j({ error: 'no backup for that passcode' }, 403, cors);
+      await rlKvClear(env, req);
       return j({ salt: bk.salt, iv: bk.iv, ct: bk.ct, ts: bk.ts }, 200, cors);
     }
     const isSub = path === '/subscribe';
-    if (!await auth(env, req, isSub || path === '/backup' || path === '/ask')) return j({ error: 'unauthorized' }, 403, cors);
+    if (!await auth(env, req)) return j({ error: 'unauthorized' }, 403, cors);
+    /* ── everything past this line is authenticated ───────────────────────────── */
     if (path === '/backup') { // encrypted on the phone before upload — the server only stores bytes
       let b; try { b = await req.json(); } catch (_) { return j({ error: 'bad json' }, 400, cors); }
       if (b && b.off) { await env.KV.delete('backup'); return j({ ok: true }, 200, cors); }
@@ -161,6 +254,15 @@ export default {
       if (b.snapshot) await env.KV.put('snapshot', JSON.stringify(b.snapshot));
       return j({ ok: true }, 200, cors);
     }
+    /* WRITE IS AUTHENTICATED — this is past the auth() gate above and there is no
+       registration path, so an unauthenticated caller cannot poison the snapshot.
+       It is stored as PLAINTEXT on purpose and that is not an oversight: the Worker
+       is the only thing awake at 9:36 ET, and it needs snap.holdings[].sym/.qty to
+       fetch quotes, snap.cash + snap.prices to total the portfolio, snap.alerts for
+       the custom price targets, snap.goal/snap.dep for the milestone and goal
+       pushes, and snap.earningsAlerts for the opt-in earnings check. Encrypting it
+       client-side would hand the Worker opaque bytes and delete every notification
+       the app sends. See worker/README.md § "Why the snapshot is plaintext". */
     if (path === '/snapshot') {
       let b; try { b = await req.json(); } catch (_) { return j({ error: 'bad json' }, 400, cors); }
       if (!b || !Array.isArray(b.holdings)) return j({ error: 'bad snapshot' }, 400, cors);
@@ -201,6 +303,8 @@ export default {
       await env.KV.put('ai', JSON.stringify({ date: today, n: n + 1 }));
       return j({ answer, left: CAP - n - 1, lighter: used !== MODELS[0] }, 200, cors);
     }
+    /* Sends real pushes and can force a report — authenticated (it is past the gate
+       above and is NOT in PRE_AUTH_POST). It must never be added to that Set. */
     if (path === '/test') {
       let b = null; try { b = await req.json(); } catch (_) { /* empty body = report test */ }
       if (b && b.kind === 'alerts') return j(await checkAlerts(env, true), 200, cors);

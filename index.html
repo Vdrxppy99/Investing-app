@@ -41,6 +41,11 @@
   form-action 'self';
   object-src 'none';
 ">
+<!-- Clickjacking guard. MUST stay first and MUST stay an external file — see the
+     header comment in js/frame-guard.js for why frame-ancestors and X-Frame-Options
+     are both unavailable on GitHub Pages, and why an inline script would be blocked
+     by our own script-src 'self'. -->
+<script src="js/frame-guard.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>My Portfolio</title>
@@ -373,7 +378,7 @@
     <div id="cashRow" class="cashrow hidden"></div>
   </section>
 
-  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.164</span></p>
+  <p class="t-caption faint foot">Built from your purchase history. Prices from the Yahoo Finance free feed, refreshed while the US market is open. Not financial advice. <span id="appVer">v2.6.165</span></p>
 </div>
 
 <!-- ═══════════════════ MARKETS ═══════════════════ -->

@@ -1,6 +1,6 @@
 /* Portfolio app service worker — offline shell + instant load.
    Only manages the app shell and CDN libraries; live price APIs bypass the SW entirely. */
-const V = 'pt-2.6.164'; // ⚠ bump on EVERY deploy — this is NOT semver, see below
+const V = 'pt-2.6.165'; // ⚠ bump on EVERY deploy — this is NOT semver, see below
 // ── VERSION SCHEME — PROUD.NORMAL.SHAME (as of this line; do NOT "correct" it back
 // to semver) ────────────────────────────────────────────────────────────────────
 // First number: releases the owner is genuinely proud of. Second: normal feature
@@ -159,7 +159,7 @@ const V = 'pt-2.6.164'; // ⚠ bump on EVERY deploy — this is NOT semver, see 
 const CORE = ['./', './index.html', './manifest.webmanifest',
   // The stylesheet is now four layered files (app.css was deleted in the redesign).
   './css/tokens.css', './css/base.css', './css/components.css', './css/layout.css',
-  './js/i18n.js', './js/icons.js', './js/ui.js', './js/tappable.js',
+  './js/frame-guard.js', './js/i18n.js', './js/icons.js', './js/ui.js', './js/tappable.js',
   './js/vault.js', './js/boot.js', './js/seed.js', './js/demo.js', './js/core.js', './js/portfolio.js', './js/api.js',
   './js/explore.js', './js/insights.js', './js/sheets.js', './js/monte-carlo.js', './js/monte-carlo-worker.js', './js/app.js',
   // Decision Ledger data layer (js/decision-ledger.js) — data + computation only this
