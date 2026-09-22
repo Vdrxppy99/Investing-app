@@ -1204,7 +1204,7 @@ function renderMoreList(){
     {title:'Financial independence', meta:`${fmt(t.value*0.04/12)}/mo safe income`, fn:openFISheet},
   ];
   list.innerHTML = rowsDef.map((r,i)=>
-    `<button class="disclose" data-i="${i}"><span class="disclose__title">${esc(r.title)}</span>`+
+    `<button class="disclose press" data-i="${i}"><span class="disclose__title">${esc(r.title)}</span>`+
     `<span class="disclose__meta">${esc(r.meta)}</span><svg aria-hidden="true"><use href="#i-chevron-right"/></svg></button>`).join('');
   list.querySelectorAll('[data-i]').forEach((el,i)=> el.onclick=rowsDef[+el.dataset.i].fn);
 }
@@ -1767,7 +1767,7 @@ function renderCoach(targetId){
   const grid=$(targetId||'coachGrid'); if(!grid) return;
   const items=coachItems();
   grid.innerHTML = items.length ? items.map(x=>
-    `<div class="icard cmove sev-${x.sev||'info'}">
+    `<div class="icard cmove press sev-${x.sev||'info'}">
       <div class="cmhead"><span class="cicon">${x.ic}</span><span class="chev">›</span></div>
       <div class="ctitle">${esc(x.title)}</div>
       <div class="cdetail">${esc(x.detail)}</div></div>`).join('')

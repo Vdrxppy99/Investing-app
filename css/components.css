@@ -866,8 +866,10 @@
     padding: var(--s-3) 0;
     border-bottom: var(--hairline) solid var(--line);
     text-align: left;
-    transition: background-color var(--dur-micro) var(--ease-out);
   }
+  /* Transition (and the scale) comes from .press, now on every live .disclose — see
+     the .hrow/.mrow/.drow/.nrow comment for why this class doesn't declare its own
+     `transition` any more (it used to, and silently defeated .press's). */
   .disclose:active { background: var(--surface-2); }
   .disclose:last-child { border-bottom: 0; }
   .disclose__title { flex: 1; font-size: var(--t-body); font-weight: var(--w-semibold); }
@@ -1298,10 +1300,17 @@
     padding: var(--row-pad-y) 0;
     border-bottom: var(--hairline) solid var(--divider);
     text-align: left;
-    transition: background-color var(--dur-micro) var(--ease-out);
   }
   .hrow:last-child, .mrow:last-child, .drow:last-child, .nrow:last-child { border-bottom: none; }
-  .hrow:active, .mrow:active, .nrow:active { background: var(--surface-2); }
+  /* Background transition (and the press scale) come from the .press class every live
+     row template now carries — this group used to declare its own
+     `transition: background-color …` here, which (being in the `components` @layer,
+     after `base` where .press lives) fully overrode .press's own transform+background
+     transition regardless of selector specificity: layer order beats specificity, so
+     the scale-down landed with no eased release at all. Dropped in favour of one
+     source of truth, matching how .stat/.dlrow/#healthCard already rely on .press
+     alone with no rule of their own to conflict with it. */
+  .hrow:active, .mrow:active, .drow:active, .nrow:active { background: var(--surface-2); }
 
   /* Press feedback for rows that look tappable via delegated handlers (js/tappable.js)
      rather than a native button — moved from a JS-injected <style> tag so a CSP
@@ -1635,8 +1644,10 @@
     background: var(--surface);
     border-radius: var(--r-button);
     text-align: left;
-    transition: background-color var(--dur-micro) var(--ease-out);
   }
+  /* Transition (and the scale) comes from .press, now on the live .idx-card template —
+     see the .hrow/.mrow/.drow/.nrow comment for why this class doesn't declare its own
+     `transition` any more. */
   .idx-card:active { background: var(--surface-2); }
   .idx-card .n {
     font-size: var(--t-caption);
@@ -1851,9 +1862,23 @@
   .chart-box { position: relative; }
   .accbreak { font-size: var(--t-caption); color: var(--text-muted); }
 
-  /* Skeletons the engine emits under its own names. */
+  /* Skeletons the engine emits under its own names (js/core.js skel(), js/explore.js
+     skelTiles() — the Markets/Following lists while mkt.fetching is true). skel()'s
+     own comment has called these "shimmer placeholder rows" since its first commit,
+     but no shimmer was ever wired: these four classes got the flat tinted block and
+     stopped. Same sheen technique the newer .skel/.skel--* system below already
+     defines (shared `sheen` keyframe, --dur-shimmer/--skeleton-sheen tokens) — reused
+     here rather than switching these live call sites over to the newer classes. */
   .skel-lines, .skel-row, .skel-tile, .skel-badge {
     background: var(--skeleton); border-radius: var(--r-input); position: relative; overflow: hidden;
+  }
+  .skel-lines::after, .skel-row::after, .skel-tile::after, .skel-badge::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+    transform: translateX(-100%);
+    animation: sheen var(--dur-shimmer) ease-in-out infinite;
   }
   .skel-lines { height: var(--s-3); }
   .skel-row { height: 56px; }
@@ -2114,8 +2139,10 @@
     background: var(--surface-2);
     border-radius: var(--r-button);
     min-width: 0;
-    transition: background-color var(--dur-micro) var(--ease-out);
   }
+  /* Transition (and the scale) comes from .press, now on the live .cmove template —
+     see the .hrow/.mrow/.drow/.nrow comment for why this class doesn't declare its own
+     `transition` any more. */
   .cmove:active { background: var(--surface-3); }
   .cmhead { display: flex; align-items: center; justify-content: space-between; }
   .cicon svg { width: 20px; height: 20px; color: var(--primary); }
@@ -2151,10 +2178,10 @@
 
    The original, proven engine JS was restored wholesale rather than edited to
    suit the new markup: editing it is what produced every glitch in this rebuild.
-   So the CSS honours ITS vocabulary instead. These are the twelve classes it
+   So the CSS honours ITS vocabulary instead. These are the thirteen classes it
    toggles, enumerated from the source rather than discovered one bug at a time:
 
-     armed closing demo hidden loading locked mbfix on seen show spinning unlocking
+     armed closing demo dragging hidden loading locked mbfix on seen show spinning unlocking
 
    If a new one ever appears, it belongs here — not in a JS edit.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2164,10 +2191,17 @@
   .minibar.show { display: flex; }
   body.mbfix .minibar { display: flex; }
 
-  /* Pull-to-refresh: .armed when past the threshold, .loading while fetching. */
+  /* Pull-to-refresh: .armed when past the threshold, .loading while fetching.
+     .dragging (js/app.js wirePTR()) spans the whole touch, start to release —
+     it pauses the spinner's own infinite CSS spin so the drag handler's inline
+     rotate() (tied to pull distance) isn't fought frame-by-frame by the
+     animation re-asserting its own transform; the continuous spin resumes the
+     moment .dragging comes off, whether that lands on .loading or on nothing
+     (sprung back, not armed). */
   .ptr { display: block; height: 0; overflow: hidden; transition: height var(--dur-micro) var(--ease-out); }
   .ptr.armed { color: var(--primary); }
   .ptr.loading { color: var(--primary); }
+  .ptr.dragging .btn__spin { animation-play-state: paused; }
 
   /* Refresh button spins while a fetch is in flight. */
   .iconbtn.spinning svg { animation: spin var(--dur-spin) linear infinite; }

@@ -87,7 +87,7 @@ function sparkArr(pts,W,H,up){
 }
 function mRow(sym,name,pxHtml,pct){
   const pill = pct==null ? '' : `<span class="pctpill ${pct>=0?'up':'down'}">${fmtPct(pct)}</span>`;
-  return `<button type="button" class="mrow" data-sym="${esc(sym)}" data-name="${esc(name||'')}">${badgeHtml(sym)}
+  return `<button type="button" class="mrow press" data-sym="${esc(sym)}" data-name="${esc(name||'')}">${badgeHtml(sym)}
     <div class="mmid"><div class="msym">${esc(sym.replace('-','.'))}</div><div class="mname">${esc(name||'')}</div></div>
     <div class="mright"><div class="mpx">${pxHtml}</div><div class="mchg">${pill}</div></div></button>`;
 }
@@ -95,7 +95,7 @@ function renderMarkets(){
   const cards=IDX_LIST.map(x=>{
     const d=mkt.idx[x.s]; if(!d) return '';
     const pct=d.prev>0?(d.price/d.prev-1)*100:0;
-    return `<div class="idx-card" data-sym="${esc(x.s)}" data-name="${esc(x.n)}"><div class="n">${x.n}</div><div class="p">${d.price.toLocaleString(appLocale(),{maximumFractionDigits:0})}</div><div class="c ${cls(pct)}">${fmtPct(pct)}</div>${sparkArr(d.spark,102,26,pct>=0)}</div>`;
+    return `<div class="idx-card press" data-sym="${esc(x.s)}" data-name="${esc(x.n)}"><div class="n">${x.n}</div><div class="p">${d.price.toLocaleString(appLocale(),{maximumFractionDigits:0})}</div><div class="c ${cls(pct)}">${fmtPct(pct)}</div>${sparkArr(d.spark,102,26,pct>=0)}</div>`;
   }).join('');
   const skelTiles=n=>Array.from({length:n},()=>'<div class="skel-tile"></div>').join('');
   $('idxRow').innerHTML = cards || (mkt.fetching ? skelTiles(4) : `<div class="mload">Couldn’t load — tap the Markets tab again to retry.</div>`);
@@ -112,7 +112,7 @@ function renderMarkets(){
     const px = q&&q.price>0 ? fmtPx(q.price) : '…';
     const pct = q&&q.prev>0 ? (q.price/q.prev-1)*100 : null;
     const pill = pct==null ? '' : `<span class="pctpill ${pct>=0?'up':'down'}">${fmtPct(pct)}</span>`;
-    return `<button type="button" class="mrow" data-sym="${esc(i.sym)}" data-name="${esc(i.name)}">${badgeHtml(i.sym)}
+    return `<button type="button" class="mrow press" data-sym="${esc(i.sym)}" data-name="${esc(i.name)}">${badgeHtml(i.sym)}
       <div class="mmid"><div class="msym">${esc(i.sym)}</div><div class="mname">${esc(i.name)}</div><div class="iwhy">${esc(i.why)}</div></div>
       <div class="mright"><div class="mpx">${px}</div><div class="mchg">${pill}</div></div></button>`;
   }).join('') || '<div class="mload">You own everything on the ideas list — impressive.</div>';
@@ -138,7 +138,7 @@ function renderFollowing(){
   const look=lookExposure();
   const tot=totals('all').value;
   $('followLookList').innerHTML = look.length ? look.map(l=>
-    `<button type="button" class="mrow" data-sym="${esc(l.sym)}" data-name="${esc(LOOK_NAMES[l.sym]||l.sym)}">${badgeHtml(l.sym)}
+    `<button type="button" class="mrow press" data-sym="${esc(l.sym)}" data-name="${esc(LOOK_NAMES[l.sym]||l.sym)}">${badgeHtml(l.sym)}
       <div class="mmid"><div class="msym">${esc(l.sym)}</div><div class="mname">${esc(LOOK_NAMES[l.sym]||'')} · via ${esc(l.via.join(', '))}</div></div>
       <div class="mright"><div class="mpx">${fmt(l.usd)}</div><div class="mchg muted">${tot>0?(l.usd/tot*100).toFixed(1):'0.0'}%</div></div></button>`
   ).join('') : '<div class="mload">Buy a fund like VOO or VTI to see what you indirectly own.</div>';
@@ -158,7 +158,7 @@ async function runSearch(q){
     box.innerHTML=qs.slice(0,8).map(x=>{
       const nm=esc(x.shortname||x.longname||'');
       const tag=x.quoteType==='ETF'?'ETF':x.quoteType==='INDEX'?'Index':esc(x.exchange||'Stock');
-      return `<button type="button" class="mrow${x.symbol.includes('.')?' dim':''}" data-sym="${esc(x.symbol)}" data-name="${nm}">${badgeHtml(x.symbol)}
+      return `<button type="button" class="mrow press${x.symbol.includes('.')?' dim':''}" data-sym="${esc(x.symbol)}" data-name="${nm}">${badgeHtml(x.symbol)}
         <div class="mmid"><div class="msym">${esc(x.symbol.replace('-','.'))}</div><div class="mname">${nm}</div></div>
         <div class="mright"><div class="mchg" style="color:var(--mut)">${tag}</div></div></button>`;
     }).join('');

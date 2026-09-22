@@ -1,22 +1,28 @@
 'use strict';
 /* ============ PULL TO REFRESH ============ */
 function wirePTR(){
-  const ptr=$('ptr'); let startY=0, pulling=false, dist=0;
+  const ptr=$('ptr'); const spin=ptr.querySelector('.btn__spin'); let startY=0, pulling=false, dist=0;
   const TH=72;
   window.addEventListener('touchstart', e=>{
     if(window.scrollY>4 || state.fetching) return;
     startY=e.touches[0].clientY; pulling=true; dist=0;
+    ptr.classList.add('dragging');
   }, {passive:true});
   window.addEventListener('touchmove', e=>{
     if(!pulling) return;
     dist=e.touches[0].clientY-startY;
-    if(dist<=0){ ptr.style.height='0px'; ptr.classList.remove('armed'); return; }
+    if(dist<=0){ ptr.style.height='0px'; ptr.classList.remove('armed'); if(spin) spin.style.transform=''; return; }
     const h=Math.min(TH+20, dist*0.5);
     ptr.style.height=h+'px';
     ptr.classList.toggle('armed', h>=TH*0.7);
+    // spinner rotation tracks the pull itself — the infinite CSS spin (paused via
+    // .ptr.dragging below) takes back over once armed/loading actually starts.
+    if(spin) spin.style.transform=`rotate(${h/(TH+20)*360}deg)`;
   }, {passive:true});
   window.addEventListener('touchend', ()=>{
     if(!pulling) return; pulling=false;
+    ptr.classList.remove('dragging');
+    if(spin) spin.style.transform='';
     if(ptr.classList.contains('armed')){
       ptr.classList.remove('armed'); ptr.classList.add('loading'); ptr.style.height=TH*0.7+'px';
       if(!$('page-markets').classList.contains('hidden') || !$('page-following').classList.contains('hidden')) refreshMarkets(true);
@@ -102,29 +108,103 @@ $('page-insights').addEventListener('click', e=>{ // look-through rows now live 
   const el=e.target.closest('.mrow');
   if(el && el.dataset.sym) openStockSheet(el.dataset.sym, el.dataset.name||'');
 });
-/* swipe a bottom sheet down to dismiss it (mobile). Checks .sheet__body's
-   scrollTop, not the outer .sheet's — the sheet rebuild (UPGRADE_PLAN.md R1)
-   moved the actual scroll container to .sheet__body, so a drag started while
-   the body is scrolled down must still scroll it rather than dismissing. */
-function wireSheetDrag(sheetId, closeFn){
-  const sh=$(sheetId); const body=sh.querySelector('.sheet__body');
-  const scrollTop=()=> body ? body.scrollTop : 0;
-  let y0=null, dy=0, dragging=false;
-  sh.addEventListener('touchstart', e=>{ if(scrollTop()>2) return; y0=e.touches[0].clientY; dy=0; dragging=true; }, {passive:true});
-  sh.addEventListener('touchmove', e=>{
-    if(!dragging||y0==null) return;
-    dy=e.touches[0].clientY-y0;
-    if(dy>0 && scrollTop()<=2) sh.style.transform=`translateY(${dy}px)`;
-  }, {passive:true});
-  sh.addEventListener('touchend', ()=>{
-    if(!dragging) return; dragging=false;
-    sh.style.transition='transform .2s ease';
-    if(dy>110){ sh.style.transform='translateY(110%)'; setTimeout(()=>{ closeFn(); sh.style.transform=''; sh.style.transition=''; }, 190); }
-    else { sh.style.transform=''; setTimeout(()=>sh.style.transition='', 210); }
-  });
+/* Swipe-down-to-dismiss for bottom sheets (mobile). ONE delegated handler for
+   BOTH sheet systems in this app — the static #detailSheet/#editSheet markup
+   (index.html, opened via showOverlay/hideOverlay in js/sheets.js) and any
+   sheet js/ui.js's uiSheet() builder emits (data-open toggled directly, no
+   .scrim wrapper) — both share the same .sheet/.sheet__grip/.sheet__body
+   markup, so matching on those classes covers either one without two copies
+   of this logic. (uiSheet() has no caller anywhere in this app today — grepped,
+   zero hits — so that half is wired but structurally untested; the static
+   system is the one real sheets actually go through.)
+
+   Finger tracks 1:1 downward; an upward drag is resisted (SHEET_RUBBER_BAND)
+   rather than blocked, since there's nothing above to reveal — pure tactile
+   feedback that you've hit the top. Dismiss commits on distance OR a fast
+   short flick (SHEET_FLICK_VELOCITY), whichever comes first, matching what a
+   native sheet feels like; short of both, it springs back. The scrim's
+   opacity is driven straight off drag progress so the backdrop visibly lifts
+   as the sheet leaves, not just a hard cut at the end.
+
+   Checks .sheet__body's own scrollTop, not the outer .sheet's — the sheet
+   rebuild (UPGRADE_PLAN.md R1) moved the actual scroll container to
+   .sheet__body, so a drag started (or continued) while the body is scrolled
+   down must keep scrolling it, not dismiss.
+
+   data-dragging is the hook css/components.css already ships for this
+   ("Set by the drag handler") — `.sheet[data-dragging="true"]{transition:none}`
+   was dead until now, the actual reason swipe-dismiss never worked: nothing
+   ever set the attribute, not that no drag handler existed (an inline-style,
+   single-sheet version already lived here; it just skipped this contract,
+   had no velocity/rubber-band/scrim tracking, and covered only one sheet at
+   a time). Disabled at the >=1024px breakpoint, where css/layout.css restyles
+   .sheet into a centred modal with no "down" to dismiss to. */
+const SHEET_DESKTOP_MQ = matchMedia('(min-width: 1024px)');
+const SHEET_DISMISS_DIST = 110;    // px — commit threshold for a slow, deliberate drag
+const SHEET_FLICK_VELOCITY = 0.6;  // px/ms (~600px/s) — a fast short flick commits under that distance
+const SHEET_RUBBER_BAND = 0.3;     // resistance factor for an upward drag
+
+function closeSheetEl(sheet){
+  const scrim=sheet.closest('.scrim');
+  if(scrim){ if(scrim.id==='detail') closeDetail(); else hideOverlay(scrim.id); }
+  else sheet.dataset.open='false'; // uiSheet()'s own contract — no .scrim, .sheet[data-open] alone drives it
 }
-wireSheetDrag('detailSheet', closeDetail);
-wireSheetDrag('editSheet', ()=>hideOverlay('editModal'));
+
+function wireSheetDrag(){
+  let sheet=null, scrim=null, body=null, dragging=false, y0=0, y=0;
+  let lastY=0, lastT=0, prevY=0, prevT=0;
+  const scrollTop=()=> body ? body.scrollTop : 0;
+  const reduced=()=> matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  document.addEventListener('touchstart', e=>{
+    if(SHEET_DESKTOP_MQ.matches) return;
+    const sh=e.target.closest('.sheet'); if(!sh) return;
+    body=sh.querySelector('.sheet__body');
+    if(scrollTop()>2) return; // body isn't at its own top — this touch scrolls it, not the sheet
+    sheet=sh; scrim=sh.closest('.scrim'); dragging=true;
+    y0=e.touches[0].clientY; y=0;
+    lastY=prevY=y0; lastT=prevT=e.timeStamp;
+  }, {passive:true});
+
+  document.addEventListener('touchmove', e=>{
+    if(!dragging || !sheet) return;
+    if(scrollTop()>2){ dragging=false; sheet=null; return; } // scrolled mid-drag — hand off, don't fight it
+    const cy=e.touches[0].clientY, dy=cy-y0;
+    y = dy>=0 ? dy : dy*SHEET_RUBBER_BAND;
+    prevY=lastY; prevT=lastT; lastY=cy; lastT=e.timeStamp;
+    sheet.dataset.dragging='true';
+    sheet.style.transform=`translateY(${y}px)`;
+    if(scrim){
+      const h=sheet.getBoundingClientRect().height||400;
+      scrim.style.transition='none';
+      scrim.style.opacity=String(Math.max(0, 1-Math.max(0,y)/h));
+    }
+  }, {passive:true});
+
+  function release(){
+    if(!dragging || !sheet){ dragging=false; return; }
+    dragging=false;
+    const sh=sheet, sc=scrim; sheet=null; scrim=null;
+    const dt=lastT-prevT, vy=dt>0 ? (lastY-prevY)/dt : 0;
+    const commit = y>0 && (y>SHEET_DISMISS_DIST || vy>SHEET_FLICK_VELOCITY);
+    sh.removeAttribute('data-dragging'); // restores the sheet's own transition (--dur-sheet/--ease-sheet)
+    if(sc) sc.style.transition='';
+    if(commit){
+      if(reduced()){ sh.style.transform=''; if(sc) sc.style.opacity=''; closeSheetEl(sh); return; }
+      const travel=sh.getBoundingClientRect().height||window.innerHeight;
+      sh.style.transform=`translateY(${travel}px)`;
+      if(sc) sc.style.opacity='0';
+      const dur=parseFloat(cvar('--dur-sheet'))||280;
+      setTimeout(()=>{ closeSheetEl(sh); sh.style.transform=''; if(sc) sc.style.opacity=''; }, dur);
+    } else {
+      sh.style.transform='';
+      if(sc) sc.style.opacity='';
+    }
+  }
+  document.addEventListener('touchend', release, {passive:true});
+  document.addEventListener('touchcancel', release, {passive:true});
+}
+wireSheetDrag();
 wireSearch(); wirePTR();
 /* #divTitle lived on #incomeCard, which left the Portfolio screen in R1 (see
    renderIncome's comment) — no trigger element for openDivSheet exists until
@@ -767,7 +847,7 @@ function renderComingUp(){
     const days=Math.max(0,Math.ceil((u.when-now)/86400000));
     const dateStr=new Date(u.when).toLocaleDateString(appLocale(),{month:'short',day:'numeric'});
     const title = u.kind==='earn' ? `Q${u.q} ${u.qy} earnings · ${dateStr}` : `Dividend · ex-div ${dateStr}`;
-    return `<button type="button" class="drow" data-sym="${esc(u.sym)}">${badgeHtml(u.sym,true)}
+    return `<button type="button" class="drow press" data-sym="${esc(u.sym)}">${badgeHtml(u.sym,true)}
       <div class="mmid"><div class="msym">${title}</div>${u.kind==='div'?`<div class="mname">estimated ${fmt(u.est)}</div>`:''}</div>
       <div class="mright"><span class="chip chip--primary">${days}d</span></div></button>`;
   }).join('');
@@ -790,7 +870,7 @@ function renderPriceHighlights(){
     body.innerHTML=`<p class="t-caption muted">Every holding is down right now — no highlights to show.</p>`;
     return;
   }
-  body.innerHTML = top.map(x=>`<button type="button" class="mrow" data-sym="${esc(x.sym)}">${badgeHtml(x.sym,true)}
+  body.innerHTML = top.map(x=>`<button type="button" class="mrow press" data-sym="${esc(x.sym)}">${badgeHtml(x.sym,true)}
       <div class="mmid"><div class="msym">${esc(x.sym.replace('-','.'))}</div><div class="mname">${esc((NAMES[x.sym]||x.sym.replace('-','.')).replace(/^Vanguard /,''))}</div></div>
       <div class="mright"><span class="pctpill up">${fmtPct(x.plp)}</span></div></button>`).join('');
   body.querySelectorAll('.mrow').forEach(el=> el.onclick=()=>openDetail(el.dataset.sym));

@@ -72,7 +72,7 @@ function holdingRow(r){
   const tick = (was!=null && p!==was) ? (p>was ? ' tick-up' : ' tick-down') : '';
   lastShownPx[r.sym] = p;
   const avg = r.qty>0 ? r.cost/r.qty : 0;
-  return `<button type="button" class="hrow${tick}" data-sym="${esc(r.sym)}">
+  return `<button type="button" class="hrow press${tick}" data-sym="${esc(r.sym)}">
     ${badgeHtml(r.sym)}
     <div class="hmid">
       <div class="hsym"><span class="hname">${esc((NAMES[r.sym]||r.sym.replace('-','.')).replace(/^Vanguard /,''))}</span> <span class="htick">${esc(r.sym.replace('-','.'))}</span></div>
