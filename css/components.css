@@ -1991,11 +1991,8 @@
   .scrim:not(.hidden) > .sheet { transform: translateY(0); opacity: 1; }
   .scrim.closing { opacity: 0; pointer-events: none; }
   .scrim.closing > .sheet { transform: translateY(100%); }
-
-  @media (min-width: 1024px) {
-    .scrim:not(.hidden) > .sheet { transform: translate(-50%, -50%) scale(1); }
-    .scrim.closing > .sheet { transform: translate(-50%, -50%) scale(0.96); }
-  }
+  /* The >=1024px centred-modal open/closing states live in css/layout.css —
+     that layer comes after this one, so a rule here would lose to it. */
 
   /* The toast uses the same .show contract as the assistant. */
   .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }

@@ -254,7 +254,16 @@
       transform: translate(-50%, -50%) scale(0.96);
       opacity: 0;
     }
-    .sheet[data-open="true"] { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    /* Open state must be declared HERE, for both sheet systems. js/sheets.js
+       opens the static sheets by removing .hidden from the parent .scrim and
+       never sets data-open on the .sheet; the matching open rule lived in
+       components.css, but this layer comes later, so `opacity: 0` above beat
+       it at any specificity. Result at >=1024px (Mac, iPad landscape): the
+       scrim went live and swallowed every click while the sheet stayed
+       invisible — the app looked frozen. Phones never reach this breakpoint. */
+    .sheet[data-open="true"],
+    .scrim:not(.hidden) > .sheet { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    .scrim.closing > .sheet { transform: translate(-50%, -50%) scale(0.96); opacity: 0; }
     .sheet__grip { display: none; }
 
     .toast { left: auto; right: var(--s-7); bottom: var(--s-7); max-width: 380px; }
