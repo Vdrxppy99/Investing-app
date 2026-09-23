@@ -317,8 +317,12 @@
      margin bleed .rail already uses. Must override max-width:100% above (same
      @layer, later + more specific wins) or the containment rule caps the
      width right back to .wrap's padded box and the negative margin does
-     nothing visible. */
-  .chart--bleed { margin-inline: calc(var(--s-5) * -1); width: auto; max-width: none; }
+     nothing visible.
+     Width is explicit, not `auto`: with auto width, .chart's aspect-ratio
+     turns its max-height cap into a width cap (240 × 16/10 = 384px). Phone
+     columns are narrower than that so it never showed; on a Mac/iPad column
+     the chart stopped two-thirds of the way across the page. */
+  .chart--bleed { margin-inline: calc(var(--s-5) * -1); width: calc(100% + var(--s-5) * 2); max-width: none; }
 
   /* Long unbroken values (tickers, currency strings) must wrap rather than push. */
   .hero__total, .row__value, .stat__value { overflow-wrap: anywhere; }
