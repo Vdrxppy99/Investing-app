@@ -5,10 +5,10 @@ const ACCOUNTS = { main:'Main Account', brok:'Brokerage' };
    hard way (a prior session STOPPED here rather than guess): the owner
    matched `main`/`brok` against his real Vanguard statements by exact share
    quantity, 2026-08-18 —
-     main → Vanguard acct 48186273, "Advised accounts"
-            (VOO 2.7455, VTI 28.4363, VXF 3.3408, VXUS 102.5996)
-     brok → Vanguard acct 71473189, "Self-managed accounts"
-            (VOO 1.0382, VXUS 2.6244, VYM 3.1760, BRK-B 10)
+     main → Vanguard "Advised accounts"
+     brok → Vanguard "Self-managed accounts"
+   (Account numbers and holdings deliberately not recorded here — this repo is
+   public. They live only in the owner's encrypted on-device vault.)
    A PARALLEL map, deliberately not a change to ACCOUNTS' own shape (string
    labels) — this app has no module system and one global scope, so widening
    ACCOUNTS' values from strings to objects risks silently breaking every
