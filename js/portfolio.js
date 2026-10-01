@@ -1034,9 +1034,7 @@ function openEdit(){
     const acc=$('buyAcc').value, sym=$('buySym').value.trim().toUpperCase().replace('.','-'),
           date=$('buyDate').value, qty=+$('buyQty').value, cost=+$('buyCost').value, div=$('buyDiv').checked;
     if(!sym || !date || !(qty>0) || !(cost>0)){ toast('Fill in ticker, date, shares and total cost first.', true); return; }
-    state.lots.push(div ? {acc,sym,date,qty,cost,div:true} : {acc,sym,date,qty,cost});
-    const h=state.holdings.find(x=>x.acc===acc && x.sym===sym);
-    if(h){ h.qty+=qty; h.cost+=cost; } else state.holdings.push({acc,sym,qty,cost});
+    applyLot({acc,sym,date,qty,cost,div});
     if(!div) state.deposits=(+state.deposits||0)+cost; // new money in — adjust in the field below if it came from existing cash
     markConfirmed(); persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
   };
@@ -1230,11 +1228,44 @@ function exportBackup(){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
 }
+/* One purchase lot into state — the lot list AND the running per-account holding,
+   exactly as the manual "Add" row has always done it. Deposits are the caller's call. */
+function applyLot({acc,sym,date,qty,cost,div}){
+  state.lots.push(div ? {acc,sym,date,qty,cost,div:true} : {acc,sym,date,qty,cost});
+  const h=state.holdings.find(x=>x.acc===acc && x.sym===sym);
+  if(h){ h.qty+=qty; h.cost+=cost; } else state.holdings.push({acc,sym,qty,cost});
+}
+/* An "add these purchases" file, as opposed to a full backup: { kind:'add-lots',
+   lots:[{acc,sym,date,qty,cost,div?}], deposits?:<new money in> }. Appends instead of
+   replacing, so it can be prepared off-device without a copy of the existing data.
+   A lot already present (same account, ticker, date and share count) is skipped, so
+   importing the same file twice — or one whose trades were also typed in by hand —
+   never double-counts; the deposit is only added if at least one new-money lot was new. */
+function importAddLots(d){
+  const valid=l=> l && ACCOUNTS[l.acc] && typeof l.sym==='string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && +l.qty>0 && +l.cost>0;
+  if(!Array.isArray(d.lots) || !d.lots.every(valid)) throw new Error('bad');
+  const same=(a,b)=> a.acc===b.acc && a.sym===b.sym && a.date===b.date && Math.abs(a.qty-b.qty)<1e-6;
+  let added=0, skipped=0, newMoney=false;
+  for(const raw of d.lots){
+    const l={acc:raw.acc, sym:raw.sym.trim().toUpperCase().replace('.','-'), date:raw.date, qty:+raw.qty, cost:+raw.cost, div:!!raw.div};
+    if(state.lots.some(x=>same(x,l))){ skipped++; continue; }
+    applyLot(l); added++; if(!l.div) newMoney=true;
+  }
+  if(newMoney && +d.deposits>0) state.deposits=(+state.deposits||0)+(+d.deposits);
+  if(added) markConfirmed();
+  return {added, skipped};
+}
 function importBackup(file){
   const r=new FileReader();
   r.onload=()=>{
     try{
       const d=JSON.parse(r.result);
+      if(d && d.kind==='add-lots'){
+        const {added, skipped}=importAddLots(d);
+        persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
+        toast(added ? `Added ${added} purchase${added>1?'s':''}`+(skipped?` (${skipped} already there, skipped).`:'.') : 'Nothing new — every purchase in that file is already recorded.');
+        return;
+      }
       if(!d || !Array.isArray(d.holdings)) throw new Error('bad');
       state.holdings=d.holdings; state.lots=Array.isArray(d.lots)?d.lots:[];
       state.cash=d.cash||{main:0,brok:0}; state.deposits=+d.deposits||0;
