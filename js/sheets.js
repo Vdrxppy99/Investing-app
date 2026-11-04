@@ -92,11 +92,10 @@ async function openStockSheet(sym, name){
   $('detailSheetHead').innerHTML = `<div class="sheet__idrow">${badgeHtml(sym)}<div class="sheet__idcol">
       <h2 class="hsym sheet__title">${esc(sym.replace('-','.'))}</h2>
       <div class="sheet__sub">${esc(name||'')}</div>
-      <div id="ssPrice" class="sheet__price">${q?fmtP(q.price):'…'}</div>
+      <div id="ssPrice" class="sheet__price"><span id="sheetPxNum">${q?fmtP(q.price):'…'}</span></div>
     </div></div><div class="sheet__headbtns"><button class="xbtn" id="watchBtn" aria-label="Toggle watchlist"></button><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>`;
   $('detailSheetBody').innerHTML = `
-    <div class="chart-box chart-box--sheet"><div id="detailChart"></div><div id="detailMsg" class="chart-box__msg">Loading chart…</div></div>
-    <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
+    ${sheetChartHtml()}
     <div class="stats" id="ssStats"></div>`;
   showOverlay('detail');
   $('detailX').onclick=closeDetail;
@@ -113,7 +112,8 @@ async function openStockSheet(sym, name){
     if(!$('page-following').classList.contains('hidden')) renderFollowing();
   };
   paintWatch();
-  if(detailChart){ detailChart.destroy(); detailChart=null; }
+  sheetRange=SHEET_RANGES.includes(state.view.range)?state.view.range:'1M';
+  wireSheetRange(sym); renderSheetChart(sym);
   try{
     let d=stockCache[sym];
     if(!d || Date.now()-d.ts>10*60000){
@@ -123,9 +123,7 @@ async function openStockSheet(sym, name){
     if(!$('ssPrice')) return; // sheet was closed or replaced meanwhile
     const closes=[], labels=[];
     d.t.forEach((t,k)=>{ const ds=dayStr(t); if(d.c[k]==null || (labels.length&&ds<=labels[labels.length-1])) return; labels.push(ds); closes.push(d.c[k]); });
-    $('ssPrice').innerHTML = `${fmtP(d.price)} <span style="font-size:14px" class="${cls(d.price-d.prev)}">${fmtPct(d.prev>0?(d.price/d.prev-1)*100:0)} today</span>`;
-    if(!$('detailChart')) return; // sheet closed or replaced meanwhile
-    detailChart=drawSheetChart('detailChart', labels.slice(), labels, closes, $('detailMsg'), 'detailRO');
+    $('ssPrice').innerHTML = `<span id="sheetPxNum">${fmtP(d.price)}</span> <span style="font-size:14px" class="${cls(d.price-d.prev)}">${fmtPct(d.prev>0?(d.price/d.prev-1)*100:0)} today</span>`;
     const hi=Math.max(...closes), lo=Math.min(...closes);
     const nCloses = closes.length;
     const sma50 = nCloses>=50 ? closes.slice(-50).reduce((a,b)=>a+b,0)/50 : null;
@@ -140,7 +138,7 @@ async function openStockSheet(sym, name){
       <div class="stat"><div class="k">200-Day SMA</div><div class="v">${sma200?fmtP(sma200):'—'}</div></div>
       <div class="stat"><div class="k">1Y change</div><div class="v ${cls(d.price-closes[0])}">${fmtPct(closes[0]>0?(d.price/closes[0]-1)*100:0)}</div></div>
       <div class="stat"><div class="k">Trend Signal</div><div class="v ${sigClass}" style="font-size:12px">${signal}</div></div>`;
-  }catch(e){ if($('detailMsg')) $('detailMsg').textContent='Couldn’t load the chart — check your connection.'; }
+  }catch(e){ /* stats only — the chart reports its own load failure */ }
 }
 function openTaxSheet(){
   const YR=31557600000, now=Date.now();

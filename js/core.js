@@ -114,7 +114,7 @@ function badge(sym){ return esc(sym.split('-')[0].slice(0,4)); }
 /* .blogo load/error is wired via the capture-phase listeners below, not inline
    onload/onerror attributes — those are blocked under a script-src CSP with no
    'unsafe-inline', even when the markup is assembled in JS rather than HTML. */
-document.addEventListener('load', e=>{ if(e.target.classList && e.target.classList.contains('blogo')) e.target.classList.add('on'); }, true);
+document.addEventListener('load', e=>{ const t=e.target; if(t.classList && t.classList.contains('blogo')){ t.classList.add('on'); if(t.parentNode) t.parentNode.classList.add('logo-on'); } }, true); // logo-on hides the monogram so it can't show through/behind the logo
 document.addEventListener('error', e=>{
   const t=e.target; if(!(t.classList && t.classList.contains('blogo'))) return;
   const fb=t.dataset.fb; // one fallback hop (favicon), then give up and leave the letter tile

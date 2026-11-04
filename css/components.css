@@ -1272,6 +1272,8 @@
      matching the actual markup: .blogo IS the img. */
   .blogo { opacity: 0; transition: opacity var(--dur-micro) var(--ease-out); }
   .blogo.on { opacity: 1; }
+  /* once a real logo has loaded the letters are redundant — hide them so the two never overlap */
+  .badge.logo-on { color: transparent; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1804,7 +1806,8 @@
   .sheet__sub { color: var(--text-muted); font-size: var(--t-caption); margin-top: var(--s-1); }
   .sheet__price { font-size: var(--t-title); font-weight: var(--w-bold); margin-top: var(--s-2); }
   .sheet__headbtns { display: flex; gap: var(--s-2); align-items: flex-start; }
-  .chart-box--sheet { height: 180px; }
+  .chart-box--sheet { height: 220px; }
+  .seg--sheet { margin-block: var(--s-3); overflow-x: auto; max-width: 100%; }
   .chart-box--sheet #detailChart { position: absolute; inset: 0; }
   /* Phase 6 goal fan chart — Lightweight Charts (js/app.js drawGoalFan()), same
      "size the plain mount div via ResizeObserver, don't force it" contract as

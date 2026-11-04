@@ -613,7 +613,7 @@ function niceLbl(l){ return /^\d{4}-\d{2}-\d{2}$/.test(l) ? new Date(l+'T12:00:0
    behaviour as the hero chart (crosshair + live readout), replacing the old Chart.js canvas.
    times: 'YYYY-MM-DD' strings (daily) or UTCTimestamp seconds (intraday), strictly ascending.
    Returns {destroy()} so every existing detailChart.destroy() call site keeps working. */
-function drawSheetChart(elId, times, labels, data, msgEl, roId){
+function drawSheetChart(elId, times, labels, data, msgEl, onScrub){
   const el=$(elId), LC=window.LightweightCharts;
   if(!el) return null;
   if(!LC){ if(msgEl) msgEl.textContent='Chart library unavailable.'; return null; }
@@ -647,19 +647,85 @@ function drawSheetChart(elId, times, labels, data, msgEl, roId){
     priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'custom',formatter:priceFormatter,minMove:0.01}});
   series.setData(times.map((t,i)=>({time:t,value:data[i]})));
   chart.timeScale().setVisibleLogicalRange({from:0,to:times.length-1});
-  const readout=roId?$(roId):null, hint=readout?readout.textContent:'';
-  const readoutAt=i=>{ if(!readout) return;
-    if(i==null){ readout.textContent=hint; return; }
-    const v=data[i], d0=data[0];
-    readout.textContent=`${niceLbl(labels[i])} · ${fmtPx(v)}${d0>0?` · ${fmtPct((v/d0-1)*100)} over range`:''}`; };
   let scrubbing=false, last=null;
   const idx=e=>{ const l=chart.timeScale().coordinateToLogical(e.clientX-el.getBoundingClientRect().left);
     return l==null?null:Math.max(0,Math.min(times.length-1,Math.round(l))); };
-  const move=e=>{ const i=idx(e); if(i==null||i===last) return; last=i; chart.setCrosshairPosition(data[i],times[i],series); readoutAt(i); };
+  const move=e=>{ const i=idx(e); if(i==null||i===last) return; last=i; chart.setCrosshairPosition(data[i],times[i],series); if(onScrub) onScrub(i); };
   el.onpointerdown=e=>{ try{el.setPointerCapture(e.pointerId);}catch(x){} scrubbing=true; move(e); };
   el.onpointermove=e=>{ if(scrubbing) move(e); };
-  el.onpointerup=el.onpointercancel=()=>{ if(!scrubbing) return; scrubbing=false; last=null; chart.clearCrosshairPosition(); readoutAt(null); };
+  el.onpointerup=el.onpointercancel=()=>{ if(!scrubbing) return; scrubbing=false; last=null; chart.clearCrosshairPosition(); if(onScrub) onScrub(null); };
   return {destroy(){ ro.disconnect(); el.onpointerdown=el.onpointermove=el.onpointerup=el.onpointercancel=null; try{chart.remove();}catch(x){} }};
+}
+/* Shared range-switchable chart for the holding sheet AND the stock sheet — same
+   Lightweight Charts engine, range chips, header-price scrub and delta readout as the
+   Portfolio hero. Series: your cached 10y history (or a fetched one for stocks you don't own);
+   1D uses intraday bars. */
+let sheetRange='1M', sheetSeq=0;
+const SHEET_RANGES=['1D','1W','1M','6M','YTD','1Y','5Y','MAX'];
+function sheetChartHtml(){
+  return `<div class="chart__readout" id="detailRO"></div>
+    <div class="chart-box chart-box--sheet"><div id="detailChart"></div><div id="detailMsg" class="chart-box__msg"></div></div>
+    <div class="seg seg--sheet" id="detailRange" role="tablist" aria-label="Range">${SHEET_RANGES.map(r=>
+      `<button class="seg__item" data-r="${r}" role="tab" aria-selected="${r===sheetRange}">${r==='MAX'?'Max':r}</button>`).join('')}</div>`;
+}
+async function sheetSeries(sym, range){
+  const intra = range==='1D';
+  let t, c;
+  if(intra){
+    const ih=state.intraday[sym];
+    if(ih && ih.t && ih.t.length>1){ t=ih.t; c=ih.c; }
+    else { const k=sym+'|1d'; let d=stockCache[k];
+      if(!d || Date.now()-d.ts>5*60000){ d=parseYahoo(await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m`,true)); d.ts=Date.now(); stockCache[k]=d; }
+      t=d.t; c=d.c; }
+  } else {
+    const h=state.history[sym];
+    if(h && h.t && h.t.length>5){ t=h.t; c=h.c; }
+    else { const k=sym+'|10y'; let d=stockCache[k];
+      if(!d || Date.now()-d.ts>10*60000){ d=parseYahoo(await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=10y&interval=1d`,true)); d.ts=Date.now(); stockCache[k]=d; }
+      t=d.t; c=d.c; }
+  }
+  const times=[], labels=[], closes=[];
+  if(intra){
+    for(let i=0;i<t.length;i++){ const ts=Math.floor(t[i]/1000); if(c[i]==null||(times.length&&ts<=times[times.length-1])) continue;
+      times.push(ts); labels.push(new Date(t[i]).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); closes.push(c[i]); }
+  } else {
+    const cut=rangeCutoff(range);
+    const all=[]; for(let i=0;i<t.length;i++){ if(c[i]==null) continue; const d=dayStr(t[i]); if(all.length&&d<=all[all.length-1][0]) continue; all.push([d,c[i]]); }
+    // same fallback as sliceRange(): cached history that ends before the window starts (offline, stale) shows everything we have rather than nothing
+    let k=all.findIndex(x=>x[0]>=cut); if(k<0||all.length-k<2) k=0;
+    for(const [d,v] of all.slice(k)){ labels.push(d); closes.push(v); }
+    const live=state.quotes[sym] && state.quotes[sym].price, today=dayStr(Date.now());
+    if(live>0){ if(labels.length&&labels[labels.length-1]===today) closes[closes.length-1]=live; else if(!labels.length||today>labels[labels.length-1]){ labels.push(today); closes.push(live); } }
+    times.push(...labels);
+  }
+  return {times, labels, closes};
+}
+async function renderSheetChart(sym){
+  const seq=++sheetSeq;
+  if(detailChart){ detailChart.destroy(); detailChart=null; }
+  const ro=$('detailRO'), msg=$('detailMsg'); if(!$('detailChart')) return;
+  if(ro) ro.innerHTML=''; if(msg) msg.textContent='Loading chart…';
+  let sr=null;
+  try{ sr=await sheetSeries(sym, sheetRange); }catch(e){ sr=undefined; }
+  if(seq!==sheetSeq || !$('detailChart')) return; // sheet closed, replaced or range changed meanwhile
+  if(sr===undefined){ $('detailMsg').textContent='Couldn’t load the chart — check your connection.'; return; }
+  const {times,labels,closes}=sr; let pxHome=null;
+  const sgn=v=>(v>=0?'+':'−')+fmtPx(Math.abs(v));
+  const readout=(i,withDate)=>{
+    const j=i==null?closes.length-1:i, d0=closes[0], diff=closes[j]-d0, pct=d0>0?` (${fmtPct((closes[j]/d0-1)*100)})`:'';
+    $('detailRO').innerHTML=`<span class="${cls(diff)}">${sgn(diff)}${pct}</span> <span class="rng">· ${withDate?niceLbl(labels[j]):sheetRange}</span>`; };
+  detailChart=drawSheetChart('detailChart', times, labels, closes, $('detailMsg'), i=>{
+    const pxEl=$('sheetPxNum'); // looked up live: the stock sheet re-renders its price when quotes land
+    if(pxEl){ if(pxHome==null) pxHome=pxEl.textContent; pxEl.textContent = i==null ? pxHome : fmtPx(closes[i]); if(i==null) pxHome=null; }
+    readout(i, i!=null); });
+  if(detailChart) readout(null,false);
+}
+function wireSheetRange(sym){
+  const seg=$('detailRange'); if(!seg) return;
+  seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    sheetRange=b.dataset.r;
+    seg.querySelectorAll('button').forEach(x=>x.setAttribute('aria-selected', String(x===b)));
+    renderSheetChart(sym); });
 }
 function drawChart(canvasId, labels, data, msgEl, bench, markers){
   if(!window.Chart){ if(msgEl) msgEl.textContent='Connect to the internet once to load the chart library.'; return null; }
@@ -941,11 +1007,10 @@ function openDetail(sym){
   $('detailSheetHead').innerHTML = `<div class="sheet__idrow">${badgeHtml(sym)}<div class="sheet__idcol">
       <h2 class="hsym sheet__title">${esc(sym.replace('-','.'))}</h2>
       <div class="sheet__sub">${esc(NAMES[sym]||'')}</div>
-      <div class="sheet__price">${fmtPx(p)} <span class="t-label ${cls(dp)}">${fmtPct(dp)} today</span></div>
+      <div class="sheet__price"><span id="sheetPxNum">${fmtPx(p)}</span> <span class="t-label ${cls(dp)}">${fmtPct(dp)} today</span></div>
     </div></div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `
-    <div class="chart-box chart-box--sheet"><div id="detailChart"></div><div id="detailMsg" class="chart-box__msg"></div></div>
-    <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
+    ${sheetChartHtml()}
     <div class="stats">
       <div class="stat"><div class="k">Shares</div><div class="v">${r.qty.toFixed(3).replace(/\.?0+$/,'')}</div></div>
       <div class="stat"><div class="k">Avg cost</div><div class="v">${fmtPx(r.cost/r.qty)}</div></div>
@@ -990,21 +1055,8 @@ function openDetail(sym){
     if(typeof pushSyncNow==='function') pushSyncNow();
     openDetail(sym);
   };
-  if(detailChart){ detailChart.destroy(); detailChart=null; }
-  const h=state.history[sym];
-  const ih=state.intraday[sym];
-  if(state.view.range==='1D' && ih && ih.t && ih.t.length>1){
-    const labels=[], closes=[], times=[];
-    for(let i=0;i<ih.t.length;i++){ const ts=Math.floor(ih.t[i]/1000); if(ih.c[i]==null || (times.length&&ts<=times[times.length-1])) continue; times.push(ts); labels.push(new Date(ih.t[i]).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); closes.push(ih.c[i]); }
-    detailChart = drawSheetChart('detailChart', times, labels, closes, $('detailMsg'), 'detailRO');
-  } else if(h && h.t && h.t.length>1){
-    const cut=rangeCutoff(state.view.range==='1D' ? '1W' : state.view.range);
-    const labels=[], closes=[];
-    for(let i=0;i<h.t.length;i++){ if(h.c[i]==null) continue; const d=dayStr(h.t[i]); if(d>=cut){ labels.push(d); closes.push(h.c[i]); } }
-    const today=dayStr(Date.now());
-    if(labels.length && labels[labels.length-1]===today) closes[closes.length-1]=p; else { labels.push(today); closes.push(p); }
-    detailChart = drawSheetChart('detailChart', labels.slice(), labels, closes, $('detailMsg'), 'detailRO');
-  } else if($('detailMsg')) $('detailMsg').textContent='Price chart appears after the first online update.';
+  if(!state.view.range || !SHEET_RANGES.includes(state.view.range)) sheetRange='1M'; else sheetRange=state.view.range;
+  wireSheetRange(sym); renderSheetChart(sym);
 }
 function closeDetail(){ hideOverlay('detail'); setTimeout(()=>{ if(detailChart && $('detail').classList.contains('hidden')){ detailChart.destroy(); detailChart=null; } }, 200); }
 $('detail').addEventListener('click', e=>{ if(e.target.id==='detail') closeDetail(); });

@@ -44,14 +44,18 @@ test('holding sheet chart does not depend on Chart.js being reachable offline, a
   await page.locator('.hrow').first().click();
   await expect(page.locator('#detailChart canvas').first()).toBeVisible();
   const ro = page.locator('#detailRO');
+  await expect(ro).toContainText('1M');
   const hint = await ro.textContent();
   const box = await page.locator('#detailChart').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2);
-  await expect(ro).not.toHaveText(hint);
+  await expect(ro).not.toHaveText(hint); // scrubbing swaps the range label for the hovered date
   await page.mouse.up();
   await expect(ro).toHaveText(hint);
+  await page.locator('#detailRange button[data-r="1Y"]').click();
+  await expect(page.locator('#detailRange button[data-r="1Y"]')).toHaveAttribute('aria-selected','true');
+  await expect(ro).toContainText('1Y');
   await expect(page.locator('.stats').first()).toBeVisible();
   expect(errors, `uncaught page errors:\n${errors.join('\n')}`).toEqual([]);
 });
