@@ -727,7 +727,7 @@ async function renderSheetChart(sym){
   const ro=$('detailRO'), msg=$('detailMsg'); if(!$('detailChart')) return;
   if(ro) ro.innerHTML=''; if(msg) msg.textContent='Loading chart…';
   let sr=null;
-  try{ sr=await sheetSeries(sym, sheetRange); }catch(e){ sr=undefined; console.error(e); }
+  try{ sr=await sheetSeries(sym, sheetRange); }catch(e){ sr=undefined; console.warn(e); }
   if(seq!==sheetSeq || !$('detailChart')) return; // sheet closed, replaced or range changed meanwhile
   if(sr===undefined){ $('detailMsg').textContent='Couldn’t load the chart — no saved or live price history for '+sym.replace('-','.')+'.'; return; }
   try{

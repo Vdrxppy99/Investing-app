@@ -8,7 +8,7 @@ GitHub Pages: https://vdrxppy99.github.io/Investing-app/
 
 Everything personal — holdings, lots, cash, goals — lives encrypted in the
 browser's `localStorage`. Nothing is sent anywhere except live-price lookups
-(by ticker only) and, optionally, an encrypted backup to the project's own
+(by ticker only), company-logo lookups (by ticker, to assets.parqet.com, with Google's favicon service as fallback) and, optionally, an encrypted backup to the project's own
 Cloudflare Worker.
 
 ## Tabs
