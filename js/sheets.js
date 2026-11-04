@@ -95,7 +95,7 @@ async function openStockSheet(sym, name){
       <div id="ssPrice" class="sheet__price">${q?fmtP(q.price):'…'}</div>
     </div></div><div class="sheet__headbtns"><button class="xbtn" id="watchBtn" aria-label="Toggle watchlist"></button><button class="xbtn" id="detailX" aria-label="Close">✕</button></div>`;
   $('detailSheetBody').innerHTML = `
-    <div class="chart-box chart-box--sheet"><canvas id="detailChart"></canvas><div id="detailMsg" class="chart-box__msg">Loading chart…</div></div>
+    <div class="chart-box chart-box--sheet"><div id="detailChart"></div><div id="detailMsg" class="chart-box__msg">Loading chart…</div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats" id="ssStats"></div>`;
   showOverlay('detail');
@@ -121,12 +121,11 @@ async function openStockSheet(sym, name){
       d=parseYahoo(j); d.ts=Date.now(); stockCache[sym]=d;
     }
     if(!$('ssPrice')) return; // sheet was closed or replaced meanwhile
-    const closes=d.c, labels=d.t.map(dayStr);
+    const closes=[], labels=[];
+    d.t.forEach((t,k)=>{ const ds=dayStr(t); if(d.c[k]==null || (labels.length&&ds<=labels[labels.length-1])) return; labels.push(ds); closes.push(d.c[k]); });
     $('ssPrice').innerHTML = `${fmtP(d.price)} <span style="font-size:14px" class="${cls(d.price-d.prev)}">${fmtPct(d.prev>0?(d.price/d.prev-1)*100:0)} today</span>`;
-    await ensureChartJs().catch(()=>{});
-    if(!$('detailChart')) return; // sheet closed or replaced while Chart.js was loading
-    detailChart=drawChart('detailChart', labels, closes, $('detailMsg'));
-    wireDetailScrub(detailChart, labels, closes, 'detailRO');
+    if(!$('detailChart')) return; // sheet closed or replaced meanwhile
+    detailChart=drawSheetChart('detailChart', labels.slice(), labels, closes, $('detailMsg'), 'detailRO');
     const hi=Math.max(...closes), lo=Math.min(...closes);
     const nCloses = closes.length;
     const sma50 = nCloses>=50 ? closes.slice(-50).reduce((a,b)=>a+b,0)/50 : null;

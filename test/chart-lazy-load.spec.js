@@ -23,40 +23,35 @@ test('Chart.js is not loaded until a chart-needing sheet actually opens', async 
   expect(loadedOnPortfolioTab).toBe(false); // hero chart is Lightweight Charts, not Chart.js
 });
 
-test('opening a holding sheet lazy-loads Chart.js and draws the chart', async ({ page }) => {
+test('holding sheet draws a Lightweight Charts chart (same engine as the hero) without loading Chart.js', async ({ page }) => {
   await unlockDemo(page);
   await page.locator('.tabbar__item[data-page="portfolio"]').click();
   await page.locator('.hrow').first().click();
-  await expect.poll(() => page.evaluate(() => typeof window.Chart !== 'undefined'), {
-    message: 'Chart.js never loaded after opening a holding sheet',
-  }).toBe(true);
-  const isPainted = () => page.evaluate(() => {
-    const c = document.getElementById('detailChart');
-    if (!c || !c.width || !c.height) return false;
-    const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
-    for (let i = 3; i < px.length; i += 4) if (px[i] !== 0) return true;
-    return false;
+  const painted = () => page.evaluate(() => {
+    const c = document.querySelector('#detailChart canvas');
+    return !!(c && c.width && c.height);
   });
-  await expect.poll(isPainted, 'detail chart canvas never painted').toBe(true);
+  await expect.poll(painted, 'detail chart never rendered').toBe(true);
+  expect(await page.evaluate(() => typeof window.Chart !== 'undefined')).toBe(false);
 });
 
-test('cold offline first use: Chart.js unavailable (never cached) fails gracefully, no crash', async ({ page }) => {
+test('holding sheet chart does not depend on Chart.js being reachable offline, and scrubbing updates the readout', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  // Simulates the exact scenario the task calls out: first-ever chart open, offline,
-  // nothing runtime-cached yet — block only the vendor file the lazy-loader fetches,
-  // not the whole origin, so the rest of the app loads normally.
   await page.route('**/vendor/chart.umd.min.js', (route) => route.abort('internetdisconnected'));
   await unlockDemo(page);
   await page.locator('.tabbar__item[data-page="portfolio"]').click();
   await page.locator('.hrow').first().click();
-  await page.waitForTimeout(500);
-  // The exact fallback text js/portfolio.js's drawChart() already shows for
-  // "Chart.js unavailable" — proves the failure path is the pre-existing,
-  // designed-for one, not a new unhandled state.
-  await expect(page.locator('#detailMsg')).toHaveText('Connect to the internet once to load the chart library.');
-  // The sheet's non-chart content (price, stats) must still work — a missing
-  // chart library isn't allowed to take the rest of the sheet down with it.
-  await expect(page.locator('#ssStats, .stats').first()).toBeVisible();
+  await expect(page.locator('#detailChart canvas').first()).toBeVisible();
+  const ro = page.locator('#detailRO');
+  const hint = await ro.textContent();
+  const box = await page.locator('#detailChart').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 20, box.y + box.height / 2);
+  await expect(ro).not.toHaveText(hint);
+  await page.mouse.up();
+  await expect(ro).toHaveText(hint);
+  await expect(page.locator('.stats').first()).toBeVisible();
   expect(errors, `uncaught page errors:\n${errors.join('\n')}`).toEqual([]);
 });

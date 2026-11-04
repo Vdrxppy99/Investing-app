@@ -1805,6 +1805,7 @@
   .sheet__price { font-size: var(--t-title); font-weight: var(--w-bold); margin-top: var(--s-2); }
   .sheet__headbtns { display: flex; gap: var(--s-2); align-items: flex-start; }
   .chart-box--sheet { height: 180px; }
+  .chart-box--sheet #detailChart { position: absolute; inset: 0; }
   /* Phase 6 goal fan chart — Lightweight Charts (js/app.js drawGoalFan()), same
      "size the plain mount div via ResizeObserver, don't force it" contract as
      .chart #mainChart above; must NOT get width/height:100% !important like the

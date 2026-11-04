@@ -609,14 +609,57 @@ function attachScrubAny(c, onMove){ // onMove(i) with index, onMove(null) when r
   };
 }
 function niceLbl(l){ return /^\d{4}-\d{2}-\d{2}$/.test(l) ? new Date(l+'T12:00:00').toLocaleDateString(appLocale(),{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : l; }
-function wireDetailScrub(c, labels, closes, roId){ // price readout for holding/stock sheets
-  const ro=$(roId); if(!ro||!c) return;
-  const hint=ro.textContent;
-  attachScrubAny(c, i=>{
-    if(i==null){ ro.textContent=hint; return; }
-    const v=closes[i], d0=closes[0];
-    ro.textContent=`${niceLbl(labels[i])} · ${fmtPx(v)}${d0>0?` · ${fmtPct((v/d0-1)*100)} over range`:''}`;
+/* Holding / stock sheet chart — Lightweight Charts, same look and the same drag-to-scrub
+   behaviour as the hero chart (crosshair + live readout), replacing the old Chart.js canvas.
+   times: 'YYYY-MM-DD' strings (daily) or UTCTimestamp seconds (intraday), strictly ascending.
+   Returns {destroy()} so every existing detailChart.destroy() call site keeps working. */
+function drawSheetChart(elId, times, labels, data, msgEl, roId){
+  const el=$(elId), LC=window.LightweightCharts;
+  if(!el) return null;
+  if(!LC){ if(msgEl) msgEl.textContent='Chart library unavailable.'; return null; }
+  if(msgEl) msgEl.textContent = labels.length<2 ? 'Chart appears after the first online price update.' : '';
+  el.innerHTML='';
+  if(labels.length<2) return null;
+  const up=data[data.length-1]>=data[0], chg=data[0]?(data[data.length-1]/data[0]-1)*100:0;
+  el.setAttribute('role','img');
+  el.setAttribute('aria-label',`Price chart, ${labels.length} points, ${up?'up':'down'} ${Math.abs(chg).toFixed(1)}% over the period.`);
+  const brand=cvar('--brand'), brandRgb=cvar('--brand-rgb'), mut=cvar('--mut'), grid=cvar('--grid'), card=cvar('--card'), faint=cvar('--faint');
+  const priceFormatter=v=>new Intl.NumberFormat(appLocale(),{style:'currency',currency:state.view.ccy,notation:'compact'}).format(v*rate());
+  const box=el.getBoundingClientRect();
+  const chart=LC.createChart(el,{
+    width:Math.max(box.width,1), height:Math.max(box.height,1),
+    layout:{background:{type:LC.ColorType.Solid,color:'transparent'},textColor:mut,fontFamily:"'Inter',-apple-system,BlinkMacSystemFont,sans-serif",fontSize:10,attributionLogo:false},
+    grid:{vertLines:{visible:false},horzLines:{color:grid}},
+    rightPriceScale:{visible:true,borderVisible:false,scaleMargins:{top:0.12,bottom:0.06}},
+    leftPriceScale:{visible:false},
+    timeScale:{visible:false,borderVisible:false,fixLeftEdge:true,fixRightEdge:true,rightOffset:0},
+    crosshair:{mode:LC.CrosshairMode.Normal,
+      vertLine:{color:faint,width:1,style:LC.LineStyle.Dashed,labelVisible:false},
+      horzLine:{visible:false,labelVisible:false}},
+    handleScroll:false, handleScale:false, localization:{priceFormatter},
   });
+  const ro=new ResizeObserver(en=>{ const b=en[0]&&en[0].contentRect; if(b&&b.width>0&&b.height>0) chart.resize(b.width,b.height); });
+  ro.observe(el);
+  el.style.touchAction='pan-y';
+  const series=chart.addSeries(LC.AreaSeries,{
+    lineColor:brand,lineWidth:2,topColor:`rgba(${brandRgb},.26)`,bottomColor:`rgba(${brandRgb},0)`,
+    crosshairMarkerVisible:true,crosshairMarkerRadius:4.5,crosshairMarkerBackgroundColor:brand,crosshairMarkerBorderColor:card,crosshairMarkerBorderWidth:1.5,
+    priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'custom',formatter:priceFormatter,minMove:0.01}});
+  series.setData(times.map((t,i)=>({time:t,value:data[i]})));
+  chart.timeScale().setVisibleLogicalRange({from:0,to:times.length-1});
+  const readout=roId?$(roId):null, hint=readout?readout.textContent:'';
+  const readoutAt=i=>{ if(!readout) return;
+    if(i==null){ readout.textContent=hint; return; }
+    const v=data[i], d0=data[0];
+    readout.textContent=`${niceLbl(labels[i])} · ${fmtPx(v)}${d0>0?` · ${fmtPct((v/d0-1)*100)} over range`:''}`; };
+  let scrubbing=false, last=null;
+  const idx=e=>{ const l=chart.timeScale().coordinateToLogical(e.clientX-el.getBoundingClientRect().left);
+    return l==null?null:Math.max(0,Math.min(times.length-1,Math.round(l))); };
+  const move=e=>{ const i=idx(e); if(i==null||i===last) return; last=i; chart.setCrosshairPosition(data[i],times[i],series); readoutAt(i); };
+  el.onpointerdown=e=>{ try{el.setPointerCapture(e.pointerId);}catch(x){} scrubbing=true; move(e); };
+  el.onpointermove=e=>{ if(scrubbing) move(e); };
+  el.onpointerup=el.onpointercancel=()=>{ if(!scrubbing) return; scrubbing=false; last=null; chart.clearCrosshairPosition(); readoutAt(null); };
+  return {destroy(){ ro.disconnect(); el.onpointerdown=el.onpointermove=el.onpointerup=el.onpointercancel=null; try{chart.remove();}catch(x){} }};
 }
 function drawChart(canvasId, labels, data, msgEl, bench, markers){
   if(!window.Chart){ if(msgEl) msgEl.textContent='Connect to the internet once to load the chart library.'; return null; }
@@ -901,7 +944,7 @@ function openDetail(sym){
       <div class="sheet__price">${fmtPx(p)} <span class="t-label ${cls(dp)}">${fmtPct(dp)} today</span></div>
     </div></div><button class="xbtn" id="detailX" aria-label="Close">✕</button>`;
   $('detailSheetBody').innerHTML = `
-    <div class="chart-box chart-box--sheet"><canvas id="detailChart"></canvas><div id="detailMsg" class="chart-box__msg"></div></div>
+    <div class="chart-box chart-box--sheet"><div id="detailChart"></div><div id="detailMsg" class="chart-box__msg"></div></div>
     <div class="scrubro" id="detailRO">↔ drag the chart to see any date's price</div>
     <div class="stats">
       <div class="stat"><div class="k">Shares</div><div class="v">${r.qty.toFixed(3).replace(/\.?0+$/,'')}</div></div>
@@ -951,24 +994,16 @@ function openDetail(sym){
   const h=state.history[sym];
   const ih=state.intraday[sym];
   if(state.view.range==='1D' && ih && ih.t && ih.t.length>1){
-    const labels=[], closes=[];
-    for(let i=0;i<ih.t.length;i++) if(ih.c[i]!=null){ labels.push(new Date(ih.t[i]).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); closes.push(ih.c[i]); }
-    ensureChartJs().catch(()=>{}).then(()=>{
-      if(!$('detailChart')) return; // sheet closed or replaced while Chart.js was loading
-      detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
-      wireDetailScrub(detailChart, labels, closes, 'detailRO');
-    });
+    const labels=[], closes=[], times=[];
+    for(let i=0;i<ih.t.length;i++){ const ts=Math.floor(ih.t[i]/1000); if(ih.c[i]==null || (times.length&&ts<=times[times.length-1])) continue; times.push(ts); labels.push(new Date(ih.t[i]).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})); closes.push(ih.c[i]); }
+    detailChart = drawSheetChart('detailChart', times, labels, closes, $('detailMsg'), 'detailRO');
   } else if(h && h.t && h.t.length>1){
     const cut=rangeCutoff(state.view.range==='1D' ? '1W' : state.view.range);
     const labels=[], closes=[];
     for(let i=0;i<h.t.length;i++){ if(h.c[i]==null) continue; const d=dayStr(h.t[i]); if(d>=cut){ labels.push(d); closes.push(h.c[i]); } }
     const today=dayStr(Date.now());
     if(labels.length && labels[labels.length-1]===today) closes[closes.length-1]=p; else { labels.push(today); closes.push(p); }
-    ensureChartJs().catch(()=>{}).then(()=>{
-      if(!$('detailChart')) return; // sheet closed or replaced while Chart.js was loading
-      detailChart = drawChart('detailChart', labels, closes, $('detailMsg'));
-      wireDetailScrub(detailChart, labels, closes, 'detailRO');
-    });
+    detailChart = drawSheetChart('detailChart', labels.slice(), labels, closes, $('detailMsg'), 'detailRO');
   } else if($('detailMsg')) $('detailMsg').textContent='Price chart appears after the first online update.';
 }
 function closeDetail(){ hideOverlay('detail'); setTimeout(()=>{ if(detailChart && $('detail').classList.contains('hidden')){ detailChart.destroy(); detailChart=null; } }, 200); }
