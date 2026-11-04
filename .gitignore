@@ -22,3 +22,12 @@ playwright/.cache/
 
 # Xcode build products — regenerated every build, was bloating every diff
 native/build/
+
+# old dev/design scratch — kept locally, not published
+CLAUDE-CODE-PROMPTS.md
+MASTER_EXECUTION_PROMPT.md
+REDESIGN_PROMPT.md
+HANDOFF.md
+redesign/
+design/
+dev/
