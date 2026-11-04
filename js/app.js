@@ -4,6 +4,7 @@ function wirePTR(){
   const ptr=$('ptr'); const spin=ptr.querySelector('.btn__spin'); let startY=0, pulling=false, dist=0;
   const TH=72;
   window.addEventListener('touchstart', e=>{
+    if(e.target.closest && e.target.closest('#mainChart,#detailChart')) return; // a finger scrubbing a chart is not a pull
     if(window.scrollY>4 || state.fetching) return;
     startY=e.touches[0].clientY; pulling=true; dist=0;
     ptr.classList.add('dragging');
@@ -159,6 +160,7 @@ function wireSheetDrag(){
   document.addEventListener('touchstart', e=>{
     if(SHEET_DESKTOP_MQ.matches) return;
     const sh=e.target.closest('.sheet'); if(!sh) return;
+    if(e.target.closest('#detailChart')) return; // scrubbing the price chart must not drag the sheet
     body=sh.querySelector('.sheet__body');
     if(scrollTop()>2) return; // body isn't at its own top — this touch scrolls it, not the sheet
     sheet=sh; scrim=sh.closest('.scrim'); dragging=true;

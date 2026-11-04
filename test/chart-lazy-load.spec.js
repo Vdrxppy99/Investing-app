@@ -59,3 +59,27 @@ test('holding sheet chart does not depend on Chart.js being reachable offline, a
   await expect(page.locator('.stats').first()).toBeVisible();
   expect(errors, `uncaught page errors:\n${errors.join('\n')}`).toEqual([]);
 });
+
+test.describe('touch', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test('dragging a finger across the holding chart scrubs it and does not move the sheet', async ({ page }) => {
+    await unlockDemo(page);
+    await page.locator('.tabbar__item[data-page="portfolio"]').click();
+    await page.locator('.hrow').first().click();
+    const chart = page.locator('#detailChart canvas').first();
+    await expect(chart).toBeVisible();
+    const ro = page.locator('#detailRO');
+    const hint = await ro.textContent();
+    const b = await page.locator('#detailChart').boundingBox();
+    const cdp = await page.context().newCDPSession(page);
+    const pt = (x, y) => [{ x, y, id: 1 }];
+    const y0 = b.y + b.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(b.x + 60, y0) });
+    for (let i = 1; i <= 6; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(b.x + 60 + i * 30, y0 + i * 4) });
+    await expect(ro).not.toHaveText(hint);
+    const moved = await page.evaluate(() => document.querySelector('#detail .sheet').style.transform || '');
+    expect(moved, 'sheet must not follow a chart scrub').toBe('');
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(ro).toHaveText(hint);
+  });
+});
