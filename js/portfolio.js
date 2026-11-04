@@ -699,6 +699,7 @@ async function sheetSeries(sym, range){
     if(h && h.t && h.t.length>5){ t=h.t; c=h.c; }
     else { const d=await fetchDailyHistory(sym); t=d.t; c=d.c; }
   }
+  const build=(t,c)=>{
   const times=[], labels=[], closes=[];
   if(intra){
     for(let i=0;i<t.length;i++){ const ts=Math.floor(t[i]/1000); if(c[i]==null||(times.length&&ts<=times[times.length-1])) continue;
@@ -714,6 +715,11 @@ async function sheetSeries(sym, range){
     times.push(...labels);
   }
   return {times, labels, closes};
+  };
+  let out=build(t,c);
+  // your cached history can be empty/odd for one ticker (failed proxy, partial vault restore) — fall back to a live fetch before giving up
+  if(out.closes.length<2 && !intra){ const d=await fetchDailyHistory(sym); out=build(d.t,d.c); }
+  return out;
 }
 async function renderSheetChart(sym){
   const seq=++sheetSeq;
@@ -721,9 +727,10 @@ async function renderSheetChart(sym){
   const ro=$('detailRO'), msg=$('detailMsg'); if(!$('detailChart')) return;
   if(ro) ro.innerHTML=''; if(msg) msg.textContent='Loading chart…';
   let sr=null;
-  try{ sr=await sheetSeries(sym, sheetRange); }catch(e){ sr=undefined; }
+  try{ sr=await sheetSeries(sym, sheetRange); }catch(e){ sr=undefined; console.error(e); }
   if(seq!==sheetSeq || !$('detailChart')) return; // sheet closed, replaced or range changed meanwhile
-  if(sr===undefined){ $('detailMsg').textContent='Couldn’t load the chart — check your connection.'; return; }
+  if(sr===undefined){ $('detailMsg').textContent='Couldn’t load the chart — no saved or live price history for '+sym.replace('-','.')+'.'; return; }
+  try{
   const {times,labels,closes}=sr; let pxHome=null;
   const sgn=v=>(v>=0?'+':'−')+fmtPx(Math.abs(v));
   const readout=(i,withDate)=>{
@@ -734,6 +741,7 @@ async function renderSheetChart(sym){
     if(pxEl){ if(pxHome==null) pxHome=pxEl.textContent; pxEl.textContent = i==null ? pxHome : fmtPx(closes[i]); if(i==null) pxHome=null; }
     readout(i, i!=null); });
   if(detailChart) readout(null,false);
+  }catch(e){ if($('detailMsg')) $('detailMsg').textContent='Chart error: '+(e&&e.message||e); console.error(e); }
 }
 function wireSheetRange(sym){
   const seg=$('detailRange'); if(!seg) return;
