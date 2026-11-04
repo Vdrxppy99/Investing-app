@@ -129,7 +129,7 @@ function badgeHtml(sym, small){ // colored letter tile; a real company logo cros
   const parq=sym.startsWith('^')?'':`https://assets.parqet.com/logos/symbol/${encodeURIComponent(sym)}?format=png&size=128`;
   const src=direct||parq||fav;
   const fb=(src!==fav&&fav)?` data-fb="${fav}"`:'';
-  const logo=src?`<img class="blogo" src="${src}"${fb} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`:'';
+  const logo=src?`<img class="blogo" src="${src}"${fb} alt="" referrerpolicy="no-referrer">`:'';
   return `<div class="badge${small?' sm':''}" style="${bstyle(colorOf(sym))}">${badge(sym)}${logo}</div>`;
 }
 function bstyle(c){ return `background:linear-gradient(140deg,${c},color-mix(in srgb,${c} 55%,#000))`; }

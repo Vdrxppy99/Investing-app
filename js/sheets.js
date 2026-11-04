@@ -115,14 +115,10 @@ async function openStockSheet(sym, name){
   sheetRange=SHEET_RANGES.includes(state.view.range)?state.view.range:'1M';
   wireSheetRange(sym); renderSheetChart(sym);
   try{
-    let d=stockCache[sym];
-    if(!d || Date.now()-d.ts>10*60000){
-      const j=await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1y&interval=1d`,true);
-      d=parseYahoo(j); d.ts=Date.now(); stockCache[sym]=d;
-    }
+    const d=await fetchDailyHistory(sym);
     if(!$('ssPrice')) return; // sheet was closed or replaced meanwhile
-    const closes=[], labels=[];
-    d.t.forEach((t,k)=>{ const ds=dayStr(t); if(d.c[k]==null || (labels.length&&ds<=labels[labels.length-1])) return; labels.push(ds); closes.push(d.c[k]); });
+    const closes=[]; // trailing year for the 52w / SMA stats, whatever span the shared fetch returned
+    { const cut=dayStr(Date.now()-366*86400000); d.t.forEach((t,k)=>{ if(d.c[k]!=null && dayStr(t)>=cut) closes.push(d.c[k]); }); }
     $('ssPrice').innerHTML = `<span id="sheetPxNum">${fmtP(d.price)}</span> <span style="font-size:14px" class="${cls(d.price-d.prev)}">${fmtPct(d.prev>0?(d.price/d.prev-1)*100:0)} today</span>`;
     const hi=Math.max(...closes), lo=Math.min(...closes);
     const nCloses = closes.length;

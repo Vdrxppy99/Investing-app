@@ -668,6 +668,23 @@ function sheetChartHtml(){
     <div class="seg seg--sheet" id="detailRange" role="tablist" aria-label="Range">${SHEET_RANGES.map(r=>
       `<button class="seg__item" data-r="${r}" role="tab" aria-selected="${r===sheetRange}">${r==='MAX'?'Max':r}</button>`).join('')}</div>`;
 }
+/* one shared daily-history request per symbol for stocks you don't hold (chart + stats both read it) —
+   10y first, a plain 1y as the fallback when a proxy chokes on the bigger payload */
+async function fetchDailyHistory(sym){
+  const k=sym+'|daily'; let d=stockCache[k];
+  if(d && Date.now()-d.ts<=10*60000) return d;
+  if(stockCache[k+'|p']) return stockCache[k+'|p']; // de-dupe concurrent callers
+  const pr=(async()=>{
+    let r;
+    for(const rg of ['10y','1y']){
+      try{ r=parseYahoo(await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${rg}&interval=1d`,true)); break; }catch(e){ r=null; }
+    }
+    if(!r) throw new Error('history unavailable');
+    r.ts=Date.now(); stockCache[k]=r; return r;
+  })();
+  stockCache[k+'|p']=pr;
+  try{ return await pr; } finally{ delete stockCache[k+'|p']; }
+}
 async function sheetSeries(sym, range){
   const intra = range==='1D';
   let t, c;
@@ -680,9 +697,7 @@ async function sheetSeries(sym, range){
   } else {
     const h=state.history[sym];
     if(h && h.t && h.t.length>5){ t=h.t; c=h.c; }
-    else { const k=sym+'|10y'; let d=stockCache[k];
-      if(!d || Date.now()-d.ts>10*60000){ d=parseYahoo(await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=10y&interval=1d`,true)); d.ts=Date.now(); stockCache[k]=d; }
-      t=d.t; c=d.c; }
+    else { const d=await fetchDailyHistory(sym); t=d.t; c=d.c; }
   }
   const times=[], labels=[], closes=[];
   if(intra){
