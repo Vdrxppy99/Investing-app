@@ -1243,7 +1243,7 @@ function readEditInputs(){
   $('editSheet').querySelectorAll('[data-f]').forEach(inp=>{
     const h=state.holdings[+inp.dataset.i]; if(!h) return;
     const f=inp.dataset.f;
-    h[f] = (f==='qty'||f==='cost') ? (+inp.value||0) : inp.value.trim().toUpperCase().replace('.','-');
+    h[f] = (f==='qty'||f==='cost') ? (+inp.value||0) : f==='acc' ? inp.value : inp.value.trim().toUpperCase().replace('.','-'); // acc is a key ('main'/'brok') — upper-casing it broke every later match
   });
 }
 /* persist = the SMALL personal/pref keys only. The heavy caches (quotes, history,
@@ -1362,7 +1362,8 @@ function applyLot({acc,sym,date,qty,cost,div}){
 function applySell({acc,sym,date,qty,proceeds,basis}){
   const i=state.holdings.findIndex(x=>x.acc===acc && x.sym===sym);
   if(i<0 || qty>state.holdings[i].qty+5e-4) // say WHAT does not add up — a generic "invalid file" hid this
-    throw Object.assign(new Error('oversell'), {sym, want:qty, have:i<0?0:state.holdings[i].qty, acc});
+    throw Object.assign(new Error('oversell'), {sym, want:qty, have:i<0?0:state.holdings[i].qty, acc,
+      elsewhere:state.holdings.filter(x=>x.sym===sym && x.acc!==acc).map(x=>`${ACCOUNTS[x.acc]||x.acc||'?'} ${+x.qty.toFixed(3)}`)});
   const h=state.holdings[i], closing=h.qty-qty<5e-4;
   if(closing) qty=h.qty;
   const b = basis>0 ? basis : closing ? h.cost : takeFifo(openLots(), acc, sym, date, qty);
@@ -1378,6 +1379,7 @@ function applySell({acc,sym,date,qty,proceeds,basis}){
    if at least one new-money lot was new. Buys apply before sells (so a same-day buy can be
    sold), and the whole file is all-or-nothing: an oversell rolls state back untouched. */
 function importAddLots(d){
+  normalizeHoldings(); // legacy upper-cased account keys would make every sale look oversold
   const valid=l=> l && ACCOUNTS[l.acc] && typeof l.sym==='string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && +l.qty>0 && +l.cost>0;
   const validSell=l=> l && ACCOUNTS[l.acc] && typeof l.sym==='string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && +l.qty>0 && +l.proceeds>0 && (l.basis==null || +l.basis>0);
   const lots=d.lots==null && Array.isArray(d.sells) ? [] : d.lots, sells=d.sells==null ? [] : d.sells;
@@ -1433,7 +1435,7 @@ function importBackupText(text){
         return;
       }
       if(!d || !Array.isArray(d.holdings)) throw new Error('bad');
-      state.holdings=d.holdings; state.lots=Array.isArray(d.lots)?d.lots:[];
+      state.holdings=d.holdings; normalizeHoldings(); state.lots=Array.isArray(d.lots)?d.lots:[];
       state.cash=d.cash||{main:0,brok:0}; state.deposits=+d.deposits||0;
       if(d.confirmed) state.confirmed=d.confirmed;
       if(d.ccy==='USD'||d.ccy==='EUR') state.view.ccy=d.ccy;
@@ -1447,7 +1449,7 @@ function importBackupText(text){
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       importSay('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){
-      if(e && e.message==='oversell') importSay(`Import cancelled, nothing changed: the file sells ${+e.want.toFixed(3)} ${e.sym.replace('-','.')} but ${ACCOUNTS[e.acc]||e.acc} holds ${+e.have.toFixed(3)}.`, true);
+      if(e && e.message==='oversell') importSay(`Import cancelled, nothing changed: the file sells ${+e.want.toFixed(3)} ${e.sym.replace('-','.')} but ${ACCOUNTS[e.acc]||e.acc} holds ${+e.have.toFixed(3)}.${e.elsewhere&&e.elsewhere.length?` (${e.sym.replace('-','.')} is held in: ${e.elsewhere.join(', ')})`:''}`, true);
       else importSay('That file is not a valid portfolio backup.', true);
     }
 }

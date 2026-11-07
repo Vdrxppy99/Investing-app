@@ -59,6 +59,26 @@ const state = {
   live:false, fetching:false
 };
 
+/* Repairs holdings damaged by a bug in the Edit-holdings sheet (fixed in v2.7.15):
+   readEditInputs() upper-cased EVERY field, including the account dropdown, so one Save
+   turned 'main'/'brok' into 'MAIN'/'BROK'. Nothing matched those keys afterwards — new
+   purchases piled up as separate rows instead of merging, and a sale found "0 shares".
+   Lower-cases the account key and merges rows that are now the same (account, ticker).
+   Lossless (quantities and cost basis are summed) and idempotent. Returns true if it changed anything. */
+function normalizeHoldings(){
+  let changed=false; const out=[], idx={};
+  for(const h of state.holdings){
+    const a=String(h.acc==null?'':h.acc).trim().toLowerCase();
+    if(a!==h.acc){ h.acc=a; changed=true; }
+    const k=h.acc+'|'+h.sym;
+    if(idx[k]!=null){ const t=out[idx[k]]; t.qty+=h.qty; t.cost+=h.cost; changed=true; }
+    else { idx[k]=out.length; out.push(h); }
+  }
+  if(changed) state.holdings=out;
+  return changed;
+}
+normalizeHoldings();
+
 /* ============ HELPERS ============ */
 const $ = id => document.getElementById(id);
 function uniqSyms(){ return [...new Set(state.holdings.map(h=>h.sym))]; }

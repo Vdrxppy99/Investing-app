@@ -204,3 +204,53 @@ test('pasting the file text imports the same as picking the file', async ({ page
   await expect(page.locator('#editModal')).toBeHidden();
   expect((await zz(page)).h).toEqual({ acc: 'brok', sym: 'ZZSELL', qty: 15, cost: 1600 });
 });
+
+/* ---- legacy damage: the Edit sheet used to upper-case the account dropdown on Save ---- */
+test('normalizeHoldings lower-cases account keys and merges the rows that become identical', async ({ page }) => {
+  await unlockDemo(page);
+  const r = await page.evaluate(() => {
+    state.holdings = [
+      { acc: 'MAIN', sym: 'VXUS', qty: 100, cost: 6000 },
+      { acc: 'MAIN', sym: 'VXUS', qty: 5.5, cost: 330 },
+      { acc: 'main', sym: 'VXUS', qty: 2, cost: 120 },
+      { acc: 'BROK', sym: 'VXUS', qty: 3, cost: 180 },
+    ];
+    const changed = normalizeHoldings();
+    const again = normalizeHoldings();
+    return { changed, again, h: state.holdings.map((x) => `${x.acc}:${x.sym}:${x.qty}:${x.cost}`) };
+  });
+  expect(r.changed).toBe(true);
+  expect(r.again).toBe(false); // idempotent
+  expect(r.h).toEqual(['main:VXUS:107.5:6450', 'brok:VXUS:3:180']);
+});
+
+test('a sale imports against holdings that were damaged by the old Edit-sheet upper-casing', async ({ page }) => {
+  await unlockDemo(page);
+  await page.evaluate(() => {
+    state.holdings = [{ acc: 'MAIN', sym: 'VXUS', qty: 100, cost: 6000 }, { acc: 'MAIN', sym: 'VXUS', qty: 13.6, cost: 800 }];
+    state.lots = [{ acc: 'main', sym: 'VXUS', date: '2026-01-05', qty: 113.6, cost: 6800 }];
+  });
+  await importFile(page, { app: 'portfolio-tracker', kind: 'add-lots',
+    sells: [{ acc: 'main', sym: 'VXUS', date: '2026-11-06', qty: 23.991, proceeds: 1942.1 }] });
+  const h = await page.evaluate(() => state.holdings.map((x) => ({ acc: x.acc, sym: x.sym, qty: +x.qty.toFixed(3) })));
+  expect(h).toEqual([{ acc: 'main', sym: 'VXUS', qty: 89.609 }]);
+});
+
+test('saving the Edit sheet no longer corrupts account keys', async ({ page }) => {
+  await unlockDemo(page);
+  const before = await page.evaluate(() => state.holdings.map((h) => h.acc));
+  await openEditSheet(page);
+  await page.locator('#saveEdit').click();
+  const after = await page.evaluate(() => state.holdings.map((h) => h.acc));
+  expect(after).toEqual(before);
+  expect(after.every((a) => a === 'main' || a === 'brok')).toBe(true);
+});
+
+test('an oversell message says where the shares actually are', async ({ page }) => {
+  await unlockDemo(page);
+  await importFile(page, BUYS); // ZZSELL is in brok
+  await openEditSheet(page);
+  await page.locator('#importFile').setInputFiles({ name: 'x.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ kind: 'add-lots', sells: [{ acc: 'main', sym: 'ZZSELL', date: '2026-07-02', qty: 1, proceeds: 10 }] })) });
+  await expect(page.locator('#importMsg')).toHaveText(/Main Account holds 0\. \(ZZSELL is held in: Brokerage 15\)/);
+});
