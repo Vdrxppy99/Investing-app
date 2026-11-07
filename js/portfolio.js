@@ -1360,7 +1360,8 @@ function applyLot({acc,sym,date,qty,cost,div}){
    position snaps to the exact remaining shares/cost so no dust row survives. */
 function applySell({acc,sym,date,qty,proceeds,basis}){
   const i=state.holdings.findIndex(x=>x.acc===acc && x.sym===sym);
-  if(i<0 || qty>state.holdings[i].qty+5e-4) throw new Error('oversell');
+  if(i<0 || qty>state.holdings[i].qty+5e-4) // say WHAT does not add up — a generic "invalid file" hid this
+    throw Object.assign(new Error('oversell'), {sym, want:qty, have:i<0?0:state.holdings[i].qty, acc});
   const h=state.holdings[i], closing=h.qty-qty<5e-4;
   if(closing) qty=h.qty;
   const b = basis>0 ? basis : closing ? h.cost : takeFifo(openLots(), acc, sym, date, qty);
@@ -1435,6 +1436,9 @@ function importBackupText(text){
       if(Array.isArray(d.alerts)) lsSet('pt_alerts', d.alerts);
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
-    }catch(e){ toast('That file is not a valid portfolio backup.', true); }
+    }catch(e){
+      if(e && e.message==='oversell') toast(`Import cancelled, nothing changed: the file sells ${+e.want.toFixed(3)} ${e.sym.replace('-','.')} but ${ACCOUNTS[e.acc]||e.acc} holds ${+e.have.toFixed(3)}.`, true);
+      else toast('That file is not a valid portfolio backup.', true);
+    }
 }
 $('editModal').addEventListener('click', e=>{ if(e.target.id==='editModal') hideOverlay('editModal'); });

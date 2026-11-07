@@ -142,7 +142,7 @@ test('an oversell rejects the whole file and rolls back, buys included', async (
       lots: [{ acc: 'brok', sym: 'ZZNEW', date: '2026-07-01', qty: 1, cost: 10 }],
       sells: [{ acc: 'brok', sym: 'ZZSELL', date: '2026-07-02', qty: 99, proceeds: 5000 }] })),
   });
-  await expect(page.locator('#toast.bad')).toBeVisible();
+  await expect(page.locator('#toast.bad')).toHaveText(/sells 99 ZZSELL but Brokerage holds 15/); // names the mismatch
   expect(await zz(page)).toEqual(before);
   expect(await page.evaluate(() => state.lots.some((l) => l.sym === 'ZZNEW'))).toBe(false);
 });
