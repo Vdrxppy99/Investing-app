@@ -1142,6 +1142,7 @@ function openEdit(){
     <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px"><input type="checkbox" id="earningsTgl"> 📅 Earnings-day alerts</label>
     <div style="color:var(--mut);font-size:11.5px;margin-top:4px;line-height:1.55">Off by default. When on, a heads-up the day before a directly-held stock's confirmed earnings report — index funds don't report earnings, so this never fires for them.</div>
     `}
+    <div id="importMsg" role="status" aria-live="polite" style="font-size:13px;font-weight:600;margin-top:10px"></div>
     <details style="margin-top:10px"><summary style="color:var(--mut);font-size:12px;cursor:pointer">Paste backup text</summary>
       <textarea id="importText" rows="5" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Paste the contents of a backup or trades .json file" style="width:100%;margin-top:8px;font:12px/1.4 ui-monospace,monospace"></textarea>
       <div class="ebtns"><button class="btn sec" id="importPasteBtn">Import pasted text</button></div></details>
@@ -1224,7 +1225,7 @@ function openEdit(){
   };
   } // end real-mode-only security/reports wiring
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
-  $('importPasteBtn').onclick=()=>{ const v=$('importText').value.trim(); if(!v){ toast('Paste the backup text first.', true); return; } importBackupText(v); };
+  $('importPasteBtn').onclick=()=>{ const v=$('importText').value.trim(); if(!v){ importSay('Paste the backup text first.', true); return; } importBackupText(v); };
   $('editSheet').querySelectorAll('.del').forEach(b=> b.onclick=()=>{ readEditInputs(); state.holdings.splice(+b.dataset.i,1); openEdit(); });
   $('addRow').onclick=()=>{ readEditInputs(); state.holdings.push({acc:'brok',sym:'',qty:0,cost:0}); openEdit(); };
   $('resetSeed').onclick=()=>showConfirm('Erase all holdings?',
@@ -1404,12 +1405,21 @@ function importAddLots(d){
   if(added||sold) markConfirmed();
   return {added, skipped, sold, soldSkipped};
 }
+/* Import result: the toast sits at the screen bottom and was not visible over the open
+   settings sheet on a phone, so a failed import looked like "nothing happens". Mirror every
+   message inside the sheet itself, next to the buttons that were just pressed. */
+function importSay(msg, bad){
+  toast(msg, bad);
+  const m=$('importMsg'); if(!m) return;
+  m.textContent=msg; m.style.color=bad?'var(--loss)':'var(--text)';
+  if(m.scrollIntoView) m.scrollIntoView({block:'nearest'});
+}
 function importBackup(file){
   const r=new FileReader();
   r.onload=()=>importBackupText(r.result);
   // iOS can hand a home-screen app a file it cannot read (iCloud placeholder, Recents pick) —
   // without this the pick silently did nothing
-  r.onerror=()=>toast('Couldn’t read that file — use “Paste backup text” below instead.', true);
+  r.onerror=()=>importSay('Couldn’t read that file — use “Paste backup text” below instead.', true);
   r.readAsText(file);
 }
 function importBackupText(text){
@@ -1419,7 +1429,7 @@ function importBackupText(text){
         const {added, skipped, sold, soldSkipped}=importAddLots(d);
         persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
         const dup=skipped+soldSkipped;
-        toast(added||sold ? `Added ${added} purchase${added===1?'':'s'}`.replace('Added 0 purchases', 'Recorded')+(sold?`${added?' and ':' '}${sold} sale${sold>1?'s':''}`:'')+(dup?` (${dup} already there, skipped).`:'.') : 'Nothing new — every purchase in that file is already recorded.');
+        importSay(added||sold ? `Added ${added} purchase${added===1?'':'s'}`.replace('Added 0 purchases', 'Recorded')+(sold?`${added?' and ':' '}${sold} sale${sold>1?'s':''}`:'')+(dup?` (${dup} already there, skipped).`:'.') : 'Nothing new — every purchase in that file is already recorded.');
         return;
       }
       if(!d || !Array.isArray(d.holdings)) throw new Error('bad');
@@ -1435,10 +1445,10 @@ function importBackupText(text){
       // untrusted file's bk would redirect future cloud uploads to an attacker's key.
       if(Array.isArray(d.alerts)) lsSet('pt_alerts', d.alerts);
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
-      toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
+      importSay('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){
-      if(e && e.message==='oversell') toast(`Import cancelled, nothing changed: the file sells ${+e.want.toFixed(3)} ${e.sym.replace('-','.')} but ${ACCOUNTS[e.acc]||e.acc} holds ${+e.have.toFixed(3)}.`, true);
-      else toast('That file is not a valid portfolio backup.', true);
+      if(e && e.message==='oversell') importSay(`Import cancelled, nothing changed: the file sells ${+e.want.toFixed(3)} ${e.sym.replace('-','.')} but ${ACCOUNTS[e.acc]||e.acc} holds ${+e.have.toFixed(3)}.`, true);
+      else importSay('That file is not a valid portfolio backup.', true);
     }
 }
 $('editModal').addEventListener('click', e=>{ if(e.target.id==='editModal') hideOverlay('editModal'); });
