@@ -179,7 +179,7 @@ function drawdownStats(){
     if(p0>0 && p1!=null) moves.push({sym:r.sym, pct:(p1/p0-1)*100});
   }
   moves.sort((a,b)=>a.pct-b.pct);
-  const boughtThrough=state.lots.some(l=>!l.div && l.date>=peakDate && l.date<=troughDate);
+  const boughtThrough=state.lots.some(l=>!l.div && !l.sell && l.date>=peakDate && l.date<=troughDate);
   return {peakVal, troughVal, dropDollars, peakDate, troughDate, recDate, recoveryMonths, curveLabels, curve,
     hardest:moves[0]||null, heldUp:moves.length?moves[moves.length-1]:null, boughtThrough, mddPct:troughDd*100};
 }
@@ -192,7 +192,7 @@ function drawdownStats(){
 function benchmarkXirr(acc, sym){
   const sp=pathValue(sym); if(!sp) return null;
   const flows=state.lots.filter(l=>(acc==='all'||l.acc===acc)&&!l.div)
-    .map(l=>({t:new Date(l.date+'T16:00:00Z').getTime(), v:-l.cost})).sort((a,b)=>a.t-b.t);
+    .map(l=>({t:new Date(l.date+'T16:00:00Z').getTime(), v:-lotFlow(l)})).sort((a,b)=>a.t-b.t);
   if(!flows.length) return null;
   flows.push({t:Date.now(), v:sp.value});
   const x=xirr(flows);
@@ -360,7 +360,7 @@ function openHealthSheet(){
 function monthlyDietzReturns(){ // 'YYYY-MM' -> deposit-adjusted % return — shared by heatmap + Monte Carlo
   const s=buildSeries('all'); if(!s||s.labels.length<3) return null;
   const eom={}; for(let i=0;i<s.labels.length;i++) eom[s.labels[i].slice(0,7)]=s.value[i];
-  const dep={}; for(const l of state.lots){ if(!l.div) dep[l.date.slice(0,7)]=(dep[l.date.slice(0,7)]||0)+l.cost; }
+  const dep={}; for(const l of state.lots){ if(!l.div) dep[l.date.slice(0,7)]=(dep[l.date.slice(0,7)]||0)+lotFlow(l); }
   const months=Object.keys(eom).sort(); const ret={};
   for(let i=1;i<months.length;i++){ const m=months[i], v0=eom[months[i-1]], d=dep[m]||0;
     if(v0>0) ret[m]=(eom[m]-v0-d)/(v0+d/2)*100; }
@@ -374,7 +374,7 @@ function periodReturns(){ // deposit-adjusted returns — ONE modified-Dietz for
   for(const [k,cut] of [['1W',rangeCutoff('1W')],['1M',rangeCutoff('1M')],['6M',rangeCutoff('6M')],['YTD',rangeCutoff('YTD')],['1Y',rangeCutoff('1Y')],['All','0000-00-00']]){
     let i=s.labels.findIndex(d=>d>=cut); if(i<0) i=0;
     if(i>=n-1){ out.push({k,p:null}); continue; }
-    const V0=s.value[i], D=state.lots.filter(l=>!l.div&&l.date>s.labels[i]).reduce((a,l)=>a+l.cost,0);
+    const V0=s.value[i], D=state.lots.filter(l=>!l.div&&l.date>s.labels[i]).reduce((a,l)=>a+lotFlow(l),0);
     out.push({k, p:(V0+D/2>0) ? (s.value[n-1]-V0-D)/(V0+D/2)*100 : null});
   }
   return out;
@@ -404,7 +404,7 @@ function pathValue(sym){ // what your exact purchases would be worth if every do
     while(lo<=hi){ const m=(lo+hi)>>1; if(days[m]<=d){ans=days[m];lo=m+1;} else hi=m-1; }
     return ans?px[ans]:null; };
   let sh=0, invested=0;
-  for(const l of state.lots){ if(l.div) continue; const p=at(l.date); if(p>0){ sh+=l.cost/p; invested+=l.cost; } }
+  for(const l of state.lots){ if(l.div) continue; const p=at(l.date); if(p>0){ sh+=lotFlow(l)/p; invested+=lotFlow(l); } }
   if(!(sh>0)) return null;
   return { value: sh*(priceOf(sym)||px[days[days.length-1]]), invested };
 }
@@ -752,7 +752,7 @@ function renderXirrMod(){
 function renderContribMod(){
   const card=$('contribModCard'), svgEl=$('contribBars'); if(!card||!svgEl) return;
   const per={};
-  for(const l of state.lots){ if(!l.div) per[l.date.slice(0,7)]=(per[l.date.slice(0,7)]||0)+l.cost; }
+  for(const l of state.lots){ if(!l.div) per[l.date.slice(0,7)]=(per[l.date.slice(0,7)]||0)+lotFlow(l); }
   const keys=Object.keys(per).sort();
   if(!keys.length){ card.hidden=true; return; }
   const labels=[], data=[];
@@ -819,7 +819,7 @@ function renderContribMod(){
    say which holding still carries a short-term lot and when it clears — "what not to sell yet". */
 function renderTaxMod(){
   const card=$('taxModCard'), svgEl=$('taxBar'); if(!card||!svgEl) return;
-  const lots=state.lots.filter(l=>!l.div);
+  const lots=openLots().filter(l=>!l.div);
   if(!lots.length){ card.hidden=true; return; }
   const YR=31557600000, now=Date.now();
   let st=0, lt=0; const bySym={};
@@ -1186,7 +1186,7 @@ if($('projHorizonSeg')) $('projHorizonSeg').querySelectorAll('button').forEach(b
 function renderMoreList(){
   const list=$('moreList'); if(!list) return;
   const t=totals('all');
-  const m12=new Set(state.lots.filter(l=>!l.div && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
+  const m12=new Set(state.lots.filter(l=>!l.div && !l.sell && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
   // Tax lots, Crash test, Where your money lives and Asset worth moved out of this list to
   // their own mod cards on the tab (DESIGN-TARGET.md session 3 — see index.html's Insights
   // section comment). Next moves moved to Home instead (session 4 — see renderHomeCoach()
@@ -1302,7 +1302,7 @@ const INFLATION = 0.025; // ~ECB/Fed long-run target; the erosion your paper ret
 function realReturn(){
   const pr=periodReturns(); const all=pr.find(x=>x.k==='All');
   if(!all || all.p==null) return null;
-  const lots=state.lots.filter(l=>!l.div).map(l=>l.date).filter(Boolean).sort();
+  const lots=state.lots.filter(l=>!l.div && !l.sell).map(l=>l.date).filter(Boolean).sort();
   if(!lots.length) return null;
   const years=Math.max(0.5,(Date.now()-new Date(lots[0]+'T12:00:00').getTime())/31557600000);
   const realTot=((1+all.p/100)/Math.pow(1+INFLATION,years)-1)*100;
@@ -1658,7 +1658,7 @@ function renderContribChart(){
   const el=$('contribChart'); if(!window.Chart) return;
   const o=Chart.getChart(el); if(o) o.destroy();
   const per={};
-  for(const l of state.lots){ if(!l.div) per[l.date.slice(0,7)]=(per[l.date.slice(0,7)]||0)+l.cost; }
+  for(const l of state.lots){ if(!l.div) per[l.date.slice(0,7)]=(per[l.date.slice(0,7)]||0)+lotFlow(l); }
   const keys=Object.keys(per).sort();
   if(!keys.length) return;
   const labels=[]; const data=[];
@@ -1682,16 +1682,16 @@ function renderContribChart(){
   attachScrubAny(contribChart, i=>{ const ro=$('contribRO'); if(!ro) return;
     ro.textContent = i==null ? '' : `${show[i]} · ${fmt(sdata[i])} added · ${fmt(scum[i])} deposited in total`; });
   const cs=$('contribSub');
-  if(cs){ const m12=new Set(state.lots.filter(l=>!l.div && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
+  if(cs){ const m12=new Set(state.lots.filter(l=>!l.div && !l.sell && l.date>dayStr(Date.now()-370*86400e3)).map(l=>l.date.slice(0,7))).size;
     cs.textContent = m12>0 ? `You added money ${m12} of the last 12 months — consistency is the engine.` : ''; }
 }
 
 /* ============ LOOKING AHEAD (coach + projection) ============ */
 /* cfmt (compact currency, privacy-aware) now lives in core.js */
 function contribPace(){ // months of history + $/month pace from real buys
-  const buys=state.lots.filter(l=>!l.div);
+  const buys=state.lots.filter(l=>!l.div && !l.sell);
   const months=buys.length?Math.max(1,(Date.now()-new Date(buys.map(l=>l.date).sort()[0]).getTime())/2629800000):12;
-  return { pmt: buys.reduce((a,l)=>a+l.cost,0)/months, buys };
+  return { pmt: state.lots.filter(l=>!l.div).reduce((a,l)=>a+lotFlow(l),0)/months, buys };
 }
 function coachItems(){ // rules-based nudges computed from YOUR data — guidance, not advice
   const items=[];
@@ -1725,7 +1725,7 @@ function coachItems(){ // rules-based nudges computed from YOUR data — guidanc
   }
   // tax lots turning long-term soon
   const YR=31557600000, now=Date.now();
-  const turning=state.lots.map(l=>({sym:l.sym, g:l.qty*priceOf(l.sym)-l.cost, at:new Date(l.date+'T12:00:00').getTime()+YR}))
+  const turning=openLots().map(l=>({sym:l.sym, g:l.qty*priceOf(l.sym)-l.cost, at:new Date(l.date+'T12:00:00').getTime()+YR}))
     .filter(x=>x.at>now && x.at<now+45*86400e3 && x.g>25).sort((a,b)=>a.at-b.at);
   if(turning.length){
     const x=turning[0], d=new Date(x.at).toLocaleDateString(appLocale(),{month:'short',day:'numeric'});
@@ -1754,7 +1754,7 @@ function savingsAlt(){ // replay every real deposit into a 3%/yr savings account
   let alt=0; const now=Date.now();
   for(const l of state.lots){ if(l.div) continue;
     const yrs=(now-new Date(l.date+'T12:00:00').getTime())/31557600000;
-    if(yrs>=0) alt+=l.cost*Math.pow(1.03,yrs); }
+    if(yrs>=0) alt+=lotFlow(l)*Math.pow(1.03,yrs); }
   if(!alt) return null;
   alt+=(+state.cash.main||0)+(+state.cash.brok||0);
   return {alt, val:t.value, ahead:t.value-alt};

@@ -82,7 +82,7 @@ function totals(acc){
   // measured from what was actually paid, not from prev close (else buy days over/understate)
   const today=dayStr(Date.now()); const bt={};
   for(const l of state.lots){
-    if(l.date===today && (acc==='all'||l.acc===acc)){
+    if(l.date===today && !l.sell && (acc==='all'||l.acc===acc)){
       const b=bt[l.sym]||(bt[l.sym]={qty:0,cost:0}); b.qty+=l.qty; b.cost+=l.cost;
     }
   }
@@ -135,6 +135,38 @@ function badgeHtml(sym, small){ // colored letter tile; a real company logo cros
 function bstyle(c){ return `background:linear-gradient(140deg,${c},color-mix(in srgb,${c} 55%,#000))`; }
 function colorOf(sym){ if(COLORS[sym]) return COLORS[sym]; let h=0; for(const ch of sym) h=(h*31+ch.charCodeAt(0))%360; return `hsl(${h},55%,52%)`; }
 function dayStr(ms){ return new Date(ms).toISOString().slice(0,10); }
+/* A SALE is stored in state.lots as a negative lot: {acc,sym,date,qty:-shares,
+   cost:-basisRelieved,sell:true,proceeds}. Keeping sells in the same log means every
+   running-total consumer (lotState, holdings history, hero chart) stays correct for free:
+   shares held and cost basis both fall on the sale date, so "profit" keeps its existing
+   meaning — unrealized gain on shares still held (see sheets.js 'Profit').
+   MONEY-FLOW consumers (XIRR, Dietz deposits, benchmark replays) must not use `cost` for a
+   sale — the cash that actually left the position is `proceeds`, not the basis — so they
+   call lotFlow(): positive = money into the portfolio, negative = money out. For a buy
+   or a dividend lot it is exactly l.cost, so sell-free data behaves as it always did. */
+function lotFlow(l){ return l.sell ? -(+l.proceeds||0) : l.cost; }
+/* Consume `qty` shares of acc/sym from `buys` (copies — mutated), oldest lot first,
+   preferring lots dated on/before the sale. Returns the cost basis relieved. FIFO is the
+   deterministic default; a file may override the basis it records (importAddLots). */
+function takeFifo(buys, acc, sym, date, qty){
+  const c=buys.filter(b=>b.acc===acc && b.sym===sym && b.qty>1e-9)
+    .sort((a,b)=> (a.date>date)-(b.date>date) || (a.date<b.date?-1:a.date>b.date?1:0));
+  let need=qty, basis=0;
+  for(const b of c){
+    if(need<=1e-9) break;
+    const take=Math.min(b.qty,need), part=b.cost*(take/b.qty);
+    b.qty-=take; b.cost-=part; need-=take; basis+=part;
+  }
+  return basis;
+}
+/* The lots still open after every sale — the per-lot view (tax lots, "Your purchases")
+   needs this because a sold lot is no longer a lot you hold. Always returns copies. */
+function openLots(){
+  const buys=state.lots.filter(l=>!l.sell).map(l=>Object.assign({},l));
+  const sells=state.lots.filter(l=>l.sell).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  for(const s of sells) takeFifo(buys, s.acc, s.sym, s.date, -s.qty);
+  return buys.filter(b=>b.qty>1e-9);
+}
 function hasLots(acc){ return state.lots.some(l=>acc==='all'||l.acc===acc); }
 function lotState(acc, d){ // shares held + total invested on day d ('YYYY-MM-DD'), per the lot log
   const out = {qty:{}, cost:0};
@@ -165,7 +197,7 @@ function xirr(flows){ // money-weighted annualized return; flows: [{t:ms, v}] ne
 function personalReturn(acc){ // dividend reinvestments are internal return, not contributions
   const flows = state.lots
     .filter(l=>(acc==='all'||l.acc===acc) && !l.div)
-    .map(l=>({t:new Date(l.date+'T16:00:00Z').getTime(), v:-l.cost}))
+    .map(l=>({t:new Date(l.date+'T16:00:00Z').getTime(), v:-lotFlow(l)}))
     .sort((a,b)=>a.t-b.t);
   if(!flows.length) return null;
   flows.push({t:Date.now(), v:totals(acc).value});
@@ -204,7 +236,7 @@ function benchSeries(labels, values){ // "what if the same money had gone into t
   for(const l of state.lots){
     if(l.div) continue;
     if(state.view.acc!=='all' && l.acc!==state.view.acc) continue;
-    if(l.date>labels[0] && l.date<=labels[labels.length-1]) byDay[l.date]=(byDay[l.date]||0)+l.cost;
+    if(l.date>labels[0] && l.date<=labels[labels.length-1]) byDay[l.date]=(byDay[l.date]||0)+lotFlow(l);
   }
   const out=[];
   for(let i=0;i<labels.length;i++){

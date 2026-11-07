@@ -111,7 +111,7 @@
     // A decision: a lot in a SELF-directed account, not a dividend reinvestment.
     // The advisor's own allocation (accountKind[acc]==='advised') isn't the
     // owner's choice to score at all.
-    const decisions = lots.filter(l => !l.div && accountKind[l.acc] === 'self');
+    const decisions = lots.filter(l => !l.div && !l.sell && accountKind[l.acc] === 'self');
 
     const rows = [];
     const unresolvedItems = [];
@@ -240,7 +240,7 @@
 
   function decisionLotSymbols(lots, accountKind) {
     const syms = new Set();
-    for (const l of (lots || [])) if (!l.div && accountKind[l.acc] === 'self') syms.add(l.sym);
+    for (const l of (lots || [])) if (!l.div && !l.sell && accountKind[l.acc] === 'self') syms.add(l.sym);
     return [...syms];
   }
 

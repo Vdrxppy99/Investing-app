@@ -138,7 +138,7 @@ async function openStockSheet(sym, name){
 }
 function openTaxSheet(){
   const YR=31557600000, now=Date.now();
-  const items=state.lots.map(l=>{
+  const items=openLots().map(l=>{
     const b=new Date(l.date+'T12:00:00').getTime();
     return {l, b, g:l.qty*priceOf(l.sym)-l.cost, lt:now-b>=YR};
   }).sort((a,b)=>(a.lt===b.lt) ? a.b-b.b : (a.lt?1:-1));

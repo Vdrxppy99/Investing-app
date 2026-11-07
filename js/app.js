@@ -1229,7 +1229,7 @@ function maybeShowMonthlyRecap(){
   for(let i=0;i<s.labels.length;i++) eom[s.labels[i].slice(0,7)]=s.value[i];
   const months=Object.keys(eom).sort(), pi=months.indexOf(pm);
   let divs=0, deps=0;
-  for(const l of state.lots){ if(l.date.slice(0,7)!==pm) continue; if(l.div) divs+=l.cost; else deps+=l.cost; }
+  for(const l of state.lots){ if(l.date.slice(0,7)!==pm) continue; if(l.div) divs+=l.cost; else deps+=lotFlow(l); }
   const gain = pi>0 ? eom[pm]-eom[months[pi-1]]-deps : null;
   const perf=[];
   for(const r of rows('all')){

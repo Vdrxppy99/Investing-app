@@ -980,7 +980,7 @@ function renderChart(){
   if(state.view.range!=='1D'){ // dot on the line for every purchase in view
     const buyByDay={};
     for(const l of state.lots){
-      if(l.div) continue;
+      if(l.div||l.sell) continue;
       if(state.view.acc!=='all' && l.acc!==state.view.acc) continue;
       buyByDay[l.date]=(buyByDay[l.date]||0)+l.cost;
     }
@@ -1049,11 +1049,17 @@ function openDetail(sym){
       ${er!=null?`<div class="stat"><div class="k">Fund fee</div><div class="v">${er.toFixed(2)}% <span class="statsub">≈${fmt(val*er/100)}/yr</span></div></div>`:''}
     </div>${hi52!=null&&hi52>lo52?`<div class="rangebar"><div class="rb-track"><i style="left:${Math.min(100,Math.max(0,(p-lo52)/(hi52-lo52)*100)).toFixed(1)}%"></i></div>
       <div class="rb-lbls"><span>${fmtPx(lo52)}</span><span>52-week range</span><span>${fmtPx(hi52)}</span></div></div>`:''}${accLines}${(function(){
-      const ls=state.lots.filter(l=>l.sym===sym && (state.view.acc==='all'||l.acc===state.view.acc)).sort((a,b)=>b.date.localeCompare(a.date));
+      const mine=l=>l.sym===sym && (state.view.acc==='all'||l.acc===state.view.acc);
+      const sold=state.lots.filter(l=>l.sell && mine(l)); // sales are shown, not counted as purchases
+      const ls=openLots().filter(mine).concat(sold).sort((a,b)=>b.date.localeCompare(a.date));
       if(!ls.length) return '';
-      return `<div style="font-size:13px;font-weight:700;margin-top:16px">Your purchases (${ls.length})</div>`+ls.map(l=>{
+      const dstr=l=>new Date(l.date+'T12:00:00').toLocaleDateString(appLocale(),{month:'short',day:'numeric',year:'2-digit'});
+      const shs=l=>Math.abs(l.qty).toFixed(3).replace(/\.?0+$/,'');
+      return `<div style="font-size:13px;font-weight:700;margin-top:16px">Your purchases (${ls.length-sold.length})</div>`+ls.map(l=>{
+        if(l.sell){ const rg=l.proceeds+l.cost; // proceeds − basis (cost is stored negative)
+          return `<div class="krow"><span class="k">${dstr(l)} · sold</span><span>${shs(l)} sh @ ${fmtPx(l.proceeds/-l.qty)} <span class="${cls(rg)}">${fmtSign(rg)}</span></span></div>`; }
         const g=l.qty*p-l.cost;
-        return `<div class="krow"><span class="k">${new Date(l.date+'T12:00:00').toLocaleDateString(appLocale(),{month:'short',day:'numeric',year:'2-digit'})}${l.div?' · dividend':''}</span><span>${l.qty.toFixed(3).replace(/\.?0+$/,'')} sh @ ${fmtPx(l.cost/l.qty)} <span class="${cls(g)}">${fmtSign(g)}</span></span></div>`;
+        return `<div class="krow"><span class="k">${dstr(l)}${l.div?' · dividend':''}</span><span>${shs(l)} sh @ ${fmtPx(l.cost/l.qty)} <span class="${cls(g)}">${fmtSign(g)}</span></span></div>`;
       }).join('');
     })()}${(function(){
       const al=(lsGet('pt_alerts')||[]).find(a=>a.sym===sym);
@@ -1245,8 +1251,8 @@ function exportCSV(){ // spreadsheet-friendly dump: positions, then every purcha
     const p=priceOf(h.sym);
     lines.push([ACCOUNTS[h.acc]||h.acc, h.sym, h.qty, h.cost.toFixed(2), p?p.toFixed(2):'', (h.qty*p).toFixed(2), (h.qty*p-h.cost).toFixed(2)].join(','));
   }
-  lines.push('','Purchase lots','Account,Symbol,Date,Shares,Cost USD,Dividend reinvestment');
-  for(const l of state.lots) lines.push([ACCOUNTS[l.acc]||l.acc, l.sym, l.date, l.qty, l.cost.toFixed(2), l.div?'yes':''].join(','));
+  lines.push('','Purchase lots','Account,Symbol,Date,Shares,Cost USD,Dividend reinvestment,Sale proceeds USD'); // a sale is a negative row: shares and cost basis relieved
+  for(const l of state.lots) lines.push([ACCOUNTS[l.acc]||l.acc, l.sym, l.date, l.qty, l.cost.toFixed(2), l.div?'yes':'', l.sell?(+l.proceeds).toFixed(2):''].join(','));
   const blob=new Blob([lines.join('\n')],{type:'text/csv'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='portfolio-'+dayStr(Date.now())+'.csv';
@@ -1345,25 +1351,53 @@ function applyLot({acc,sym,date,qty,cost,div}){
   const h=state.holdings.find(x=>x.acc===acc && x.sym===sym);
   if(h){ h.qty+=qty; h.cost+=cost; } else state.holdings.push({acc,sym,qty,cost});
 }
-/* An "add these purchases" file, as opposed to a full backup: { kind:'add-lots',
-   lots:[{acc,sym,date,qty,cost,div?}], deposits?:<new money in> }. Appends instead of
-   replacing, so it can be prepared off-device without a copy of the existing data.
-   A lot already present (same account, ticker, date and share count) is skipped, so
-   importing the same file twice — or one whose trades were also typed in by hand —
-   never double-counts; the deposit is only added if at least one new-money lot was new. */
+/* One sale into state — a negative lot (see lotFlow() in core.js) plus the running
+   holding. Cost basis relieved is FIFO unless the file states it; closing out the whole
+   position snaps to the exact remaining shares/cost so no dust row survives. */
+function applySell({acc,sym,date,qty,proceeds,basis}){
+  const i=state.holdings.findIndex(x=>x.acc===acc && x.sym===sym);
+  if(i<0 || qty>state.holdings[i].qty+5e-4) throw new Error('oversell');
+  const h=state.holdings[i], closing=h.qty-qty<5e-4;
+  if(closing) qty=h.qty;
+  const b = basis>0 ? basis : closing ? h.cost : takeFifo(openLots(), acc, sym, date, qty);
+  state.lots.push({acc,sym,date,qty:-qty,cost:-b,sell:true,proceeds});
+  if(closing) state.holdings.splice(i,1); else { h.qty-=qty; h.cost-=b; }
+}
+/* An "add these trades" file, as opposed to a full backup: { kind:'add-lots',
+   lots:[{acc,sym,date,qty,cost,div?}], sells?:[{acc,sym,date,qty,proceeds,basis?}],
+   deposits?:<new money in> }. Appends instead of replacing, so it can be prepared
+   off-device without a copy of the existing data. A trade already present (same account,
+   ticker, date and share count) is skipped, so importing the same file twice — or one
+   whose trades were also typed in by hand — never double-counts; the deposit is only added
+   if at least one new-money lot was new. Buys apply before sells (so a same-day buy can be
+   sold), and the whole file is all-or-nothing: an oversell rolls state back untouched. */
 function importAddLots(d){
   const valid=l=> l && ACCOUNTS[l.acc] && typeof l.sym==='string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && +l.qty>0 && +l.cost>0;
-  if(!Array.isArray(d.lots) || !d.lots.every(valid)) throw new Error('bad');
+  const validSell=l=> l && ACCOUNTS[l.acc] && typeof l.sym==='string' && /^\d{4}-\d{2}-\d{2}$/.test(l.date) && +l.qty>0 && +l.proceeds>0 && (l.basis==null || +l.basis>0);
+  const lots=d.lots==null && Array.isArray(d.sells) ? [] : d.lots, sells=d.sells==null ? [] : d.sells;
+  if(!Array.isArray(lots) || !lots.every(valid) || !Array.isArray(sells) || !sells.every(validSell)) throw new Error('bad');
+  const snap=JSON.stringify({h:state.holdings, l:state.lots, d:state.deposits});
+  const norm=s=>s.trim().toUpperCase().replace('.','-');
   const same=(a,b)=> a.acc===b.acc && a.sym===b.sym && a.date===b.date && Math.abs(a.qty-b.qty)<1e-6;
-  let added=0, skipped=0, newMoney=false;
-  for(const raw of d.lots){
-    const l={acc:raw.acc, sym:raw.sym.trim().toUpperCase().replace('.','-'), date:raw.date, qty:+raw.qty, cost:+raw.cost, div:!!raw.div};
-    if(state.lots.some(x=>same(x,l))){ skipped++; continue; }
-    applyLot(l); added++; if(!l.div) newMoney=true;
+  let added=0, skipped=0, sold=0, soldSkipped=0, newMoney=false;
+  try{
+    for(const raw of lots){
+      const l={acc:raw.acc, sym:norm(raw.sym), date:raw.date, qty:+raw.qty, cost:+raw.cost, div:!!raw.div};
+      if(state.lots.some(x=>!x.sell && same(x,l))){ skipped++; continue; }
+      applyLot(l); added++; if(!l.div) newMoney=true;
+    }
+    for(const raw of sells){
+      const s={acc:raw.acc, sym:norm(raw.sym), date:raw.date, qty:+raw.qty, proceeds:+raw.proceeds, basis:raw.basis==null?0:+raw.basis};
+      // a closing sale is snapped to the exact remaining shares, so match with the same slack
+      if(state.lots.some(x=>x.sell && x.acc===s.acc && x.sym===s.sym && x.date===s.date && Math.abs(-x.qty-s.qty)<5e-4)){ soldSkipped++; continue; }
+      applySell(s); sold++;
+    }
+  }catch(e){
+    const o=JSON.parse(snap); state.holdings=o.h; state.lots=o.l; state.deposits=o.d; throw e;
   }
   if(newMoney && +d.deposits>0) state.deposits=(+state.deposits||0)+(+d.deposits);
-  if(added) markConfirmed();
-  return {added, skipped};
+  if(added||sold) markConfirmed();
+  return {added, skipped, sold, soldSkipped};
 }
 function importBackup(file){
   const r=new FileReader();
@@ -1371,9 +1405,10 @@ function importBackup(file){
     try{
       const d=JSON.parse(r.result);
       if(d && d.kind==='add-lots'){
-        const {added, skipped}=importAddLots(d);
+        const {added, skipped, sold, soldSkipped}=importAddLots(d);
         persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
-        toast(added ? `Added ${added} purchase${added>1?'s':''}`+(skipped?` (${skipped} already there, skipped).`:'.') : 'Nothing new — every purchase in that file is already recorded.');
+        const dup=skipped+soldSkipped;
+        toast(added||sold ? `Added ${added} purchase${added===1?'':'s'}`.replace('Added 0 purchases', 'Recorded')+(sold?`${added?' and ':' '}${sold} sale${sold>1?'s':''}`:'')+(dup?` (${dup} already there, skipped).`:'.') : 'Nothing new — every purchase in that file is already recorded.');
         return;
       }
       if(!d || !Array.isArray(d.holdings)) throw new Error('bad');
