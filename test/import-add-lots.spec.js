@@ -193,3 +193,13 @@ test('holding sheet lists the sale with its realized gain; tax lots show only wh
   expect(tax).not.toMatch(/ZZSELL[\s\S]*ZZSELL/);            // one open lot, not two
   expect(errs).toEqual([]);
 });
+
+test('pasting the file text imports the same as picking the file', async ({ page }) => {
+  await unlockDemo(page);
+  await openEditSheet(page);
+  await page.locator('#editModal summary').click(); // the paste box is collapsed by default
+  await page.locator('#importText').evaluate((el, v) => { el.value = v; }, JSON.stringify(BUYS));
+  await page.locator('#importPasteBtn').click();
+  await expect(page.locator('#editModal')).toBeHidden();
+  expect((await zz(page)).h).toEqual({ acc: 'brok', sym: 'ZZSELL', qty: 15, cost: 1600 });
+});

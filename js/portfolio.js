@@ -1142,6 +1142,9 @@ function openEdit(){
     <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px"><input type="checkbox" id="earningsTgl"> 📅 Earnings-day alerts</label>
     <div style="color:var(--mut);font-size:11.5px;margin-top:4px;line-height:1.55">Off by default. When on, a heads-up the day before a directly-held stock's confirmed earnings report — index funds don't report earnings, so this never fires for them.</div>
     `}
+    <details style="margin-top:10px"><summary style="color:var(--mut);font-size:12px;cursor:pointer">Paste backup text</summary>
+      <textarea id="importText" rows="5" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Paste the contents of a backup or trades .json file" style="width:100%;margin-top:8px;font:12px/1.4 ui-monospace,monospace"></textarea>
+      <div class="ebtns"><button class="btn sec" id="importPasteBtn">Import pasted text</button></div></details>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">`;
   showOverlay('editModal');
   $('editX').onclick=$('cancelEdit').onclick=()=>hideOverlay('editModal');
@@ -1221,6 +1224,7 @@ function openEdit(){
   };
   } // end real-mode-only security/reports wiring
   $('importFile').onchange=e=>{ if(e.target.files[0]) importBackup(e.target.files[0]); };
+  $('importPasteBtn').onclick=()=>{ const v=$('importText').value.trim(); if(!v){ toast('Paste the backup text first.', true); return; } importBackupText(v); };
   $('editSheet').querySelectorAll('.del').forEach(b=> b.onclick=()=>{ readEditInputs(); state.holdings.splice(+b.dataset.i,1); openEdit(); });
   $('addRow').onclick=()=>{ readEditInputs(); state.holdings.push({acc:'brok',sym:'',qty:0,cost:0}); openEdit(); };
   $('resetSeed').onclick=()=>showConfirm('Erase all holdings?',
@@ -1401,9 +1405,15 @@ function importAddLots(d){
 }
 function importBackup(file){
   const r=new FileReader();
-  r.onload=()=>{
+  r.onload=()=>importBackupText(r.result);
+  // iOS can hand a home-screen app a file it cannot read (iCloud placeholder, Recents pick) —
+  // without this the pick silently did nothing
+  r.onerror=()=>toast('Couldn’t read that file — use “Paste backup text” below instead.', true);
+  r.readAsText(file);
+}
+function importBackupText(text){
     try{
-      const d=JSON.parse(r.result);
+      const d=JSON.parse(text);
       if(d && d.kind==='add-lots'){
         const {added, skipped, sold, soldSkipped}=importAddLots(d);
         persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
@@ -1426,7 +1436,5 @@ function importBackup(file){
       persist(); hideOverlay('editModal'); renderAll(); refreshAll(true);
       toast('Backup restored — '+state.holdings.length+' positions, '+state.lots.length+' lots.');
     }catch(e){ toast('That file is not a valid portfolio backup.', true); }
-  };
-  r.readAsText(file);
 }
 $('editModal').addEventListener('click', e=>{ if(e.target.id==='editModal') hideOverlay('editModal'); });
